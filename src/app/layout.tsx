@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono, Bebas_Neue } from "next/font/google";
+import { Toaster } from "@/components/ui/sonner";
+import { SearchParamToast } from "@/components/search-param-toast";
 import { studio } from "@/lib/studio.config";
 import "./globals.css";
 
@@ -22,6 +25,7 @@ const bebasNeue = Bebas_Neue({
 export const metadata: Metadata = {
   title: `${studio.fullName} — ${studio.tagline}`,
   description: `${studio.fullName}: ${studio.tagline}. Marca a tua aula online.`,
+  applicationName: studio.fullName,
 };
 
 export default function RootLayout({
@@ -36,6 +40,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {children}
+        <Toaster position="top-center" />
+        <Suspense fallback={null}>
+          <SearchParamToast />
+        </Suspense>
       </body>
     </html>
   );

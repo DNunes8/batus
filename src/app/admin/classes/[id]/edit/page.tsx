@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { SubmitButton } from "@/components/submit-button";
 import { updateClassTemplate } from "../../actions";
 
 const DAYS = [
@@ -151,7 +151,9 @@ export default async function EditClassPage({
         </div>
 
         <div className="flex items-center gap-3 pt-4">
-          <Button type="submit">Guardar alterações</Button>
+          <SubmitButton pendingText="A guardar…">
+            Guardar alterações
+          </SubmitButton>
           <Link
             href="/admin/classes"
             className="text-sm text-muted-foreground hover:text-foreground"

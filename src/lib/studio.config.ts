@@ -27,6 +27,10 @@ export const studio = {
     background: "#FAFAF7", // warm off-white
     foreground: "#0A0A0A", // rich near-black
     accent: "#C9A227",     // champion gold (placeholder pending decision)
+    // Optional asset paths (relative to /public). Set when files are saved.
+    // Components fall back to typographic + plain backgrounds if nullish.
+    logo_url: "/batus-logo.png" as string | null,
+    hero_image_url: "/hero.jpg" as string | null,
   },
 
   locale: {

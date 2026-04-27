@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/submit-button";
 import {
   addDays,
   formatDayHeader,
@@ -199,9 +200,13 @@ function BookingControl({
         <span className="text-xs uppercase tracking-widest text-foreground">
           Marcado
         </span>
-        <Button type="submit" variant="outline" size="sm">
+        <SubmitButton
+          variant="outline"
+          size="sm"
+          pendingText="A cancelar…"
+        >
           Cancelar
-        </Button>
+        </SubmitButton>
       </form>
     );
   }
@@ -216,9 +221,9 @@ function BookingControl({
             ? ` · #${cls.user_waitlist_position}`
             : ""}
         </span>
-        <Button type="submit" variant="outline" size="sm">
+        <SubmitButton variant="outline" size="sm" pendingText="A sair…">
           Sair
-        </Button>
+        </SubmitButton>
       </form>
     );
   }
@@ -229,9 +234,9 @@ function BookingControl({
     <form action={bookClass}>
       <input type="hidden" name="template_id" value={cls.template_id} />
       <input type="hidden" name="instance_date" value={cls.date} />
-      <Button type="submit" size="sm">
+      <SubmitButton size="sm" pendingText="A marcar…">
         {isFull ? "Lista de espera" : "Marcar"}
-      </Button>
+      </SubmitButton>
     </form>
   );
 }

@@ -55,7 +55,13 @@ export function SiteFooter() {
             © {new Date().getFullYear()} {studio.fullName}. Todos os direitos
             reservados.
           </p>
-          <p>
+          <div className="flex flex-wrap items-center gap-4">
+            <Link href="/privacidade" className="hover:text-foreground">
+              Privacidade
+            </Link>
+            <Link href="/termos" className="hover:text-foreground">
+              Termos
+            </Link>
             <Link
               href={`https://instagram.com/${studio.social.instagram}`}
               className="hover:text-foreground"
@@ -64,7 +70,7 @@ export function SiteFooter() {
             >
               @{studio.social.instagram}
             </Link>
-          </p>
+          </div>
         </div>
       </div>
     </footer>

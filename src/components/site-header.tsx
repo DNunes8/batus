@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Menu } from "lucide-react";
 import { studio } from "@/lib/studio.config";
@@ -24,20 +25,43 @@ export type HeaderUser = {
   is_admin: boolean;
 } | null;
 
+function Wordmark() {
+  if (studio.brand.logo_url) {
+    return (
+      <span className="flex items-center gap-3">
+        <Image
+          src={studio.brand.logo_url}
+          alt={studio.fullName}
+          width={36}
+          height={36}
+          className="rounded-full bg-background"
+        />
+        <span className="font-display text-2xl tracking-[0.08em] leading-none">
+          {studio.name.toUpperCase()}
+        </span>
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-baseline gap-2">
+      <span className="font-display text-2xl tracking-[0.08em] leading-none">
+        {studio.name.toUpperCase()}
+      </span>
+      <span className="hidden text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground sm:inline">
+        Boxing &amp; Training
+      </span>
+    </span>
+  );
+}
+
 export function SiteHeader({ user }: { user: HeaderUser }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="flex items-baseline gap-2">
-          <span className="font-display text-2xl tracking-[0.08em] leading-none">
-            {studio.name.toUpperCase()}
-          </span>
-          <span className="hidden text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground sm:inline">
-            Boxing &amp; Training
-          </span>
+        <Link href="/" aria-label={studio.fullName}>
+          <Wordmark />
         </Link>
 
-        {/* Desktop nav */}
         <nav className="hidden items-center gap-7 md:flex">
           {NAV.map((item) => (
             <Link
@@ -51,7 +75,6 @@ export function SiteHeader({ user }: { user: HeaderUser }) {
           {user ? <DesktopUserMenu user={user} /> : <DesktopLoginButton />}
         </nav>
 
-        {/* Mobile menu trigger */}
         <Sheet>
           <SheetTrigger
             aria-label="Abrir menu"
@@ -115,11 +138,7 @@ function DesktopLoginButton() {
   );
 }
 
-function DesktopUserMenu({
-  user,
-}: {
-  user: NonNullable<HeaderUser>;
-}) {
+function DesktopUserMenu({ user }: { user: NonNullable<HeaderUser> }) {
   return (
     <div className="ml-2 flex items-center gap-2">
       {user.is_admin && (
@@ -145,11 +164,7 @@ function DesktopUserMenu({
   );
 }
 
-function MobileUserMenu({
-  user,
-}: {
-  user: NonNullable<HeaderUser>;
-}) {
+function MobileUserMenu({ user }: { user: NonNullable<HeaderUser> }) {
   return (
     <div className="space-y-2">
       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">

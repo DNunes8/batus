@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { SubmitButton } from "@/components/submit-button";
 import { createSoloSession } from "../actions";
 
 export default function NewSessionPage() {
@@ -85,7 +85,7 @@ export default function NewSessionPage() {
         </div>
 
         <div className="flex items-center gap-3 pt-4">
-          <Button type="submit">Criar sessão</Button>
+          <SubmitButton pendingText="A criar…">Criar sessão</SubmitButton>
           <Link
             href="/admin/sessions"
             className="text-sm text-muted-foreground hover:text-foreground"

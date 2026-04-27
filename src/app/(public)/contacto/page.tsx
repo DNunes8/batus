@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { studio } from "@/lib/studio.config";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { SubmitButton } from "@/components/submit-button";
 import { submitContactMessage } from "./actions";
 
 export default async function ContactoPage({
@@ -117,7 +117,7 @@ export default async function ContactoPage({
                 </p>
               )}
 
-              <Button type="submit">Enviar</Button>
+              <SubmitButton pendingText="A enviar…">Enviar</SubmitButton>
             </form>
           )}
         </div>

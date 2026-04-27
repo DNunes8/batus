@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
@@ -25,11 +26,28 @@ export default async function Home() {
     .order("start_time")
     .limit(8);
 
+  const heroImage = studio.brand.hero_image_url;
+
   return (
     <>
       {/* Hero */}
-      <section className="relative border-b border-border/60">
-        <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6 sm:py-40">
+      <section className="relative overflow-hidden border-b border-border/60">
+        {heroImage && (
+          <div aria-hidden className="absolute inset-0 -z-10">
+            <Image
+              src={heroImage}
+              alt=""
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/40" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
+          </div>
+        )}
+
+        <div className="relative mx-auto max-w-6xl px-4 py-24 sm:px-6 sm:py-40">
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
             {studio.city} · {studio.country}
           </p>

@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { SubmitButton } from "@/components/submit-button";
 import { formatTime } from "@/lib/schedule";
 import { getStudentStats } from "@/lib/stats";
 import { updateOwnProfile } from "./actions";
@@ -156,9 +156,9 @@ export default async function PerfilPage() {
               Partilhar isto com o treinador ajuda a personalizar o teu treino.
             </p>
           </div>
-          <Button type="submit" size="sm">
+          <SubmitButton size="sm" pendingText="A guardar…">
             Guardar
-          </Button>
+          </SubmitButton>
         </form>
       </section>
     </section>

@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseEuroToCents } from "@/lib/money";
@@ -23,6 +24,7 @@ export async function updateStudentNotesAndGoals(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/admin/students/${id}`);
+  redirect(`/admin/students/${id}?saved=1`);
 }
 
 export async function upsertPaymentRecord(formData: FormData) {
@@ -35,7 +37,6 @@ export async function upsertPaymentRecord(formData: FormData) {
 
   if (!user_id || !month) throw new Error("Dados em falta.");
 
-  // month input is YYYY-MM; we store as YYYY-MM-01.
   const monthDate = month.length === 7 ? `${month}-01` : month;
 
   const supabase = await createClient();
@@ -54,6 +55,7 @@ export async function upsertPaymentRecord(formData: FormData) {
 
   revalidatePath(`/admin/students/${user_id}`);
   revalidatePath("/admin/earnings");
+  redirect(`/admin/students/${user_id}?saved=1`);
 }
 
 export async function togglePaymentStatus(formData: FormData) {

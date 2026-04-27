@@ -27,4 +27,5 @@ export async function updateOwnProfile(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/perfil");
+  redirect("/perfil?saved=1");
 }
