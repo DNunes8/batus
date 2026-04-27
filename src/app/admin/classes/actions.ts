@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { addDays, dayOfWeek as dowHelper, mondayOf } from "@/lib/schedule";
 
 export async function createClassTemplate(formData: FormData) {
   const supabase = await createClient();
@@ -35,8 +36,19 @@ export async function createClassTemplate(formData: FormData) {
     throw new Error(error.message);
   }
 
+  // Find the first concrete instance of this template (next matching
+  // day-of-week from active_from) so we can land the user on the
+  // calendar week that actually contains their new class.
+  let cursor = active_from;
+  for (let i = 0; i < 7; i++) {
+    if (day_of_week === dowHelper(cursor)) break;
+    cursor = addDays(cursor, 1);
+  }
+
   revalidatePath("/admin/classes");
-  redirect("/admin/classes");
+  revalidatePath("/admin/calendar");
+  revalidatePath("/aulas");
+  redirect(`/admin/calendar?week=${mondayOf(cursor)}&saved=1`);
 }
 
 export async function updateClassTemplate(formData: FormData) {
