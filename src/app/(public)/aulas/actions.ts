@@ -111,7 +111,7 @@ export async function cancelBooking(formData: FormData) {
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      `id, instance_date, status, class_templates!inner(start_time)`,
+      `id, template_id, instance_date, status, class_templates!inner(start_time)`,
     )
     .eq("id", booking_id)
     .single();
@@ -120,8 +120,10 @@ export async function cancelBooking(formData: FormData) {
     throw new Error("Marcação não encontrada.");
   }
 
+  const wasBooked = booking.status === "booked";
+
   // Cutoff check only applies to confirmed bookings; waitlisted can always cancel.
-  if (booking.status === "booked") {
+  if (wasBooked) {
     const { data: settingRow } = await supabase
       .from("settings")
       .select("value")
@@ -154,7 +156,29 @@ export async function cancelBooking(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
-  // Day 4 TODO: promote first waitlisted booking to "booked".
+  // If a confirmed slot opened up, promote the first waitlisted person.
+  // Use the admin client because the user can't see other students' bookings.
+  if (wasBooked) {
+    const admin = createAdminClient();
+    const { data: nextInLine } = await admin
+      .from("bookings")
+      .select("id")
+      .eq("template_id", booking.template_id)
+      .eq("instance_date", booking.instance_date)
+      .eq("status", "waitlisted")
+      .order("waitlist_position", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (nextInLine) {
+      await admin
+        .from("bookings")
+        .update({ status: "booked", waitlist_position: null })
+        .eq("id", nextInLine.id);
+      // Day 6: send notification email to the promoted student.
+    }
+  }
 
   revalidatePath("/aulas");
+  revalidatePath("/admin/calendar");
 }
