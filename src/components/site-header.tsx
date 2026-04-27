@@ -29,14 +29,19 @@ function Wordmark() {
   if (studio.brand.logo_url) {
     return (
       <span className="flex items-center gap-3">
-        <Image
-          src={studio.brand.logo_url}
-          alt={studio.fullName}
-          width={56}
-          height={56}
-          quality={95}
-          className="-my-3 shrink-0"
-        />
+        {/* Crop into the center via rounded-full mask + scale, since the
+           source PNG is an Instagram zoom screenshot with a gray border
+           around the actual logo circle. */}
+        <span className="relative -my-3 size-14 shrink-0 overflow-hidden rounded-full bg-white">
+          <Image
+            src={studio.brand.logo_url}
+            alt={studio.fullName}
+            fill
+            quality={95}
+            sizes="56px"
+            className="scale-[1.18] object-cover"
+          />
+        </span>
         <span className="hidden font-display text-2xl tracking-[0.08em] leading-none sm:inline">
           {studio.name.toUpperCase()}
         </span>

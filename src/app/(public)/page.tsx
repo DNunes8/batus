@@ -289,14 +289,16 @@ export default async function Home() {
 
         <div className="relative mx-auto max-w-7xl px-6 py-24 sm:px-12 sm:py-32 lg:px-16">
           {studio.brand.logo_url && (
-            <Image
-              src={studio.brand.logo_url}
-              alt=""
-              width={120}
-              height={120}
-              quality={95}
-              className="mb-10 invert"
-            />
+            <span className="relative mb-10 block size-32 overflow-hidden rounded-full">
+              <Image
+                src={studio.brand.logo_url}
+                alt=""
+                fill
+                quality={95}
+                sizes="128px"
+                className="scale-[1.18] object-cover invert"
+              />
+            </span>
           )}
 
           <div className="grid items-end gap-12 lg:grid-cols-2">

@@ -15,7 +15,7 @@ import {
   todayLisbon,
   type ScheduleClass,
 } from "@/lib/schedule";
-import { bookClass, cancelBooking } from "./actions";
+import { bookClass } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,7 @@ export default async function AulasPage({
             HORÁRIO
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Semana de {formatWeekRange(weekStart)}
+            Boxe e kickboxing · Semana de {formatWeekRange(weekStart)}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -81,10 +81,18 @@ export default async function AulasPage({
         </div>
       </header>
 
-      <p className="mt-6 text-sm text-foreground/70">
-        Marca a tua aula com um clique. Podes cancelar até 4h antes. Se a aula
-        estiver cheia, entras na lista de espera e somos avisados quando há
-        vaga.
+      <p className="mt-6 max-w-2xl text-sm text-foreground/70">
+        Horário aberto a todos. Marca uma aula com um clique
+        {user
+          ? ". Para cancelar uma marcação, vai a "
+          : " (precisas de iniciar sessão). Para cancelar, vai a "}
+        <Link
+          href="/perfil"
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          Perfil
+        </Link>
+        .
       </p>
 
       {(() => {
@@ -208,36 +216,21 @@ function BookingControl({
 
   if (cls.user_booking_status === "booked") {
     return (
-      <form action={cancelBooking} className="flex items-center gap-2">
-        <input type="hidden" name="booking_id" value={cls.user_booking_id} />
-        <span className="text-xs uppercase tracking-widest text-foreground">
-          Marcado
-        </span>
-        <SubmitButton
-          variant="outline"
-          size="sm"
-          pendingText="A cancelar…"
-        >
-          Cancelar
-        </SubmitButton>
-      </form>
+      <span className="inline-flex items-center gap-2 rounded-md border border-foreground/30 bg-foreground/5 px-3 py-1.5 text-xs uppercase tracking-widest">
+        <span className="size-1.5 rounded-full bg-foreground" />
+        Marcado
+      </span>
     );
   }
 
   if (cls.user_booking_status === "waitlisted") {
     return (
-      <form action={cancelBooking} className="flex items-center gap-2">
-        <input type="hidden" name="booking_id" value={cls.user_booking_id} />
-        <span className="text-xs uppercase tracking-widest text-muted-foreground">
-          Lista de espera
-          {cls.user_waitlist_position
-            ? ` · #${cls.user_waitlist_position}`
-            : ""}
-        </span>
-        <SubmitButton variant="outline" size="sm" pendingText="A sair…">
-          Sair
-        </SubmitButton>
-      </form>
+      <span className="inline-flex items-center gap-2 rounded-md border border-border/60 px-3 py-1.5 text-xs uppercase tracking-widest text-muted-foreground">
+        Lista de espera
+        {cls.user_waitlist_position
+          ? ` · #${cls.user_waitlist_position}`
+          : ""}
+      </span>
     );
   }
 

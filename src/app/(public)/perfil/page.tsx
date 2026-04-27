@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { formatTime } from "@/lib/schedule";
 import { getStudentStats } from "@/lib/stats";
+import { cancelBooking } from "@/app/(public)/aulas/actions";
 import { updateOwnProfile } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -91,7 +93,7 @@ export default async function PerfilPage() {
             {stats.upcoming.map((b) => (
               <li
                 key={b.id}
-                className="flex items-baseline justify-between gap-4 px-4 py-3"
+                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
               >
                 <div className="flex items-baseline gap-3">
                   <span className="font-display text-lg tracking-wider tabular-nums">
@@ -100,14 +102,27 @@ export default async function PerfilPage() {
                   <div>
                     <p className="text-sm font-medium">{b.template_name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatBookingDate(b.instance_date)} · {b.duration_minutes}{" "}
-                      min
+                      {formatBookingDate(b.instance_date)} ·{" "}
+                      {b.duration_minutes} min
                     </p>
                   </div>
                 </div>
-                <span className="text-xs uppercase tracking-widest text-muted-foreground">
-                  {b.status === "waitlisted" ? "Em espera" : "Marcado"}
-                </span>
+                <form
+                  action={cancelBooking}
+                  className="flex items-center gap-2"
+                >
+                  <input type="hidden" name="booking_id" value={b.id} />
+                  <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                    {b.status === "waitlisted" ? "Em espera" : "Marcado"}
+                  </span>
+                  <SubmitButton
+                    variant="outline"
+                    size="sm"
+                    pendingText="A cancelar…"
+                  >
+                    Cancelar
+                  </SubmitButton>
+                </form>
               </li>
             ))}
           </ul>
