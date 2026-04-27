@@ -30,8 +30,8 @@ export const studio = {
     // Optional asset paths (relative to /public). Set when files are saved.
     // Components fall back to typographic + plain backgrounds if nullish.
     logo_url: "/batus-logo.png" as string | null,
-    hero_image_url: "/hero.jpg" as string | null,
-    coach_image_url: "/coach.jpg" as string | null,
+    hero_image_url: "/hero.png" as string | null,
+    coach_image_url: "/coach.png" as string | null,
   },
 
   locale: {
