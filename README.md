@@ -1,36 +1,35 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Batus
 
-## Getting Started
+Booking and management web app for **Batus Studio** — boxing and kickboxing in Braga, Portugal.
 
-First, run the development server:
+Replaces a third-party booking SaaS with a single, owner-controlled site that combines marketing, class booking, and admin tools.
+
+## Stack
+
+- **Next.js 16** (App Router) on **Vercel**
+- **Supabase** — Postgres, Auth (magic link), Storage
+- **Tailwind v4** + **shadcn/ui**
+- **Resend** for transactional email
+- PWA (installable on iOS/Android home screen, no native app)
+
+## Local development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+nvm use            # picks the version in .nvmrc (Node 22)
+npm install
+npm run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+See `.env.example` once added (Day 2 — Supabase setup).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Architecture notes
 
-## Learn More
+- **Single source of branding:** `src/lib/studio.config.ts`. Logos, colors, contact info, copy live there.
+- **Portuguese-first.** Optional EN later via a single `pt.json` / `en.json` swap.
+- **No payments integration.** Cash / MBWay / bank transfer happen outside the app; admin tracks "paid this month" per student-month.
 
-To learn more about Next.js, take a look at the following resources:
+## Ownership
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Infrastructure (Vercel, Supabase, future domain) is owned by `batusboxing@gmail.com`. The single GitHub repo is public for resilience — anyone can clone if the original maintainer is unreachable.
