@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ConfirmForm } from "@/components/confirm-form";
 import {
   addDays,
   formatDayHeader,
@@ -50,15 +52,15 @@ export default async function AdminCalendarPage({
             render={<Link href={`/admin/calendar?week=${prevWeek}`} />}
             nativeButton={false}
             variant="outline"
-            size="sm"
+            aria-label="Semana anterior"
           >
-            ←
+            <ChevronLeft className="size-4" />
+            <span className="hidden sm:inline">Anterior</span>
           </Button>
           <Button
             render={<Link href={`/admin/calendar?week=${todayStr}`} />}
             nativeButton={false}
             variant="outline"
-            size="sm"
           >
             Hoje
           </Button>
@@ -66,9 +68,10 @@ export default async function AdminCalendarPage({
             render={<Link href={`/admin/calendar?week=${nextWeek}`} />}
             nativeButton={false}
             variant="outline"
-            size="sm"
+            aria-label="Próxima semana"
           >
-            →
+            <span className="hidden sm:inline">Próxima</span>
+            <ChevronRight className="size-4" />
           </Button>
         </div>
       </header>
@@ -96,7 +99,8 @@ export default async function AdminCalendarPage({
                   </Button>
                 </form>
               ) : (
-                <form
+                <ConfirmForm
+                  message="Fechar o estúdio neste dia? Todas as aulas vão aparecer canceladas para os alunos."
                   action={setClosedDay}
                   className="flex items-center gap-2"
                 >
@@ -109,7 +113,7 @@ export default async function AdminCalendarPage({
                   <Button type="submit" variant="outline" size="sm">
                     Fechar dia
                   </Button>
-                </form>
+                </ConfirmForm>
               )}
             </div>
 
@@ -171,7 +175,8 @@ function ClassCard({ cls }: { cls: AdminScheduleClass }) {
             </Button>
           </form>
         ) : (
-          <form
+          <ConfirmForm
+            message={`Cancelar a aula "${cls.name}" neste dia? Os alunos com marcação vão ver-la cancelada.`}
             action={cancelClassInstance}
             className="flex items-center gap-2"
           >
@@ -185,7 +190,7 @@ function ClassCard({ cls }: { cls: AdminScheduleClass }) {
             <Button type="submit" variant="outline" size="sm">
               Cancelar aula
             </Button>
-          </form>
+          </ConfirmForm>
         )}
       </div>
 

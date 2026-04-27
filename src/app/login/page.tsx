@@ -30,15 +30,34 @@ export default function LoginPage() {
             <h1 className="font-display text-2xl tracking-wide">
               VERIFICA O TEU EMAIL
             </h1>
-            <p className="mt-3 text-sm text-muted-foreground">
+            <p className="mt-3 text-sm text-foreground/80">
               Enviámos um link para{" "}
-              <span className="text-foreground">{state.email}</span>. Clica para
-              entrar.
+              <span className="font-medium">{state.email}</span>. Abre o email e
+              clica no link para entrar.
             </p>
+            <div className="mt-8 rounded-md border border-border/60 bg-muted/30 p-4 text-left text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">
+                Não vês o email?
+              </p>
+              <ul className="mt-2 list-inside list-disc space-y-1">
+                <li>Verifica a pasta de spam ou lixo.</li>
+                <li>Confirma se o email está bem escrito.</li>
+                <li>Espera 1 minuto e tenta de novo.</li>
+              </ul>
+            </div>
           </div>
         ) : (
           <form action={formAction} className="space-y-4">
-            <div className="space-y-2">
+            <div className="text-center">
+              <h1 className="font-display text-2xl tracking-wide">ENTRAR</h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Vamos enviar-te um link para o teu email.
+                <br />
+                Clicas no link e estás dentro — sem palavras-passe.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-4">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
@@ -58,13 +77,16 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={pending}>
               {pending ? "A enviar…" : "Continuar"}
             </Button>
-
-            <p className="pt-2 text-center text-xs text-muted-foreground">
-              Enviamos um link mágico. Sem palavras-passe.
-            </p>
           </form>
         )}
       </div>
+
+      <Link
+        href="/"
+        className="mt-12 text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground"
+      >
+        ← Voltar ao site
+      </Link>
     </div>
   );
 }

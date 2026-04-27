@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+import { ConfirmForm } from "@/components/confirm-form";
+import { deleteClassTemplate } from "./actions";
+
+export const dynamic = "force-dynamic";
 
 const DAY_LABEL: Record<number, string> = {
   0: "Dom",
@@ -25,11 +29,15 @@ export default async function ClassesListPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-            Aulas
+            Modelos de aula
           </p>
           <h1 className="mt-4 font-display text-3xl tracking-[0.04em] sm:text-4xl">
             HORÁRIOS
           </h1>
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+            Cada modelo é uma aula recorrente (ex: Boxe Iniciados, Segundas
+            18:00). O calendário gera as aulas reais a partir destes modelos.
+          </p>
         </div>
         <Button
           render={<Link href="/admin/classes/new" />}
@@ -42,7 +50,7 @@ export default async function ClassesListPage() {
       {!templates || templates.length === 0 ? (
         <div className="mt-12 rounded-md border border-dashed border-border/60 p-10 text-center">
           <p className="text-sm text-muted-foreground">
-            Ainda não tens aulas. Cria a primeira.
+            Ainda não tens modelos de aula. Cria o primeiro.
           </p>
           <Button
             render={<Link href="/admin/classes/new" />}
@@ -63,6 +71,7 @@ export default async function ClassesListPage() {
                 <th className="px-4 py-3 font-medium">Duração</th>
                 <th className="px-4 py-3 font-medium">Capacidade</th>
                 <th className="px-4 py-3 font-medium">Período</th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
@@ -70,12 +79,40 @@ export default async function ClassesListPage() {
                 <tr key={t.id} className="hover:bg-muted/30">
                   <td className="px-4 py-3 font-medium">{t.name}</td>
                   <td className="px-4 py-3">{DAY_LABEL[t.day_of_week]}</td>
-                  <td className="px-4 py-3">{t.start_time.slice(0, 5)}</td>
+                  <td className="px-4 py-3 tabular-nums">
+                    {t.start_time.slice(0, 5)}
+                  </td>
                   <td className="px-4 py-3">{t.duration_minutes} min</td>
                   <td className="px-4 py-3">{t.capacity}</td>
                   <td className="px-4 py-3 text-muted-foreground">
                     Desde {t.active_from}
                     {t.active_until ? ` até ${t.active_until}` : ""}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        render={<Link href={`/admin/classes/${t.id}/edit`} />}
+                        nativeButton={false}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Editar
+                      </Button>
+                      <ConfirmForm
+                        message={`Apagar "${t.name}" para sempre? Vai falhar se existirem marcações.`}
+                        action={deleteClassTemplate}
+                      >
+                        <input type="hidden" name="id" value={t.id} />
+                        <Button
+                          type="submit"
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive"
+                        >
+                          Apagar
+                        </Button>
+                      </ConfirmForm>
+                    </div>
                   </td>
                 </tr>
               ))}

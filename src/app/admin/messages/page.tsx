@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+import { ConfirmForm } from "@/components/confirm-form";
 import {
   deleteMessage,
   markMessageRead,
@@ -81,7 +82,10 @@ export default async function MessagesPage() {
                         </Button>
                       </form>
                     )}
-                    <form action={deleteMessage}>
+                    <ConfirmForm
+                      message={`Apagar a mensagem de ${m.name}? Não dá para desfazer.`}
+                      action={deleteMessage}
+                    >
                       <input type="hidden" name="id" value={m.id} />
                       <Button
                         type="submit"
@@ -91,7 +95,7 @@ export default async function MessagesPage() {
                       >
                         Apagar
                       </Button>
-                    </form>
+                    </ConfirmForm>
                   </div>
                 </div>
                 <p className="mt-3 whitespace-pre-wrap text-sm">{m.message}</p>

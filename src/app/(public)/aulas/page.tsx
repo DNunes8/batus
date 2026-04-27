@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,15 +56,15 @@ export default async function AulasPage({
             render={<Link href={`/aulas?week=${prevWeek}`} />}
             nativeButton={false}
             variant="outline"
-            size="sm"
+            aria-label="Semana anterior"
           >
-            ←
+            <ChevronLeft className="size-4" />
+            <span className="hidden sm:inline">Anterior</span>
           </Button>
           <Button
             render={<Link href={`/aulas?week=${todayStr}`} />}
             nativeButton={false}
             variant="outline"
-            size="sm"
           >
             Hoje
           </Button>
@@ -71,12 +72,19 @@ export default async function AulasPage({
             render={<Link href={`/aulas?week=${nextWeek}`} />}
             nativeButton={false}
             variant="outline"
-            size="sm"
+            aria-label="Próxima semana"
           >
-            →
+            <span className="hidden sm:inline">Próxima</span>
+            <ChevronRight className="size-4" />
           </Button>
         </div>
       </header>
+
+      <p className="mt-6 text-sm text-foreground/70">
+        Marca a tua aula com um clique. Podes cancelar até 4h antes. Se a aula
+        estiver cheia, entras na lista de espera e somos avisados quando há
+        vaga.
+      </p>
 
       <div className="mt-10 space-y-10">
         {days.map((day) => (

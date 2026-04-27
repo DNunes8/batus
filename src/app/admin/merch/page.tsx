@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { formatEuro } from "@/lib/money";
+import { ConfirmForm } from "@/components/confirm-form";
 import { deleteMerchItem, toggleMerchActive } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -86,7 +87,10 @@ export default async function MerchPage() {
                     {item.is_active ? "Desativar" : "Ativar"}
                   </Button>
                 </form>
-                <form action={deleteMerchItem}>
+                <ConfirmForm
+                  message={`Apagar "${item.name}" para sempre? Não dá para desfazer.`}
+                  action={deleteMerchItem}
+                >
                   <input type="hidden" name="id" value={item.id} />
                   <Button
                     type="submit"
@@ -96,7 +100,7 @@ export default async function MerchPage() {
                   >
                     Apagar
                   </Button>
-                </form>
+                </ConfirmForm>
               </div>
             </div>
           ))}

@@ -25,8 +25,10 @@ export default function SobrePage() {
           numa cultura de respeito e exigência. Aulas para todos os níveis: de
           quem nunca calçou luvas a quem quer competir.
         </p>
-        <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">
-          [Bio do treinador a preencher]
+        <p>
+          O estúdio combina aulas de grupo regulares com sessões individuais
+          (1:1) para quem precisa de atenção personalizada — recuperação,
+          preparação de combate, ou simplesmente forma física.
         </p>
       </div>
 
