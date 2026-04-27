@@ -95,7 +95,8 @@ export default async function Home() {
                 alt={`${studio.fullName} — ${studio.coach}`}
                 fill
                 priority
-                sizes="(max-width: 1024px) 100vw, 45vw"
+                quality={95}
+                sizes="(max-width: 1024px) 100vw, 50vw"
                 className="object-cover"
               />
             ) : (
@@ -127,6 +128,7 @@ export default async function Home() {
                 src={coachImage}
                 alt={studio.coach}
                 fill
+                quality={95}
                 sizes="(max-width: 1024px) 100vw, 50vw"
                 className="object-cover"
               />
@@ -202,9 +204,24 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* SCHEDULE PREVIEW */}
-      <section className="border-b border-border/60">
-        <div className="mx-auto max-w-7xl px-6 py-20 sm:px-12 sm:py-24 lg:px-16">
+      {/* SCHEDULE PREVIEW — light side with subtle logo watermark */}
+      <section className="relative overflow-hidden border-b border-border/60">
+        {studio.brand.logo_url && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-20 top-1/2 hidden -translate-y-1/2 opacity-[0.04] lg:block"
+          >
+            <Image
+              src={studio.brand.logo_url}
+              alt=""
+              width={520}
+              height={520}
+              quality={95}
+            />
+          </div>
+        )}
+
+        <div className="relative mx-auto max-w-7xl px-6 py-20 sm:px-12 sm:py-24 lg:px-16">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
@@ -213,6 +230,10 @@ export default async function Home() {
               <h2 className="mt-4 font-display text-5xl tracking-[0.04em] sm:text-6xl">
                 HORÁRIO SEMANAL
               </h2>
+              <p className="mt-3 max-w-md text-sm text-muted-foreground">
+                Aulas de boxe e kickboxing ao longo da semana. Marca um clique
+                e estás dentro.
+              </p>
             </div>
             <Button
               render={<Link href="/aulas" />}
@@ -228,19 +249,19 @@ export default async function Home() {
               Horário em construção. Contacta-nos para mais informações.
             </p>
           ) : (
-            <ul className="mt-12 grid gap-x-12 gap-y-4 md:grid-cols-2">
+            <ul className="mt-12 grid gap-px bg-border/60 sm:grid-cols-2">
               {templates.map((t, i) => (
                 <li
                   key={i}
-                  className="flex items-baseline justify-between gap-6 border-b border-border/40 pb-3"
+                  className="flex items-baseline justify-between gap-6 bg-background px-5 py-5 sm:px-6 sm:py-6"
                 >
                   <div>
-                    <p className="text-base font-medium">{t.name}</p>
-                    <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
                       {DAY_LABEL[t.day_of_week]}
                     </p>
+                    <p className="mt-1 text-base font-medium">{t.name}</p>
                   </div>
-                  <span className="font-display text-2xl tracking-wider tabular-nums">
+                  <span className="font-display text-3xl tracking-wider tabular-nums">
                     {formatTime(t.start_time)}
                   </span>
                 </li>
@@ -250,9 +271,34 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* CTA — inverted, weighty close */}
-      <section className="bg-foreground text-background">
-        <div className="mx-auto max-w-7xl px-6 py-24 sm:px-12 sm:py-32 lg:px-16">
+      {/* CTA — full-bleed dark close with hero photo + prominent logo */}
+      <section className="relative overflow-hidden bg-foreground text-background">
+        {heroImage && (
+          <div aria-hidden className="absolute inset-0">
+            <Image
+              src={heroImage}
+              alt=""
+              fill
+              quality={90}
+              sizes="100vw"
+              className="object-cover opacity-30"
+            />
+            <div className="absolute inset-0 bg-foreground/70" />
+          </div>
+        )}
+
+        <div className="relative mx-auto max-w-7xl px-6 py-24 sm:px-12 sm:py-32 lg:px-16">
+          {studio.brand.logo_url && (
+            <Image
+              src={studio.brand.logo_url}
+              alt=""
+              width={120}
+              height={120}
+              quality={95}
+              className="mb-10 invert"
+            />
+          )}
+
           <div className="grid items-end gap-12 lg:grid-cols-2">
             <h2 className="font-display text-6xl leading-[0.9] tracking-[0.04em] sm:text-7xl xl:text-8xl">
               PRONTO PARA<br />

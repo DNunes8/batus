@@ -32,11 +32,12 @@ function Wordmark() {
         <Image
           src={studio.brand.logo_url}
           alt={studio.fullName}
-          width={36}
-          height={36}
-          className="rounded-full bg-background"
+          width={56}
+          height={56}
+          quality={95}
+          className="-my-3 shrink-0"
         />
-        <span className="font-display text-2xl tracking-[0.08em] leading-none">
+        <span className="hidden font-display text-2xl tracking-[0.08em] leading-none sm:inline">
           {studio.name.toUpperCase()}
         </span>
       </span>

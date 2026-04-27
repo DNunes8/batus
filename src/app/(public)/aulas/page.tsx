@@ -87,63 +87,76 @@ export default async function AulasPage({
         vaga.
       </p>
 
-      <div className="mt-10 space-y-10">
-        {days.map((day) => (
-          <div key={day.date}>
-            <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">
-              {formatDayHeader(day.date)}
-              {day.date === todayStr && (
-                <span className="ml-2 inline-block rounded-sm bg-foreground px-1.5 py-0.5 text-[10px] tracking-widest text-background">
-                  HOJE
-                </span>
-              )}
-            </h2>
+      {(() => {
+        const visibleDays = days.filter(
+          (d) => d.closed || d.classes.length > 0,
+        );
 
-            {day.closed ? (
-              <p className="mt-3 text-sm text-muted-foreground">
-                Fechado — {day.closed_reason}
-              </p>
-            ) : day.classes.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">
-                Sem aulas neste dia.
-              </p>
-            ) : (
-              <ul className="mt-3 divide-y divide-border/60 rounded-md border border-border/60">
-                {day.classes.map((c) => (
-                  <li
-                    key={`${c.template_id}-${c.date}`}
-                    className="flex flex-wrap items-center justify-between gap-4 px-4 py-4"
-                  >
-                    <div className="flex items-baseline gap-4">
-                      <span className="font-display text-xl tracking-wider tabular-nums">
-                        {formatTime(c.start_time)}
-                      </span>
-                      <div>
-                        <p className="font-medium">{c.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {c.duration_minutes} min ·{" "}
-                          {c.cancelled
-                            ? "Cancelada"
-                            : `${c.booked_count}/${c.capacity}${
-                                c.waitlist_count > 0
-                                  ? ` · lista ${c.waitlist_count}`
-                                  : ""
-                              }`}
-                        </p>
-                      </div>
-                    </div>
-                    <BookingControl
-                      cls={c}
-                      isLoggedIn={!!user}
-                      isPast={isClassInPast(c.date, c.start_time)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
+        if (visibleDays.length === 0) {
+          return (
+            <p className="mt-12 text-sm text-muted-foreground">
+              Sem aulas marcadas nesta semana. Tenta a próxima semana ou
+              contacta o estúdio.
+            </p>
+          );
+        }
+
+        return (
+          <div className="mt-10 space-y-10">
+            {visibleDays.map((day) => (
+              <div key={day.date}>
+                <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">
+                  {formatDayHeader(day.date)}
+                  {day.date === todayStr && (
+                    <span className="ml-2 inline-block rounded-sm bg-foreground px-1.5 py-0.5 text-[10px] tracking-widest text-background">
+                      HOJE
+                    </span>
+                  )}
+                </h2>
+
+                {day.closed ? (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Fechado — {day.closed_reason}
+                  </p>
+                ) : (
+                  <ul className="mt-3 divide-y divide-border/60 rounded-md border border-border/60">
+                    {day.classes.map((c) => (
+                      <li
+                        key={`${c.template_id}-${c.date}`}
+                        className="flex flex-wrap items-center justify-between gap-4 px-4 py-4"
+                      >
+                        <div className="flex items-baseline gap-4">
+                          <span className="font-display text-xl tracking-wider tabular-nums">
+                            {formatTime(c.start_time)}
+                          </span>
+                          <div>
+                            <p className="font-medium">{c.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {c.duration_minutes} min ·{" "}
+                              {c.cancelled
+                                ? "Cancelada"
+                                : `${c.booked_count}/${c.capacity}${
+                                    c.waitlist_count > 0
+                                      ? ` · lista ${c.waitlist_count}`
+                                      : ""
+                                  }`}
+                            </p>
+                          </div>
+                        </div>
+                        <BookingControl
+                          cls={c}
+                          isLoggedIn={!!user}
+                          isPast={isClassInPast(c.date, c.start_time)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        );
+      })()}
     </section>
   );
 }
