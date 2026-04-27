@@ -25,6 +25,16 @@ export default async function AdminLayout({
     redirect("/login?next=/admin");
   }
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile?.is_admin) {
+    redirect("/?error=not_admin");
+  }
+
   return (
     <div className="flex min-h-screen">
       <aside className="hidden w-56 shrink-0 border-r border-border/60 bg-muted/30 px-4 py-6 lg:block">
