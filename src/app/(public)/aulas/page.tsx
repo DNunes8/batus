@@ -212,6 +212,9 @@ function BookingControl({
         <input type="hidden" name="booking_id" value={cls.user_booking_id} />
         <span className="text-xs uppercase tracking-widest text-muted-foreground">
           Lista de espera
+          {cls.user_waitlist_position
+            ? ` · #${cls.user_waitlist_position}`
+            : ""}
         </span>
         <Button type="submit" variant="outline" size="sm">
           Sair

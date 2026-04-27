@@ -1,18 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-
-const NAV = [
-  { href: "/admin", label: "Dashboard" },
-  { href: "/admin/calendar", label: "Calendário" },
-  { href: "/admin/classes", label: "Modelos" },
-  { href: "/admin/students", label: "Alunos" },
-  { href: "/admin/sessions", label: "1:1s" },
-  { href: "/admin/earnings", label: "Receitas" },
-  { href: "/admin/messages", label: "Mensagens" },
-  { href: "/admin/merch", label: "Loja" },
-  { href: "/admin/claims", label: "Pedidos" },
-] as const;
+import { AdminMobileNav } from "@/components/admin-mobile-nav";
+import { ADMIN_NAV } from "@/lib/admin-nav";
 
 export default async function AdminLayout({
   children,
@@ -39,7 +29,7 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="min-h-screen lg:flex">
       <aside className="hidden w-56 shrink-0 border-r border-border/60 bg-muted/30 px-4 py-6 lg:block">
         <Link href="/admin" className="block">
           <span className="font-display text-2xl tracking-[0.08em]">
@@ -50,7 +40,7 @@ export default async function AdminLayout({
           </span>
         </Link>
         <nav className="mt-10 flex flex-col gap-1">
-          {NAV.map((item) => (
+          {ADMIN_NAV.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -60,8 +50,20 @@ export default async function AdminLayout({
             </Link>
           ))}
         </nav>
+        <div className="mt-10 border-t border-border/60 pt-4">
+          <Link
+            href="/"
+            className="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted"
+          >
+            Ver site público →
+          </Link>
+        </div>
       </aside>
-      <main className="flex-1">{children}</main>
+
+      <div className="flex flex-1 flex-col">
+        <AdminMobileNav />
+        <main className="flex-1">{children}</main>
+      </div>
     </div>
   );
 }

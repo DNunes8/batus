@@ -15,6 +15,7 @@ export type ScheduleClass = {
   cancellation_reason?: string;
   user_booking_id?: string;
   user_booking_status?: "booked" | "waitlisted";
+  user_waitlist_position?: number | null;
 };
 
 export type ScheduleDay = {
@@ -187,7 +188,7 @@ export async function getWeekSchedule(
     ? (
         await supabase
           .from("bookings")
-          .select("id, template_id, instance_date, status")
+          .select("id, template_id, instance_date, status, waitlist_position")
           .eq("user_id", user.id)
           .gte("instance_date", weekStart)
           .lt("instance_date", weekEnd)
@@ -272,6 +273,7 @@ export async function getWeekSchedule(
           userBooking?.status === "booked" || userBooking?.status === "waitlisted"
             ? userBooking.status
             : undefined,
+        user_waitlist_position: userBooking?.waitlist_position ?? null,
       };
     });
 
