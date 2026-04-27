@@ -7,7 +7,9 @@ import {
   formatTime,
   formatWeekRange,
   getWeekSchedule,
+  isClassInPast,
   mondayOf,
+  safeReferenceDate,
   todayLisbon,
   type ScheduleClass,
 } from "@/lib/schedule";
@@ -21,7 +23,7 @@ export default async function AulasPage({
   searchParams: Promise<{ week?: string }>;
 }) {
   const params = await searchParams;
-  const referenceDate = params.week ?? todayLisbon();
+  const referenceDate = safeReferenceDate(params.week);
   const weekStart = mondayOf(referenceDate);
   const days = await getWeekSchedule(weekStart);
 
@@ -124,6 +126,7 @@ export default async function AulasPage({
                     <BookingControl
                       cls={c}
                       isLoggedIn={!!user}
+                      isPast={isClassInPast(c.date, c.start_time)}
                     />
                   </li>
                 ))}
@@ -139,14 +142,31 @@ export default async function AulasPage({
 function BookingControl({
   cls,
   isLoggedIn,
+  isPast,
 }: {
   cls: ScheduleClass;
   isLoggedIn: boolean;
+  isPast: boolean;
 }) {
   if (cls.cancelled) {
     return (
       <span className="text-xs uppercase tracking-widest text-muted-foreground">
         {cls.cancellation_reason ?? "Cancelada"}
+      </span>
+    );
+  }
+
+  if (isPast) {
+    if (cls.user_booking_status === "booked") {
+      return (
+        <span className="text-xs uppercase tracking-widest text-muted-foreground">
+          Marcado · passou
+        </span>
+      );
+    }
+    return (
+      <span className="text-xs uppercase tracking-widest text-muted-foreground">
+        Passou
       </span>
     );
   }

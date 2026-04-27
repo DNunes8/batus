@@ -8,6 +8,7 @@ import {
   formatWeekRange,
   getAdminWeekSchedule,
   mondayOf,
+  safeReferenceDate,
   todayLisbon,
   type AdminScheduleClass,
 } from "@/lib/schedule";
@@ -26,7 +27,7 @@ export default async function AdminCalendarPage({
   searchParams: Promise<{ week?: string }>;
 }) {
   const params = await searchParams;
-  const referenceDate = params.week ?? todayLisbon();
+  const referenceDate = safeReferenceDate(params.week);
   const weekStart = mondayOf(referenceDate);
   const days = await getAdminWeekSchedule(weekStart);
   const todayStr = todayLisbon();

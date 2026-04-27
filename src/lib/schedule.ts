@@ -75,6 +75,26 @@ export function mondayOf(s: string): string {
   return addDays(s, offset);
 }
 
+// Returns the input if it's a valid YYYY-MM-DD date, else today (Lisbon).
+// Defends pages against ?week=garbage in the URL.
+export function safeReferenceDate(input: string | undefined): string {
+  if (input && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    const d = new Date(`${input}T00:00:00Z`);
+    if (!isNaN(d.getTime())) return input;
+  }
+  return todayLisbon();
+}
+
+// Server-side check: is this class instance already in the past?
+// Approximates Lisbon offset (DST aware via month). Off by minutes during
+// DST transition windows, fine for "should we show the Marcar button".
+export function isClassInPast(date: string, startTime: string): boolean {
+  const month = parseISODate(date).getUTCMonth();
+  const offset = month >= 2 && month <= 9 ? "+01:00" : "+00:00";
+  const start = new Date(`${date}T${startTime}${offset}`);
+  return start.getTime() < Date.now();
+}
+
 const PT_DAYS = [
   "Domingo",
   "Segunda",
