@@ -3,8 +3,9 @@
 
 export const studio = {
   name: "Batus",
-  fullName: "Batus Studio",
+  fullName: "Batus Boxing & Training",
   tagline: "Boxe e kickboxing em Braga",
+  coach: "Robert Baltaru",
   city: "Braga",
   country: "Portugal",
 
@@ -15,13 +16,17 @@ export const studio = {
   },
 
   social: {
-    instagram: "TBD",
+    instagram: "batusboxing",
     facebook: "TBD",
   },
 
+  // Monochrome system + single accent. Logo is pure black on white;
+  // accent is gold (champion/laurel) — pending Diogo's confirmation between
+  // gold and Portuguese red.
   brand: {
-    primary: "#000000",
-    accent: "#dc2626",
+    background: "#FAFAF7", // warm off-white
+    foreground: "#0A0A0A", // rich near-black
+    accent: "#C9A227",     // champion gold (placeholder pending decision)
   },
 
   locale: {
