@@ -2,6 +2,51 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { dayOfWeek as dowHelper } from "@/lib/schedule";
+
+export type CalendarActionState = {
+  error?: string;
+  success?: boolean;
+} | null;
+
+export async function createClassFromCalendar(
+  _prev: CalendarActionState,
+  formData: FormData,
+): Promise<CalendarActionState> {
+  const date = formData.get("date") as string | null;
+  const name = ((formData.get("name") as string | null) ?? "").trim();
+  const start_time = formData.get("start_time") as string | null;
+  const duration_minutes = Number(formData.get("duration_minutes") ?? 60);
+  const capacity = Number(formData.get("capacity") ?? 12);
+  const is_public = formData.get("is_public") !== "false";
+  const repeat_weekly = formData.get("repeat_weekly") === "on";
+
+  if (!date || !name || !start_time) {
+    return { error: "Preenche o nome e a hora." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("class_templates").insert({
+    name,
+    description: null,
+    day_of_week: dowHelper(date),
+    start_time,
+    duration_minutes,
+    capacity,
+    active_from: date,
+    active_until: repeat_weekly ? null : date,
+    is_public,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/admin/calendar");
+  revalidatePath("/admin/classes");
+  revalidatePath("/aulas");
+  return { success: true };
+}
 
 export async function setClosedDay(formData: FormData) {
   const date = formData.get("date") as string | null;

@@ -150,6 +150,19 @@ export default async function EditClassPage({
           </div>
         </div>
 
+        <div className="space-y-2">
+          <Label htmlFor="is_public">Visibilidade</Label>
+          <select
+            id="is_public"
+            name="is_public"
+            defaultValue={t.is_public === false ? "false" : "true"}
+            className={SELECT_CLASSES}
+          >
+            <option value="true">Pública — visível no horário público</option>
+            <option value="false">Só membros — só alunos com sessão iniciada</option>
+          </select>
+        </div>
+
         <div className="flex items-center gap-3 pt-4">
           <SubmitButton pendingText="A guardar…">
             Guardar alterações

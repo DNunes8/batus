@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmForm } from "@/components/confirm-form";
+import { AddClassDialog } from "@/components/admin/add-class-dialog";
+import { CloseDayDialog } from "@/components/admin/close-day-dialog";
 import {
   addDays,
   formatWeekRange,
@@ -13,12 +15,7 @@ import {
   type AdminScheduleClass,
   type AdminScheduleDay,
 } from "@/lib/schedule";
-import {
-  cancelClassInstance,
-  reopenDay,
-  restoreClassInstance,
-  setClosedDay,
-} from "./actions";
+import { reopenDay, restoreClassInstance, cancelClassInstance } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -42,13 +39,13 @@ export default async function AdminCalendarPage({
   const nextWeek = addDays(weekStart, 7);
 
   return (
-    <div className="p-6 sm:p-10 lg:p-12">
+    <div className="p-4 sm:p-6 lg:p-10">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border/60 pb-6">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
             Calendário
           </p>
-          <h1 className="mt-3 font-display text-3xl tracking-[0.04em] sm:text-4xl">
+          <h1 className="mt-3 font-display text-2xl tracking-[0.04em] sm:text-3xl">
             SEMANA DE {formatWeekRange(weekStart).toUpperCase()}
           </h1>
         </div>
@@ -81,6 +78,12 @@ export default async function AdminCalendarPage({
         </div>
       </header>
 
+      <p className="mt-6 max-w-2xl text-sm text-muted-foreground">
+        Carrega em <span className="text-foreground">+ Adicionar aula</span> em
+        qualquer dia para criar uma aula avulsa ou recorrente. Cada modelo
+        criado em <Link href="/admin/classes" className="underline hover:text-foreground">Modelos</Link> aparece automaticamente nos dias correspondentes.
+      </p>
+
       <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7">
         {days.map((day) => (
           <DayCard key={day.date} day={day} todayStr={todayStr} />
@@ -101,11 +104,10 @@ function DayCard({
 
   return (
     <div
-      className={`flex min-h-[300px] flex-col overflow-hidden rounded-lg border bg-background ${
+      className={`flex min-h-[280px] flex-col overflow-hidden rounded-lg border bg-background ${
         isToday ? "border-foreground" : "border-border/60"
       }`}
     >
-      {/* Day header */}
       <div className="flex items-baseline justify-between border-b border-border/40 px-4 py-3">
         <div>
           <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
@@ -122,7 +124,6 @@ function DayCard({
         )}
       </div>
 
-      {/* Body */}
       <div className="flex-1 space-y-2 px-3 py-3">
         {day.closed ? (
           <div className="py-4 text-center">
@@ -135,42 +136,36 @@ function DayCard({
               </p>
             )}
           </div>
-        ) : day.classes.length === 0 ? (
-          <p className="py-6 text-center text-[11px] uppercase tracking-widest text-muted-foreground">
-            Sem aulas
-          </p>
         ) : (
-          day.classes.map((c) => (
-            <ClassBlock key={`${c.template_id}-${c.date}`} cls={c} />
-          ))
+          <>
+            {day.classes.length === 0 && (
+              <p className="py-4 text-center text-[11px] uppercase tracking-widest text-muted-foreground">
+                Sem aulas
+              </p>
+            )}
+            {day.classes.map((c) => (
+              <ClassBlock key={`${c.template_id}-${c.date}`} cls={c} />
+            ))}
+            <div className="pt-1">
+              <AddClassDialog date={day.date} />
+            </div>
+          </>
         )}
       </div>
 
-      {/* Footer action */}
-      <div className="border-t border-border/40 px-3 py-2">
+      <div className="border-t border-border/40 px-3 py-1">
         {day.closed ? (
           <form action={reopenDay}>
             <input type="hidden" name="date" value={day.date} />
             <button
               type="submit"
-              className="w-full py-1 text-[10px] font-medium uppercase tracking-[0.2em] text-foreground hover:opacity-70"
+              className="w-full py-2 text-[11px] font-medium uppercase tracking-[0.2em] text-foreground hover:opacity-70"
             >
               Reabrir dia
             </button>
           </form>
         ) : (
-          <ConfirmForm
-            message="Fechar este dia? Todas as aulas vão aparecer canceladas para os alunos."
-            action={setClosedDay}
-          >
-            <input type="hidden" name="date" value={day.date} />
-            <button
-              type="submit"
-              className="w-full py-1 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground"
-            >
-              Fechar dia
-            </button>
-          </ConfirmForm>
+          <CloseDayDialog date={day.date} />
         )}
       </div>
     </div>

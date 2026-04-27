@@ -21,6 +21,8 @@ export async function createClassTemplate(formData: FormData) {
     throw new Error("Campos obrigatórios em falta.");
   }
 
+  const is_public = formData.get("is_public") !== "false";
+
   const { error } = await supabase.from("class_templates").insert({
     name,
     description: descriptionRaw || null,
@@ -30,6 +32,7 @@ export async function createClassTemplate(formData: FormData) {
     capacity,
     active_from,
     active_until: activeUntilRaw || null,
+    is_public,
   });
 
   if (error) {
@@ -68,6 +71,8 @@ export async function updateClassTemplate(formData: FormData) {
     throw new Error("Campos obrigatórios em falta.");
   }
 
+  const is_public = formData.get("is_public") !== "false";
+
   const { error } = await supabase
     .from("class_templates")
     .update({
@@ -79,6 +84,7 @@ export async function updateClassTemplate(formData: FormData) {
       capacity,
       active_from,
       active_until: activeUntilRaw || null,
+      is_public,
     })
     .eq("id", id);
 
