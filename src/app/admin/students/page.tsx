@@ -29,14 +29,14 @@ export default async function StudentsPage() {
           Sem alunos registados.
         </p>
       ) : (
-        <div className="mt-10 overflow-hidden rounded-md border border-border/60">
+        <div className="mt-10 overflow-x-auto rounded-md border border-border/60">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 font-medium">Nome</th>
-                <th className="px-4 py-3 font-medium">Email</th>
-                <th className="px-4 py-3 font-medium">Telefone</th>
-                <th className="px-4 py-3 font-medium">Desde</th>
+                <th className="hidden px-4 py-3 font-medium md:table-cell">Email</th>
+                <th className="hidden px-4 py-3 font-medium lg:table-cell">Telefone</th>
+                <th className="hidden px-4 py-3 font-medium lg:table-cell">Desde</th>
                 <th className="px-4 py-3 font-medium"></th>
               </tr>
             </thead>
@@ -63,11 +63,13 @@ export default async function StudentsPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{p.email}</td>
-                    <td className="px-4 py-3 text-muted-foreground">
+                    <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
+                      {p.email}
+                    </td>
+                    <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">
                       {p.phone || "—"}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground tabular-nums">
+                    <td className="hidden px-4 py-3 text-muted-foreground tabular-nums lg:table-cell">
                       {since}
                     </td>
                     <td className="px-4 py-3 text-right">

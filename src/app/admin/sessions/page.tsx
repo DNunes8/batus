@@ -61,15 +61,15 @@ export default async function SessionsPage() {
           </Button>
         </div>
       ) : (
-        <div className="mt-10 overflow-hidden rounded-md border border-border/60">
+        <div className="mt-10 overflow-x-auto rounded-md border border-border/60">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 font-medium">Data</th>
                 <th className="px-4 py-3 font-medium">Aluno</th>
-                <th className="px-4 py-3 font-medium">Duração</th>
+                <th className="hidden px-4 py-3 font-medium md:table-cell">Duração</th>
                 <th className="px-4 py-3 font-medium">Valor</th>
-                <th className="px-4 py-3 font-medium">Notas</th>
+                <th className="hidden px-4 py-3 font-medium lg:table-cell">Notas</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
@@ -87,11 +87,13 @@ export default async function SessionsPage() {
                   <tr key={s.id} className="hover:bg-muted/30">
                     <td className="px-4 py-3 tabular-nums">{date}</td>
                     <td className="px-4 py-3 font-medium">{name}</td>
-                    <td className="px-4 py-3">{s.duration_minutes} min</td>
+                    <td className="hidden px-4 py-3 md:table-cell">
+                      {s.duration_minutes} min
+                    </td>
                     <td className="px-4 py-3 tabular-nums">
                       {formatEuro(s.price_cents)}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
+                    <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">
                       {s.notes || "—"}
                     </td>
                   </tr>

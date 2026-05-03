@@ -61,16 +61,16 @@ export default async function ClassesListPage() {
           </Button>
         </div>
       ) : (
-        <div className="mt-10 overflow-hidden rounded-md border border-border/60">
+        <div className="mt-10 overflow-x-auto rounded-md border border-border/60">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 font-medium">Nome</th>
                 <th className="px-4 py-3 font-medium">Dia</th>
                 <th className="px-4 py-3 font-medium">Hora</th>
-                <th className="px-4 py-3 font-medium">Duração</th>
-                <th className="px-4 py-3 font-medium">Capacidade</th>
-                <th className="px-4 py-3 font-medium">Período</th>
+                <th className="hidden px-4 py-3 font-medium md:table-cell">Duração</th>
+                <th className="hidden px-4 py-3 font-medium md:table-cell">Capacidade</th>
+                <th className="hidden px-4 py-3 font-medium lg:table-cell">Período</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -82,9 +82,13 @@ export default async function ClassesListPage() {
                   <td className="px-4 py-3 tabular-nums">
                     {t.start_time.slice(0, 5)}
                   </td>
-                  <td className="px-4 py-3">{t.duration_minutes} min</td>
-                  <td className="px-4 py-3">{t.capacity}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td className="hidden px-4 py-3 md:table-cell">
+                    {t.duration_minutes} min
+                  </td>
+                  <td className="hidden px-4 py-3 md:table-cell">
+                    {t.capacity}
+                  </td>
+                  <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">
                     Desde {t.active_from}
                     {t.active_until ? ` até ${t.active_until}` : ""}
                   </td>

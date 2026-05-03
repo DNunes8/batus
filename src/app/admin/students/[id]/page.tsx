@@ -125,7 +125,7 @@ export default async function StudentDetailPage({
             Sem registos de pagamento.
           </p>
         ) : (
-          <div className="mt-4 overflow-hidden rounded-md border border-border/60">
+          <div className="mt-4 overflow-x-auto rounded-md border border-border/60">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
                 <tr>

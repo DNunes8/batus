@@ -67,7 +67,7 @@ export default async function ClaimsPage({
           Sem pedidos {STATUS_LABEL[status].toLowerCase()}.
         </p>
       ) : (
-        <div className="mt-8 overflow-hidden rounded-md border border-border/60">
+        <div className="mt-8 overflow-x-auto rounded-md border border-border/60">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
               <tr>

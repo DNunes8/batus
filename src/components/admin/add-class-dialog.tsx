@@ -66,7 +66,7 @@ export function AddClassDialog({ date }: { date: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
-        className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-border/60 px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/40 hover:bg-muted hover:text-foreground"
+        className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-border/60 px-3 py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground/40 hover:bg-muted hover:text-foreground sm:py-2 sm:text-xs"
       >
         + Adicionar aula
       </DialogTrigger>
