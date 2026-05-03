@@ -54,7 +54,7 @@ export default async function Home() {
       {/* HERO — two columns: editorial type left, photo right */}
       <section className="border-b border-border/60">
         <div className="mx-auto grid max-w-7xl items-stretch lg:grid-cols-[1.1fr_1fr]">
-          <div className="flex flex-col justify-center px-6 py-16 sm:px-12 sm:py-20 lg:px-16 lg:py-24">
+          <div className="flex animate-in flex-col justify-center px-6 py-16 fade-in slide-in-from-bottom-2 duration-700 sm:px-12 sm:py-20 lg:px-16 lg:py-24">
             <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
               {studio.city} · {studio.country}
             </p>

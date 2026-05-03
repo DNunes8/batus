@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -66,9 +67,10 @@ export function AddClassDialog({ date }: { date: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
-        className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-border/60 px-3 py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground/40 hover:bg-muted hover:text-foreground sm:py-2 sm:text-xs"
+        className="group flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-foreground/20 bg-background/50 px-3 py-3 text-sm font-medium text-foreground transition-all hover:border-foreground hover:bg-foreground hover:text-background sm:py-2 sm:text-xs"
       >
-        + Adicionar aula
+        <Plus className="size-4 transition-transform group-hover:rotate-90" />
+        Adicionar aula
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

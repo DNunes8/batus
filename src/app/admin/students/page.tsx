@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -25,9 +26,15 @@ export default async function StudentsPage() {
       </div>
 
       {!profiles || profiles.length === 0 ? (
-        <p className="mt-12 text-sm text-muted-foreground">
-          Sem alunos registados.
-        </p>
+        <div className="mt-12 flex flex-col items-center justify-center rounded-md border border-dashed border-border/60 px-6 py-16 text-center">
+          <Users className="size-10 text-muted-foreground/40" />
+          <p className="mt-4 text-sm text-muted-foreground">
+            Sem alunos registados ainda.
+          </p>
+          <p className="mt-1 max-w-xs text-xs text-muted-foreground/70">
+            Os alunos aparecem aqui automaticamente quando criam conta no site.
+          </p>
+        </div>
       ) : (
         <div className="mt-10 overflow-x-auto rounded-md border border-border/60">
           <table className="w-full text-sm">

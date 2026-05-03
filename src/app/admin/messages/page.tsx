@@ -1,3 +1,4 @@
+import { Inbox } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { ConfirmForm } from "@/components/confirm-form";
@@ -31,9 +32,15 @@ export default async function MessagesPage() {
       </p>
 
       {!messages || messages.length === 0 ? (
-        <p className="mt-12 text-sm text-muted-foreground">
-          Sem mensagens recebidas.
-        </p>
+        <div className="mt-12 flex flex-col items-center justify-center rounded-md border border-dashed border-border/60 px-6 py-16 text-center">
+          <Inbox className="size-10 text-muted-foreground/40" />
+          <p className="mt-4 text-sm text-muted-foreground">
+            Caixa de mensagens vazia.
+          </p>
+          <p className="mt-1 max-w-xs text-xs text-muted-foreground/70">
+            Mensagens enviadas pelo formulário de contacto aparecem aqui.
+          </p>
+        </div>
       ) : (
         <div className="mt-10 space-y-3">
           {messages.map((m) => {

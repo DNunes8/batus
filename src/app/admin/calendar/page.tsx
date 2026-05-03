@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmForm } from "@/components/confirm-form";
 import { AddClassDialog } from "@/components/admin/add-class-dialog";
@@ -118,7 +118,11 @@ function DayCard({
           </p>
         </div>
         {isToday && (
-          <span className="rounded-sm bg-foreground px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-background">
+          <span className="inline-flex items-center gap-1.5 rounded-sm bg-foreground px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-background">
+            <span className="relative inline-flex size-1.5">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-gold opacity-75" />
+              <span className="relative inline-flex size-1.5 rounded-full bg-gold" />
+            </span>
             HOJE
           </span>
         )}
@@ -206,13 +210,25 @@ function ClassBlock({ cls }: { cls: AdminScheduleClass }) {
     );
   }
 
+  const isFull = cls.booked_count >= cls.capacity;
+
   return (
-    <div className="rounded-md border border-border/40 bg-background p-2.5 transition-colors hover:border-border">
+    <div
+      className={`rounded-md border bg-background p-2.5 transition-colors ${
+        isFull
+          ? "border-gold/40 bg-gold/5 hover:border-gold"
+          : "border-border/40 hover:border-border"
+      }`}
+    >
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-display text-base tabular-nums">
           {formatTime(cls.start_time)}
         </span>
-        <span className="text-[10px] tabular-nums text-muted-foreground">
+        <span
+          className={`text-[10px] tabular-nums ${
+            isFull ? "font-medium text-foreground" : "text-muted-foreground"
+          }`}
+        >
           {cls.booked_count}/{cls.capacity}
           {cls.waitlist_count > 0 && ` · +${cls.waitlist_count}`}
         </span>

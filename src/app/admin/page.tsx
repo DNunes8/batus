@@ -1,4 +1,11 @@
 import Link from "next/link";
+import {
+  TrendingUp,
+  Calendar,
+  Package,
+  Mail,
+  ArrowRight,
+} from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { formatEuro, monthKey } from "@/lib/money";
@@ -108,22 +115,26 @@ export default async function AdminDashboardPage() {
 
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <DashboardCard
+          icon={TrendingUp}
           label="Receitas este mês"
           value={formatEuro(monthEarnings)}
           href="/admin/earnings"
         />
         <DashboardCard
+          icon={Calendar}
           label="Aulas hoje"
           value={String(todayClasses.length)}
           href="/admin/calendar"
         />
         <DashboardCard
+          icon={Package}
           label="Pedidos pendentes"
           value={String(pendingClaims)}
           href="/admin/claims"
           highlight={pendingClaims > 0}
         />
         <DashboardCard
+          icon={Mail}
           label="Mensagens por ler"
           value={String(unreadMessages)}
           href="/admin/messages"
@@ -214,11 +225,13 @@ export default async function AdminDashboardPage() {
 }
 
 function DashboardCard({
+  icon: Icon,
   label,
   value,
   href,
   highlight = false,
 }: {
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
   href: string;
@@ -227,13 +240,15 @@ function DashboardCard({
   return (
     <Link
       href={href}
-      className={`block rounded-md border p-5 transition-colors hover:border-foreground/40 ${
-        highlight
-          ? "border-foreground/30 bg-muted/30"
-          : "border-border/60"
+      className={`group block rounded-md border p-5 transition-all hover:-translate-y-0.5 hover:border-foreground/40 hover:shadow-sm ${
+        highlight ? "border-foreground/30 bg-muted/30" : "border-border/60"
       }`}
     >
-      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+      <div className="flex items-start justify-between">
+        <Icon className="size-4 text-muted-foreground" />
+        <ArrowRight className="size-3.5 -translate-x-1 text-muted-foreground/50 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+      </div>
+      <p className="mt-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
         {label}
       </p>
       <p className="mt-2 font-display text-3xl tabular-nums">{value}</p>

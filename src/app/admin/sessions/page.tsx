@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { formatEuro } from "@/lib/money";
@@ -48,9 +49,13 @@ export default async function SessionsPage() {
       </div>
 
       {rows.length === 0 ? (
-        <div className="mt-12 rounded-md border border-dashed border-border/60 p-10 text-center">
-          <p className="text-sm text-muted-foreground">
+        <div className="mt-12 flex flex-col items-center justify-center rounded-md border border-dashed border-border/60 px-6 py-16 text-center">
+          <UserRound className="size-10 text-muted-foreground/40" />
+          <p className="mt-4 text-sm text-muted-foreground">
             Ainda não tens sessões registadas.
+          </p>
+          <p className="mt-1 max-w-xs text-xs text-muted-foreground/70">
+            Sessões 1:1 são registadas aqui — ficam fora do horário público.
           </p>
           <Button
             render={<Link href="/admin/sessions/new" />}

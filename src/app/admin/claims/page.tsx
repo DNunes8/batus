@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Package } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { formatEuro } from "@/lib/money";
@@ -63,9 +64,12 @@ export default async function ClaimsPage({
       </div>
 
       {!claims || claims.length === 0 ? (
-        <p className="mt-10 text-sm text-muted-foreground">
-          Sem pedidos {STATUS_LABEL[status].toLowerCase()}.
-        </p>
+        <div className="mt-10 flex flex-col items-center justify-center rounded-md border border-dashed border-border/60 px-6 py-16 text-center">
+          <Package className="size-10 text-muted-foreground/40" />
+          <p className="mt-4 text-sm text-muted-foreground">
+            Sem pedidos {STATUS_LABEL[status].toLowerCase()}.
+          </p>
+        </div>
       ) : (
         <div className="mt-8 overflow-x-auto rounded-md border border-border/60">
           <table className="w-full text-sm">
