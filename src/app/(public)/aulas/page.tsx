@@ -207,7 +207,7 @@ function BookingControl({
         render={<Link href="/login?next=/aulas" />}
         nativeButton={false}
         variant="outline"
-        size="sm"
+        className="h-10 px-4"
       >
         Entrar para marcar
       </Button>
@@ -216,7 +216,7 @@ function BookingControl({
 
   if (cls.user_booking_status === "booked") {
     return (
-      <span className="inline-flex items-center gap-2 rounded-md border border-foreground/30 bg-foreground/5 px-3 py-1.5 text-xs uppercase tracking-widest">
+      <span className="inline-flex h-10 items-center gap-2 rounded-md border border-foreground/30 bg-foreground/5 px-3 text-xs uppercase tracking-widest">
         <span className="size-1.5 rounded-full bg-foreground" />
         Marcado
       </span>
@@ -225,7 +225,7 @@ function BookingControl({
 
   if (cls.user_booking_status === "waitlisted") {
     return (
-      <span className="inline-flex items-center gap-2 rounded-md border border-border/60 px-3 py-1.5 text-xs uppercase tracking-widest text-muted-foreground">
+      <span className="inline-flex h-10 items-center gap-2 rounded-md border border-border/60 px-3 text-xs uppercase tracking-widest text-muted-foreground">
         Lista de espera
         {cls.user_waitlist_position
           ? ` · #${cls.user_waitlist_position}`
@@ -240,7 +240,7 @@ function BookingControl({
     <form action={bookClass}>
       <input type="hidden" name="template_id" value={cls.template_id} />
       <input type="hidden" name="instance_date" value={cls.date} />
-      <SubmitButton size="sm" pendingText="A marcar…">
+      <SubmitButton className="h-10 px-4" pendingText="A marcar…">
         {isFull ? "Lista de espera" : "Marcar"}
       </SubmitButton>
     </form>
