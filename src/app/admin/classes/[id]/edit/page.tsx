@@ -72,7 +72,7 @@ export default async function EditClassPage({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="day_of_week">Dia da semana</Label>
             <select
@@ -101,7 +101,7 @@ export default async function EditClassPage({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="duration_minutes">Duração (min)</Label>
             <Input
@@ -128,7 +128,7 @@ export default async function EditClassPage({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="active_from">Ativa a partir de</Label>
             <Input
@@ -163,13 +163,13 @@ export default async function EditClassPage({
           </select>
         </div>
 
-        <div className="flex items-center gap-3 pt-4">
-          <SubmitButton pendingText="A guardar…">
+        <div className="flex flex-col-reverse items-stretch gap-3 pt-4 sm:flex-row sm:items-center">
+          <SubmitButton className="h-11 text-base" pendingText="A guardar…">
             Guardar alterações
           </SubmitButton>
           <Link
             href="/admin/classes"
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className="text-center text-sm text-muted-foreground hover:text-foreground sm:text-left"
           >
             Cancelar
           </Link>

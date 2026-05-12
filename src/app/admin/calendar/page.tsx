@@ -55,6 +55,7 @@ export default async function AdminCalendarPage({
             nativeButton={false}
             variant="outline"
             aria-label="Semana anterior"
+            className="h-10 w-10 p-0 sm:h-9 sm:w-auto sm:px-3"
           >
             <ChevronLeft className="size-4" />
             <span className="hidden sm:inline">Anterior</span>
@@ -63,6 +64,7 @@ export default async function AdminCalendarPage({
             render={<Link href={`/admin/calendar?week=${todayStr}`} />}
             nativeButton={false}
             variant="outline"
+            className="h-10 px-4 sm:h-9 sm:px-3"
           >
             Hoje
           </Button>
@@ -71,6 +73,7 @@ export default async function AdminCalendarPage({
             nativeButton={false}
             variant="outline"
             aria-label="Próxima semana"
+            className="h-10 w-10 p-0 sm:h-9 sm:w-auto sm:px-3"
           >
             <span className="hidden sm:inline">Próxima</span>
             <ChevronRight className="size-4" />

@@ -117,7 +117,9 @@ export default async function ContactoPage({
                 </p>
               )}
 
-              <SubmitButton pendingText="A enviar…">Enviar</SubmitButton>
+              <SubmitButton className="h-11 text-base" pendingText="A enviar…">
+                Enviar
+              </SubmitButton>
             </form>
           )}
         </div>

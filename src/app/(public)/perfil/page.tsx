@@ -117,7 +117,7 @@ export default async function PerfilPage() {
                   </span>
                   <SubmitButton
                     variant="outline"
-                    size="sm"
+                    className="h-10 px-4"
                     pendingText="A cancelar…"
                   >
                     Cancelar
@@ -171,7 +171,7 @@ export default async function PerfilPage() {
               Partilhar isto com o treinador ajuda a personalizar o teu treino.
             </p>
           </div>
-          <SubmitButton size="sm" pendingText="A guardar…">
+          <SubmitButton className="h-11 text-base" pendingText="A guardar…">
             Guardar
           </SubmitButton>
         </form>

@@ -114,7 +114,7 @@ export default async function LojaPage() {
                 ) : (
                   <form action={claimItem}>
                     <input type="hidden" name="item_id" value={item.id} />
-                    <Button type="submit" className="w-full">
+                    <Button type="submit" className="h-11 w-full text-base">
                       Reservar
                     </Button>
                   </form>

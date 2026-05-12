@@ -92,7 +92,7 @@ export function AddClassDialog({ date }: { date: string }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="start_time">Hora</Label>
               <Input
@@ -117,7 +117,7 @@ export function AddClassDialog({ date }: { date: string }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="capacity">Capacidade</Label>
               <Input
@@ -167,10 +167,16 @@ export function AddClassDialog({ date }: { date: string }) {
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
+              className="h-11 text-base sm:h-9 sm:text-sm"
             >
               Cancelar
             </Button>
-            <SubmitButton pendingText="A criar…">Criar aula</SubmitButton>
+            <SubmitButton
+              className="h-11 text-base sm:h-9 sm:text-sm"
+              pendingText="A criar…"
+            >
+              Criar aula
+            </SubmitButton>
           </div>
         </form>
       </DialogContent>

@@ -26,6 +26,24 @@ export const metadata: Metadata = {
   title: `${studio.fullName} — ${studio.tagline}`,
   description: `${studio.fullName}: ${studio.tagline}. Marca a tua aula online.`,
   applicationName: studio.fullName,
+  appleWebApp: {
+    capable: true,
+    title: studio.name,
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport = {
+  themeColor: "#0a0a0a",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  // viewportFit covers iPhone notch / safe-area, lets us paint into the
+  // status bar when launched as PWA.
+  viewportFit: "cover" as const,
 };
 
 export default function RootLayout({

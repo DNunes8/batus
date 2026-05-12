@@ -47,7 +47,7 @@ export default function NewSessionPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="duration_minutes">Duração (min)</Label>
             <Input
@@ -84,11 +84,13 @@ export default function NewSessionPage() {
           />
         </div>
 
-        <div className="flex items-center gap-3 pt-4">
-          <SubmitButton pendingText="A criar…">Criar sessão</SubmitButton>
+        <div className="flex flex-col-reverse items-stretch gap-3 pt-4 sm:flex-row sm:items-center">
+          <SubmitButton className="h-11 text-base" pendingText="A criar…">
+            Criar sessão
+          </SubmitButton>
           <Link
             href="/admin/sessions"
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className="text-center text-sm text-muted-foreground hover:text-foreground sm:text-left"
           >
             Cancelar
           </Link>

@@ -82,10 +82,15 @@ export function CloseDayDialog({ date }: { date: string }) {
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
+              className="h-11 text-base sm:h-9 sm:text-sm"
             >
               Voltar
             </Button>
-            <SubmitButton pendingText="A fechar…" variant="destructive">
+            <SubmitButton
+              className="h-11 text-base sm:h-9 sm:text-sm"
+              pendingText="A fechar…"
+              variant="destructive"
+            >
               Fechar dia
             </SubmitButton>
           </div>

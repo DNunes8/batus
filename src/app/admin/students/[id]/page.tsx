@@ -69,7 +69,7 @@ export default async function StudentDetailPage({
           className="mt-4 space-y-4 rounded-md border border-border/60 p-4"
         >
           <input type="hidden" name="id" value={profile.id} />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="full_name">Nome</Label>
               <Input
@@ -109,7 +109,7 @@ export default async function StudentDetailPage({
               placeholder="Visíveis só para o admin"
             />
           </div>
-          <Button type="submit" size="sm">
+          <Button type="submit" className="h-11 text-base">
             Guardar
           </Button>
         </form>
