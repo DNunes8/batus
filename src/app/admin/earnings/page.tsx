@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatEuro, formatMonthYear, monthKey } from "@/lib/money";
+import { addDays, dayOfWeek, todayLisbon } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +26,14 @@ export default async function EarningsPage() {
 
   const months = lastNMonths(6);
   const oldestMonth = months[0];
+  const today = todayLisbon();
 
-  const [paymentsRes, solosRes] = await Promise.all([
+  const [
+    paymentsRes,
+    oneOffSolosRes,
+    soloTemplatesRes,
+    soloOverridesRes,
+  ] = await Promise.all([
     admin
       .from("payment_records")
       .select("month, amount_cents, paid_at")
@@ -36,6 +43,15 @@ export default async function EarningsPage() {
       .from("solo_sessions")
       .select("session_date, price_cents")
       .gte("session_date", `${oldestMonth}T00:00:00`),
+    admin
+      .from("solo_session_templates")
+      .select("id, day_of_week, price_cents, active_from, active_until")
+      .lte("active_from", today),
+    admin
+      .from("solo_session_overrides")
+      .select("template_id, instance_date, cancelled")
+      .gte("instance_date", oldestMonth)
+      .lte("instance_date", today),
   ]);
 
   const totals: Record<string, MonthlyTotals> = {};
@@ -48,10 +64,38 @@ export default async function EarningsPage() {
     if (totals[m]) totals[m].payments_cents += row.amount_cents ?? 0;
   }
 
-  for (const row of solosRes.data ?? []) {
+  // One-off solos (legacy /admin/sessions/new entries)
+  for (const row of oneOffSolosRes.data ?? []) {
     const sessionMonth = monthKey(new Date(row.session_date));
     if (totals[sessionMonth]) {
       totals[sessionMonth].solos_cents += row.price_cents ?? 0;
+    }
+  }
+
+  // Recurring 1:1 instances: generate occurrences from templates,
+  // skip cancelled ones via overrides, sum at the template price.
+  const soloOverrides = soloOverridesRes.data ?? [];
+  for (const tpl of soloTemplatesRes.data ?? []) {
+    const startDate =
+      tpl.active_from > oldestMonth ? tpl.active_from : oldestMonth;
+    const endDate =
+      tpl.active_until && tpl.active_until < today ? tpl.active_until : today;
+
+    // Advance to first matching day-of-week
+    let cursor = startDate;
+    while (cursor <= endDate && dayOfWeek(cursor) !== tpl.day_of_week) {
+      cursor = addDays(cursor, 1);
+    }
+
+    while (cursor <= endDate) {
+      const ov = soloOverrides.find(
+        (o) => o.template_id === tpl.id && o.instance_date === cursor,
+      );
+      if (!ov?.cancelled) {
+        const m = `${cursor.slice(0, 7)}-01`;
+        if (totals[m]) totals[m].solos_cents += tpl.price_cents ?? 0;
+      }
+      cursor = addDays(cursor, 7);
     }
   }
 

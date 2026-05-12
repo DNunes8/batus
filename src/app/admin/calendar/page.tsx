@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmForm } from "@/components/confirm-form";
 import { AddClassDialog } from "@/components/admin/add-class-dialog";
 import { CloseDayDialog } from "@/components/admin/close-day-dialog";
+import { RescheduleDialog } from "@/components/admin/reschedule-dialog";
+import { formatEuro } from "@/lib/money";
 import {
   addDays,
   formatWeekRange,
@@ -12,10 +14,17 @@ import {
   mondayOf,
   safeReferenceDate,
   todayLisbon,
-  type AdminScheduleClass,
+  type AdminGroupEntry,
+  type AdminSoloEntry,
   type AdminScheduleDay,
 } from "@/lib/schedule";
-import { reopenDay, restoreClassInstance, cancelClassInstance } from "./actions";
+import {
+  reopenDay,
+  restoreClassInstance,
+  cancelClassInstance,
+  cancelSoloInstance,
+  restoreSoloInstance,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -82,9 +91,16 @@ export default async function AdminCalendarPage({
       </header>
 
       <p className="mt-6 max-w-2xl text-sm text-muted-foreground">
-        Carrega em <span className="text-foreground">+ Adicionar aula</span> em
-        qualquer dia para criar uma aula avulsa ou recorrente. Cada modelo
-        criado em <Link href="/admin/classes" className="underline hover:text-foreground">Modelos</Link> aparece automaticamente nos dias correspondentes.
+        Carrega em <span className="text-foreground">+ Adicionar</span> em
+        qualquer dia para criar uma aula de grupo ou um 1:1 (única ou
+        recorrente). Modelos em{" "}
+        <Link
+          href="/admin/classes"
+          className="underline hover:text-foreground"
+        >
+          Modelos
+        </Link>{" "}
+        aparecem automaticamente nos dias correspondentes.
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7">
@@ -145,14 +161,24 @@ function DayCard({
           </div>
         ) : (
           <>
-            {day.classes.length === 0 && (
+            {day.entries.length === 0 && (
               <p className="py-4 text-center text-[11px] uppercase tracking-widest text-muted-foreground">
                 Sem aulas
               </p>
             )}
-            {day.classes.map((c) => (
-              <ClassBlock key={`${c.template_id}-${c.date}`} cls={c} />
-            ))}
+            {day.entries.map((entry) =>
+              entry.kind === "group" ? (
+                <GroupBlock
+                  key={`g-${entry.template_id}-${entry.date}`}
+                  entry={entry}
+                />
+              ) : (
+                <SoloBlock
+                  key={`s-${entry.template_id}-${entry.date}`}
+                  entry={entry}
+                />
+              ),
+            )}
             <div className="pt-1">
               <AddClassDialog date={day.date} />
             </div>
@@ -179,29 +205,29 @@ function DayCard({
   );
 }
 
-function ClassBlock({ cls }: { cls: AdminScheduleClass }) {
-  if (cls.cancelled) {
+function GroupBlock({ entry }: { entry: AdminGroupEntry }) {
+  if (entry.cancelled) {
     return (
       <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2.5">
         <div className="flex items-baseline justify-between gap-2">
           <span className="font-display text-base tabular-nums text-destructive line-through">
-            {formatTime(cls.start_time)}
+            {formatTime(entry.start_time)}
           </span>
           <span className="text-[9px] uppercase tracking-[0.15em] text-destructive">
             Cancelada
           </span>
         </div>
         <p className="mt-1 text-sm font-medium text-destructive/90">
-          {cls.name}
+          {entry.name}
         </p>
-        {cls.cancellation_reason && (
+        {entry.cancellation_reason && (
           <p className="mt-1 text-[11px] text-muted-foreground">
-            {cls.cancellation_reason}
+            {entry.cancellation_reason}
           </p>
         )}
         <form action={restoreClassInstance} className="mt-2">
-          <input type="hidden" name="template_id" value={cls.template_id} />
-          <input type="hidden" name="instance_date" value={cls.date} />
+          <input type="hidden" name="template_id" value={entry.template_id} />
+          <input type="hidden" name="instance_date" value={entry.date} />
           <button
             type="submit"
             className="text-[10px] uppercase tracking-[0.15em] text-foreground hover:opacity-70"
@@ -213,7 +239,7 @@ function ClassBlock({ cls }: { cls: AdminScheduleClass }) {
     );
   }
 
-  const isFull = cls.booked_count >= cls.capacity;
+  const isFull = entry.booked_count >= entry.capacity;
 
   return (
     <div
@@ -225,22 +251,22 @@ function ClassBlock({ cls }: { cls: AdminScheduleClass }) {
     >
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-display text-base tabular-nums">
-          {formatTime(cls.start_time)}
+          {formatTime(entry.start_time)}
         </span>
         <span
           className={`text-[10px] tabular-nums ${
             isFull ? "font-medium text-foreground" : "text-muted-foreground"
           }`}
         >
-          {cls.booked_count}/{cls.capacity}
-          {cls.waitlist_count > 0 && ` · +${cls.waitlist_count}`}
+          {entry.booked_count}/{entry.capacity}
+          {entry.waitlist_count > 0 && ` · +${entry.waitlist_count}`}
         </span>
       </div>
-      <p className="mt-1 text-sm font-medium leading-tight">{cls.name}</p>
+      <p className="mt-1 text-sm font-medium leading-tight">{entry.name}</p>
 
-      {cls.roster.length > 0 && (
+      {entry.roster.length > 0 && (
         <ul className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
-          {cls.roster.slice(0, 3).map((r) => {
+          {entry.roster.slice(0, 3).map((r) => {
             const name = r.full_name || r.email.split("@")[0];
             return (
               <li
@@ -256,28 +282,118 @@ function ClassBlock({ cls }: { cls: AdminScheduleClass }) {
               </li>
             );
           })}
-          {cls.roster.length > 3 && (
+          {entry.roster.length > 3 && (
             <li className="text-muted-foreground/60">
-              +{cls.roster.length - 3} mais
+              +{entry.roster.length - 3} mais
             </li>
           )}
         </ul>
       )}
 
-      <ConfirmForm
-        message={`Cancelar "${cls.name}" neste dia? Os alunos com marcação vão ver-la cancelada.`}
-        action={cancelClassInstance}
-        className="mt-2 border-t border-border/30 pt-1.5"
-      >
-        <input type="hidden" name="template_id" value={cls.template_id} />
-        <input type="hidden" name="instance_date" value={cls.date} />
-        <button
-          type="submit"
-          className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-destructive"
+      <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/30 pt-1.5">
+        <RescheduleDialog
+          kind="group"
+          template_id={entry.template_id}
+          instance_date={entry.date}
+          current_start_time={entry.start_time}
+          label={entry.name}
+        />
+        <ConfirmForm
+          message={`Cancelar "${entry.name}" neste dia? Os alunos com marcação vão ver-la cancelada.`}
+          action={cancelClassInstance}
         >
-          Cancelar aula
-        </button>
-      </ConfirmForm>
+          <input type="hidden" name="template_id" value={entry.template_id} />
+          <input type="hidden" name="instance_date" value={entry.date} />
+          <button
+            type="submit"
+            className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-destructive"
+          >
+            Cancelar
+          </button>
+        </ConfirmForm>
+      </div>
+    </div>
+  );
+}
+
+function SoloBlock({ entry }: { entry: AdminSoloEntry }) {
+  if (entry.cancelled) {
+    return (
+      <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2.5">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="font-display text-base tabular-nums text-destructive line-through">
+            {formatTime(entry.start_time)}
+          </span>
+          <span className="text-[9px] uppercase tracking-[0.15em] text-destructive">
+            Cancelada
+          </span>
+        </div>
+        <p className="mt-1 text-sm font-medium text-destructive/90">
+          1:1 · {entry.student_name}
+        </p>
+        {entry.cancellation_reason && (
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {entry.cancellation_reason}
+          </p>
+        )}
+        <form action={restoreSoloInstance} className="mt-2">
+          <input type="hidden" name="template_id" value={entry.template_id} />
+          <input type="hidden" name="instance_date" value={entry.date} />
+          <button
+            type="submit"
+            className="text-[10px] uppercase tracking-[0.15em] text-foreground hover:opacity-70"
+          >
+            Restaurar →
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-gold/30 bg-gold/5 p-2.5 transition-colors hover:border-gold/60">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="font-display text-base tabular-nums">
+          {formatTime(entry.start_time)}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-sm border border-gold/50 px-1 py-0.5 text-[9px] uppercase tracking-[0.15em] text-foreground">
+          1:1
+        </span>
+      </div>
+      <p className="mt-1 text-sm font-medium leading-tight">
+        {entry.student_name}
+      </p>
+      <p className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">
+        {entry.duration_minutes} min · {formatEuro(entry.price_cents)}
+      </p>
+      {entry.notes && (
+        <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">
+          {entry.notes}
+        </p>
+      )}
+
+      <div className="mt-2 flex items-center justify-between gap-2 border-t border-gold/20 pt-1.5">
+        <RescheduleDialog
+          kind="solo"
+          template_id={entry.template_id}
+          instance_date={entry.date}
+          current_start_time={entry.start_time}
+          label={`1:1 · ${entry.student_name}`}
+        />
+        <ConfirmForm
+          message={`Cancelar 1:1 com ${entry.student_name} neste dia?`}
+          action={cancelSoloInstance}
+        >
+          <input type="hidden" name="template_id" value={entry.template_id} />
+          <input type="hidden" name="instance_date" value={entry.date} />
+          <button
+            type="submit"
+            className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-destructive"
+          >
+            Cancelar
+          </button>
+        </ConfirmForm>
+      </div>
     </div>
   );
 }

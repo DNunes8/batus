@@ -35,12 +35,33 @@ export type RosterEntry = {
   waitlist_position: number | null;
 };
 
-export type AdminScheduleClass = ScheduleClass & {
+export type AdminGroupEntry = ScheduleClass & {
+  kind: "group";
   roster: RosterEntry[];
 };
 
+export type AdminSoloEntry = {
+  kind: "solo";
+  template_id: string;
+  date: string;
+  user_id: string | null;
+  student_name: string;
+  start_time: string;
+  duration_minutes: number;
+  price_cents: number;
+  notes: string | null;
+  cancelled: boolean;
+  cancellation_reason?: string;
+};
+
+export type AdminScheduleEntry = AdminGroupEntry | AdminSoloEntry;
+
+// Backwards-compat alias for the calendar code that still calls these
+// "classes". Both kinds now flow through this type.
+export type AdminScheduleClass = AdminScheduleEntry;
+
 export type AdminScheduleDay = Omit<ScheduleDay, "classes"> & {
-  classes: AdminScheduleClass[];
+  entries: AdminScheduleEntry[];
 };
 
 // ---------- date helpers ----------
@@ -291,7 +312,7 @@ export async function getWeekSchedule(
 }
 
 // Admin variant: uses service-role client so it can see all bookings + profiles.
-// Returns roster (student names + statuses) for each class instance.
+// Returns merged group-class + 1:1 entries per day, sorted by start_time.
 export async function getAdminWeekSchedule(
   weekStart: string,
 ): Promise<AdminScheduleDay[]> {
@@ -299,10 +320,12 @@ export async function getAdminWeekSchedule(
   const admin = createAdminClient();
 
   const [
-    templatesRes,
-    overridesRes,
+    classTemplatesRes,
+    classOverridesRes,
     closedDaysRes,
     bookingsRes,
+    soloTemplatesRes,
+    soloOverridesRes,
   ] = await Promise.all([
     admin.from("class_templates").select("*"),
     admin
@@ -323,12 +346,24 @@ export async function getAdminWeekSchedule(
       .gte("instance_date", weekStart)
       .lt("instance_date", weekEnd)
       .in("status", ["booked", "waitlisted"]),
+    admin
+      .from("solo_session_templates")
+      .select(
+        `id, user_id, student_name, day_of_week, start_time, duration_minutes, price_cents, notes, active_from, active_until, profile:profiles(full_name)`,
+      ),
+    admin
+      .from("solo_session_overrides")
+      .select("*")
+      .gte("instance_date", weekStart)
+      .lt("instance_date", weekEnd),
   ]);
 
-  const templates = templatesRes.data ?? [];
-  const overrides = overridesRes.data ?? [];
+  const classTemplates = classTemplatesRes.data ?? [];
+  const classOverrides = classOverridesRes.data ?? [];
   const closedDays = closedDaysRes.data ?? [];
   const bookings = bookingsRes.data ?? [];
+  const soloTemplates = soloTemplatesRes.data ?? [];
+  const soloOverrides = soloOverridesRes.data ?? [];
 
   const days: AdminScheduleDay[] = [];
   for (let i = 0; i < 7; i++) {
@@ -342,20 +377,21 @@ export async function getAdminWeekSchedule(
         day_of_week: dow,
         closed: true,
         closed_reason: closedDay.reason,
-        classes: [],
+        entries: [],
       });
       continue;
     }
 
-    const dayTemplates = templates.filter(
+    // ---------- group class instances ----------
+    const dayClassTemplates = classTemplates.filter(
       (t) =>
         t.day_of_week === dow &&
         t.active_from <= date &&
         (t.active_until === null || t.active_until >= date),
     );
 
-    const classes: AdminScheduleClass[] = dayTemplates.map((t) => {
-      const override = overrides.find(
+    const groupEntries: AdminGroupEntry[] = dayClassTemplates.map((t) => {
+      const override = classOverrides.find(
         (o) => o.template_id === t.id && o.instance_date === date,
       );
 
@@ -379,7 +415,6 @@ export async function getAdminWeekSchedule(
         };
       });
 
-      // Booked first, then waitlisted by waitlist_position.
       roster.sort((a, b) => {
         if (a.status === "booked" && b.status !== "booked") return -1;
         if (a.status !== "booked" && b.status === "booked") return 1;
@@ -388,6 +423,7 @@ export async function getAdminWeekSchedule(
 
       if (override?.cancelled) {
         return {
+          kind: "group" as const,
           template_id: t.id,
           date,
           name: t.name,
@@ -409,6 +445,7 @@ export async function getAdminWeekSchedule(
       ).length;
 
       return {
+        kind: "group" as const,
         template_id: t.id,
         date,
         name: t.name,
@@ -424,13 +461,64 @@ export async function getAdminWeekSchedule(
       };
     });
 
-    classes.sort((a, b) => a.start_time.localeCompare(b.start_time));
+    // ---------- 1:1 instances ----------
+    const daySoloTemplates = soloTemplates.filter(
+      (t) =>
+        t.day_of_week === dow &&
+        t.active_from <= date &&
+        (t.active_until === null || t.active_until >= date),
+    );
+
+    const soloEntries: AdminSoloEntry[] = daySoloTemplates.map((t) => {
+      const override = soloOverrides.find(
+        (o) => o.template_id === t.id && o.instance_date === date,
+      );
+
+      const profile = t.profile as unknown as {
+        full_name: string | null;
+      } | null;
+      const student = profile?.full_name || t.student_name || "Aluno";
+
+      if (override?.cancelled) {
+        return {
+          kind: "solo" as const,
+          template_id: t.id,
+          date,
+          user_id: t.user_id,
+          student_name: student,
+          start_time: t.start_time,
+          duration_minutes: t.duration_minutes,
+          price_cents: t.price_cents,
+          notes: t.notes,
+          cancelled: true,
+          cancellation_reason: override.reason ?? undefined,
+        };
+      }
+
+      return {
+        kind: "solo" as const,
+        template_id: t.id,
+        date,
+        user_id: t.user_id,
+        student_name: student,
+        start_time: override?.override_start_time ?? t.start_time,
+        duration_minutes:
+          override?.override_duration_minutes ?? t.duration_minutes,
+        price_cents: t.price_cents,
+        notes: t.notes,
+        cancelled: false,
+      };
+    });
+
+    // ---------- merge + sort by start_time ----------
+    const entries: AdminScheduleEntry[] = [...groupEntries, ...soloEntries];
+    entries.sort((a, b) => a.start_time.localeCompare(b.start_time));
 
     days.push({
       date,
       day_of_week: dow,
       closed: false,
-      classes,
+      entries,
     });
   }
 
