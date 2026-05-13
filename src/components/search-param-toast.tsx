@@ -33,6 +33,11 @@ const TOAST_BY_PARAM: Record<string, ToastConfig> = {
     type: "success",
     message: "Marcação cancelada.",
   },
+  welcome: {
+    type: "success",
+    message: "Bem-vindo ao Batus!",
+    description: "Marca a tua primeira aula em baixo.",
+  },
 };
 
 export function SearchParamToast() {
