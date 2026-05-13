@@ -93,10 +93,19 @@ export async function bookClass(formData: FormData) {
 
   revalidatePath("/aulas");
   revalidatePath("/perfil");
-  // Preserve the week the user was on so the page comes back to the same view,
-  // then trigger the toast via search-param.
+  revalidatePath(`/aulas/${template_id}/${instance_date}`);
+
+  // If the form told us where to return to (e.g. the class detail page),
+  // bounce back there with the toast. Otherwise default to the schedule
+  // pre-anchored to the right week.
+  const status_param = isFull ? "waitlist" : "booked";
+  const return_to = (formData.get("return_to") as string | null)?.trim();
+  if (return_to) {
+    const separator = return_to.includes("?") ? "&" : "?";
+    redirect(`${return_to}${separator}${status_param}=1`);
+  }
   const week = mondayOf(instance_date);
-  redirect(`/aulas?week=${week}&${isFull ? "waitlist" : "booked"}=1`);
+  redirect(`/aulas?week=${week}&${status_param}=1`);
 }
 
 export async function cancelBooking(formData: FormData) {

@@ -136,7 +136,10 @@ export default async function AulasPage({
                         key={`${c.template_id}-${c.date}`}
                         className="flex flex-wrap items-center justify-between gap-4 px-4 py-4"
                       >
-                        <div className="flex items-baseline gap-4">
+                        <Link
+                          href={`/aulas/${c.template_id}/${c.date}`}
+                          className="-mx-2 flex flex-1 items-baseline gap-4 rounded px-2 py-1 transition-colors hover:bg-muted/50"
+                        >
                           <span className="font-display text-xl tracking-wider tabular-nums">
                             {formatTime(c.start_time)}
                           </span>
@@ -153,7 +156,7 @@ export default async function AulasPage({
                                   }`}
                             </p>
                           </div>
-                        </div>
+                        </Link>
                         <BookingControl
                           cls={c}
                           isLoggedIn={!!user}
