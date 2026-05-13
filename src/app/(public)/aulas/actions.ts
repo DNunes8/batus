@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { mondayOf } from "@/lib/schedule";
 
 export async function bookClass(formData: FormData) {
   const supabase = await createClient();
@@ -91,6 +92,11 @@ export async function bookClass(formData: FormData) {
   }
 
   revalidatePath("/aulas");
+  revalidatePath("/perfil");
+  // Preserve the week the user was on so the page comes back to the same view,
+  // then trigger the toast via search-param.
+  const week = mondayOf(instance_date);
+  redirect(`/aulas?week=${week}&${isFull ? "waitlist" : "booked"}=1`);
 }
 
 export async function cancelBooking(formData: FormData) {
@@ -181,4 +187,6 @@ export async function cancelBooking(formData: FormData) {
 
   revalidatePath("/aulas");
   revalidatePath("/admin/calendar");
+  revalidatePath("/perfil");
+  redirect("/perfil?cancelled=1");
 }
