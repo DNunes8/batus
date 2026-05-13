@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
+import { WhatsAppShareButton } from "@/components/whatsapp-share-button";
 import { studio } from "@/lib/studio.config";
 import {
   dayOfWeek,
@@ -164,6 +166,16 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
 
   const backHref = `/aulas?week=${mondayOf(date)}`;
 
+  // Build the absolute URL once on the server so the share text has the right
+  // host (matches custom domain after handover; works on Vercel previews too).
+  const headersList = await headers();
+  const host = headersList.get("host") ?? "localhost:3000";
+  const protocol = host.startsWith("localhost") ? "http" : "https";
+  const absoluteUrl = `${protocol}://${host}/aulas/${template_id}/${date}`;
+
+  const showShareButton =
+    !isCancelled && !isPast && template.is_public;
+
   return (
     <section className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-14">
       <Link
@@ -174,21 +186,32 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
         Voltar ao horário
       </Link>
 
-      <div className="mt-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-          {formatDayHeader(date)}
-        </p>
-        <h1 className="mt-3 font-display text-4xl leading-tight tracking-[0.04em] sm:text-5xl">
-          {template.name.toUpperCase()}
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          com {studio.coach} · {studio.city}
-        </p>
-
-        {!template.is_public && (
-          <p className="mt-3 inline-flex items-center rounded-sm border border-foreground/30 bg-muted/30 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-foreground">
-            Só membros
+      <div className="mt-6 flex flex-wrap items-start justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+            {formatDayHeader(date)}
           </p>
+          <h1 className="mt-3 font-display text-4xl leading-tight tracking-[0.04em] sm:text-5xl">
+            {template.name.toUpperCase()}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            com {studio.coach} · {studio.city}
+          </p>
+
+          {!template.is_public && (
+            <p className="mt-3 inline-flex items-center rounded-sm border border-foreground/30 bg-muted/30 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-foreground">
+              Só membros
+            </p>
+          )}
+        </div>
+
+        {showShareButton && (
+          <WhatsAppShareButton
+            className_name={template.name}
+            dayLabel={formatDayHeader(date)}
+            timeLabel={formatTime(startTime)}
+            url={absoluteUrl}
+          />
         )}
       </div>
 
