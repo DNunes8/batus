@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type AuthState = {
   error?: string;
@@ -57,9 +58,15 @@ export async function signInWithPassword(
   redirect(await destinationForUser(data.user.id));
 }
 
-// Primary signup flow: email + password. With "Confirm email" disabled in
-// the Supabase dashboard, this creates a session immediately and the user
-// goes straight to /bem-vindo to fill in their name.
+// Primary signup flow: email + password.
+//
+// We deliberately route through the admin API (`admin.auth.admin.createUser`
+// with `email_confirm: true`) instead of `supabase.auth.signUp` so that the
+// account is created already-confirmed — no email round-trip required, no
+// dependency on whether the Supabase dashboard has "Confirm email" toggled
+// on or off. Critical for non-tech students who'd be lost in their inbox.
+//
+// After creating, we sign in normally to get the session cookie.
 export async function signUpWithPassword(
   _prev: AuthState,
   formData: FormData,
@@ -73,34 +80,56 @@ export async function signUpWithPassword(
     return { error: "Preenche email e palavra-passe." };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const admin = createAdminClient();
+  const { data: created, error: createError } =
+    await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
 
-  if (error) {
-    const msg = error.message.toLowerCase();
-    if (msg.includes("already registered") || msg.includes("user already")) {
+  if (createError) {
+    const msg = createError.message.toLowerCase();
+    if (
+      msg.includes("already") ||
+      msg.includes("registered") ||
+      msg.includes("exists") ||
+      msg.includes("duplicate")
+    ) {
       return {
         error:
           "Já existe uma conta com este email. Volta a Entrar com a tua palavra-passe.",
       };
     }
-    if (msg.includes("password") && msg.includes("short")) {
+    if (
+      msg.includes("password") &&
+      (msg.includes("short") || msg.includes("weak"))
+    ) {
       return { error: "Palavra-passe demasiado curta — usa 6 ou mais." };
     }
-    return { error: error.message };
+    return { error: createError.message };
   }
 
-  if (data.session) {
-    revalidatePath("/", "layout");
-    redirect("/bem-vindo");
+  if (!created.user) {
+    return { error: "Não foi possível criar a conta. Tenta novamente." };
   }
 
-  // Fallback for the case where the admin hasn't disabled email confirmation
-  // in the Supabase dashboard yet.
-  return {
-    error:
-      "Verifica o teu email para confirmar a conta. (Confirma com o teu treinador se o email não chegar.)",
-  };
+  // Create the session.
+  const supabase = await createClient();
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (signInError) {
+    return {
+      error:
+        "Conta criada, mas não conseguimos iniciar sessão. Tenta Entrar com a tua palavra-passe.",
+    };
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/bem-vindo");
 }
 
 // Fallback for the rare "forgot password" / "can't remember it" case.
