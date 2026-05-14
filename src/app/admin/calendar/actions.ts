@@ -10,6 +10,89 @@ export type CalendarActionState = {
   success?: boolean;
 } | null;
 
+// One-tap "add this model to today". Clones an existing class_template's
+// config onto a specific date as a one-off (active_from = active_until = date)
+// so the schedule generator renders it just for that day.
+export async function createGroupInstanceFromTemplate(input: {
+  template_id: string;
+  date: string;
+}) {
+  const { template_id, date } = input;
+  if (!template_id || !date) throw new Error("Pedido inválido.");
+
+  const supabase = await createClient();
+
+  const { data: source, error: fetchErr } = await supabase
+    .from("class_templates")
+    .select(
+      "name, description, start_time, duration_minutes, capacity, is_public",
+    )
+    .eq("id", template_id)
+    .single();
+
+  if (fetchErr || !source) {
+    throw new Error("Modelo não encontrado.");
+  }
+
+  const { error } = await supabase.from("class_templates").insert({
+    name: source.name,
+    description: source.description,
+    day_of_week: dowHelper(date),
+    start_time: source.start_time,
+    duration_minutes: source.duration_minutes,
+    capacity: source.capacity,
+    is_public: source.is_public,
+    active_from: date,
+    active_until: date,
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin/calendar");
+  revalidatePath("/admin/classes");
+  revalidatePath("/aulas");
+}
+
+// Same as above but for 1:1 templates.
+export async function createSoloInstanceFromTemplate(input: {
+  template_id: string;
+  date: string;
+}) {
+  const { template_id, date } = input;
+  if (!template_id || !date) throw new Error("Pedido inválido.");
+
+  const supabase = await createClient();
+
+  const { data: source, error: fetchErr } = await supabase
+    .from("solo_session_templates")
+    .select(
+      "user_id, student_name, start_time, duration_minutes, price_cents, notes",
+    )
+    .eq("id", template_id)
+    .single();
+
+  if (fetchErr || !source) {
+    throw new Error("Modelo não encontrado.");
+  }
+
+  const { error } = await supabase.from("solo_session_templates").insert({
+    user_id: source.user_id,
+    student_name: source.student_name,
+    day_of_week: dowHelper(date),
+    start_time: source.start_time,
+    duration_minutes: source.duration_minutes,
+    price_cents: source.price_cents,
+    notes: source.notes,
+    active_from: date,
+    active_until: date,
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin/calendar");
+  revalidatePath("/aulas");
+}
+
 export async function createClassFromCalendar(
   _prev: CalendarActionState,
   formData: FormData,

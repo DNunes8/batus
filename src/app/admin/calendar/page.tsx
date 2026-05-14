@@ -2,9 +2,14 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmForm } from "@/components/confirm-form";
-import { AddClassDialog } from "@/components/admin/add-class-dialog";
+import {
+  AddClassDialog,
+  type GroupTemplateLite,
+  type SoloTemplateLite,
+} from "@/components/admin/add-class-dialog";
 import { CloseDayDialog } from "@/components/admin/close-day-dialog";
 import { RescheduleDialog } from "@/components/admin/reschedule-dialog";
+import { createClient } from "@/lib/supabase/server";
 import { formatEuro } from "@/lib/money";
 import {
   addDays,
@@ -75,6 +80,51 @@ export default async function AdminCalendarPage({
   const prevWeek = addDays(weekStart, -7);
   const nextWeek = addDays(weekStart, 7);
 
+  // Active "models" the coach can one-tap onto any day. Only recurring
+  // templates (active_until IS NULL) — one-off historical inserts shouldn't
+  // pollute the picker. Sorted by day_of_week + start_time for predictable order.
+  const supabase = await createClient();
+  const [groupTplRes, soloTplRes] = await Promise.all([
+    supabase
+      .from("class_templates")
+      .select("id, name, day_of_week, start_time, duration_minutes, capacity")
+      .is("active_until", null)
+      .lte("active_from", todayStr)
+      .order("day_of_week", { ascending: true })
+      .order("start_time", { ascending: true }),
+    supabase
+      .from("solo_session_templates")
+      .select(
+        "id, student_name, day_of_week, start_time, duration_minutes, price_cents, profile:profiles(full_name)",
+      )
+      .is("active_until", null)
+      .lte("active_from", todayStr)
+      .order("day_of_week", { ascending: true })
+      .order("start_time", { ascending: true }),
+  ]);
+
+  const groupTemplates: GroupTemplateLite[] = (groupTplRes.data ?? []).map(
+    (t) => ({
+      id: t.id,
+      name: t.name,
+      day_of_week: t.day_of_week,
+      start_time: t.start_time,
+      duration_minutes: t.duration_minutes,
+      capacity: t.capacity,
+    }),
+  );
+  const soloTemplates: SoloTemplateLite[] = (soloTplRes.data ?? []).map((t) => {
+    const profile = t.profile as unknown as { full_name: string | null } | null;
+    return {
+      id: t.id,
+      label: profile?.full_name ?? t.student_name ?? "Aluno",
+      day_of_week: t.day_of_week,
+      start_time: t.start_time,
+      duration_minutes: t.duration_minutes,
+      price_cents: t.price_cents,
+    };
+  });
+
   // Selected day for the mobile/tablet "one day at a time" view.
   // Priority: ?day= if it's in this week → today if it's in this week → weekStart.
   // Keeps the URL stable so navigation between weeks doesn't lose context.
@@ -141,14 +191,25 @@ export default async function AdminCalendarPage({
 
       {/* Expanded selected day (mobile + tablet). One day, full detail. */}
       <div className="mt-4 xl:hidden">
-        <ExpandedDayCard day={selectedDay} todayStr={todayStr} />
+        <ExpandedDayCard
+          day={selectedDay}
+          todayStr={todayStr}
+          groupTemplates={groupTemplates}
+          soloTemplates={soloTemplates}
+        />
       </div>
 
       {/* Seven-column grid (desktop only). At xl+ the screen is wide enough
           to scan the whole week at a glance — the strip becomes redundant. */}
       <div className="mt-8 hidden grid-cols-7 gap-3 xl:grid">
         {days.map((day) => (
-          <DayCard key={day.date} day={day} todayStr={todayStr} />
+          <DayCard
+            key={day.date}
+            day={day}
+            todayStr={todayStr}
+            groupTemplates={groupTemplates}
+            soloTemplates={soloTemplates}
+          />
         ))}
       </div>
     </div>
@@ -228,9 +289,13 @@ function WeekStrip({
 function ExpandedDayCard({
   day,
   todayStr,
+  groupTemplates,
+  soloTemplates,
 }: {
   day: AdminScheduleDay;
   todayStr: string;
+  groupTemplates: GroupTemplateLite[];
+  soloTemplates: SoloTemplateLite[];
 }) {
   const isToday = day.date === todayStr;
 
@@ -296,7 +361,11 @@ function ExpandedDayCard({
               ),
             )}
             <div className="pt-2">
-              <AddClassDialog date={day.date} />
+              <AddClassDialog
+                date={day.date}
+                groupTemplates={groupTemplates}
+                soloTemplates={soloTemplates}
+              />
             </div>
           </>
         )}
@@ -324,9 +393,13 @@ function ExpandedDayCard({
 function DayCard({
   day,
   todayStr,
+  groupTemplates,
+  soloTemplates,
 }: {
   day: AdminScheduleDay;
   todayStr: string;
+  groupTemplates: GroupTemplateLite[];
+  soloTemplates: SoloTemplateLite[];
 }) {
   const isToday = day.date === todayStr;
 
@@ -389,7 +462,11 @@ function DayCard({
               ),
             )}
             <div className="pt-1">
-              <AddClassDialog date={day.date} />
+              <AddClassDialog
+                date={day.date}
+                groupTemplates={groupTemplates}
+                soloTemplates={soloTemplates}
+              />
             </div>
           </>
         )}
