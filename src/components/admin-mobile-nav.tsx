@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Menu } from "lucide-react";
 import {
@@ -9,13 +10,31 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { ADMIN_NAV } from "@/lib/admin-nav";
+import { studio } from "@/lib/studio.config";
 
 export function AdminMobileNav() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 px-4 py-3 backdrop-blur lg:hidden">
       <div className="flex items-center justify-between">
-        <Link href="/admin" className="flex items-baseline gap-2">
-          <span className="font-display text-xl tracking-[0.08em]">BATUS</span>
+        <Link
+          href="/admin"
+          className="flex items-center gap-2"
+          aria-label={studio.fullName}
+        >
+          {studio.brand.logo?.horizontal ? (
+            <Image
+              src={studio.brand.logo.horizontal}
+              alt={studio.fullName}
+              width={520}
+              height={120}
+              priority
+              className="h-8 w-auto"
+            />
+          ) : (
+            <span className="font-display text-xl tracking-[0.08em]">
+              BATUS
+            </span>
+          )}
           <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Admin
           </span>

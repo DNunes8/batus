@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -45,7 +46,17 @@ function formatPtDate(d: string): string {
 }
 
 export function CloseDayDialog({ date }: { date: string }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+
+  // Wrap setClosedDay so we can close the dialog + refresh after success.
+  // The server action revalidates server-side but the router still holds
+  // the previous render until we explicitly refresh.
+  async function handleAction(formData: FormData) {
+    await setClosedDay(formData);
+    setOpen(false);
+    router.refresh();
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -61,7 +72,7 @@ export function CloseDayDialog({ date }: { date: string }) {
           </p>
         </DialogHeader>
 
-        <form action={setClosedDay} className="space-y-4">
+        <form action={handleAction} className="space-y-4">
           <input type="hidden" name="date" value={date} />
 
           <div className="space-y-2">

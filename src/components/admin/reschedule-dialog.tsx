@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -32,9 +33,17 @@ export function RescheduleDialog({
   current_start_time: string;
   label: string;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const action =
     kind === "group" ? rescheduleClassInstance : rescheduleSoloInstance;
+
+  // Wrap the server action so we can close the dialog + refresh after.
+  async function handleAction(formData: FormData) {
+    await action(formData);
+    setOpen(false);
+    router.refresh();
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -49,7 +58,7 @@ export function RescheduleDialog({
           </p>
         </DialogHeader>
 
-        <form action={action} className="space-y-4">
+        <form action={handleAction} className="space-y-4">
           <input type="hidden" name="template_id" value={template_id} />
           <input type="hidden" name="instance_date" value={instance_date} />
 

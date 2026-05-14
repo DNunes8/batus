@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import {
   Dialog,
@@ -58,6 +59,7 @@ const BUTTON_MOBILE_CLASSES = "h-11 text-base sm:h-9 sm:text-sm";
 type Kind = "group" | "solo";
 
 export function AddClassDialog({ date }: { date: string }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<Kind>("group");
 
@@ -73,8 +75,12 @@ export function AddClassDialog({ date }: { date: string }) {
   useEffect(() => {
     if (groupState?.success || soloState?.success) {
       setOpen(false);
+      // revalidatePath in the server action invalidates the cache server-side,
+      // but the client router still has the previous render. Force a refresh
+      // so the new class actually appears in the day card.
+      router.refresh();
     }
-  }, [groupState, soloState]);
+  }, [groupState, soloState, router]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
