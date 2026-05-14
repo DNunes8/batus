@@ -21,14 +21,14 @@ export function AdminMobileNav() {
           className="flex items-center gap-2"
           aria-label={studio.fullName}
         >
-          {studio.brand.logo?.horizontal ? (
+          {studio.brand.logo?.stacked ? (
             <Image
-              src={studio.brand.logo.horizontal}
+              src={studio.brand.logo.stacked}
               alt={studio.fullName}
-              width={520}
-              height={120}
+              width={400}
+              height={400}
               priority
-              className="h-8 w-auto"
+              className="h-10 w-auto"
             />
           ) : (
             <span className="font-display text-xl tracking-[0.08em]">

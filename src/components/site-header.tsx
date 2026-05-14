@@ -27,18 +27,37 @@ export type HeaderUser = {
 
 function Wordmark() {
   const horizontal = studio.brand.logo?.horizontal;
-  if (horizontal) {
+  const stacked = studio.brand.logo?.stacked;
+
+  // Mobile uses the stacked variant — the Spartan B mark dominates so the
+  // logo reads even at small sizes. Desktop uses the horizontal lockup so
+  // the full "BATUS BOXING & TRAINING / ROBERT BALTARU" wordmark gets the
+  // space it deserves.
+  if (horizontal || stacked) {
     return (
       <span className="flex items-center transition-opacity hover:opacity-80">
-        <Image
-          src={horizontal}
-          alt={studio.fullName}
-          width={520}
-          height={120}
-          priority
-          quality={95}
-          className="h-9 w-auto sm:h-10"
-        />
+        {stacked && (
+          <Image
+            src={stacked}
+            alt={studio.fullName}
+            width={400}
+            height={400}
+            priority
+            quality={95}
+            className="h-11 w-auto md:hidden"
+          />
+        )}
+        {horizontal && (
+          <Image
+            src={horizontal}
+            alt={studio.fullName}
+            width={520}
+            height={120}
+            priority
+            quality={95}
+            className={`${stacked ? "hidden md:block" : ""} h-10 w-auto`}
+          />
+        )}
       </span>
     );
   }
