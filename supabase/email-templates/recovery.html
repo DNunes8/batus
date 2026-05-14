@@ -1,0 +1,122 @@
+<!--
+  Supabase email template — "Reset Password" (type=recovery).
+
+  Where to paste:
+    Supabase Dashboard → Authentication → Email Templates → Reset Password
+    Subject: Repor a tua palavra-passe — Batus
+    Body: the HTML below (replace the entire default template)
+
+  Prerequisites:
+    • Supabase → Authentication → URL Configuration → "Site URL" must point
+      to the deployed app (e.g. https://batus.vercel.app). The {{ .SiteURL }}
+      variable below resolves to that value, and the logo + link both depend
+      on it.
+    • /public/logo-stacked.png must be deployed. (Already is.)
+
+  Why this template is non-negotiable:
+    The href MUST be exactly:
+      {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery
+    Anything else breaks the SSR flow — see src/app/auth/confirm/route.ts.
+-->
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light">
+  <title>Repor palavra-passe — Batus</title>
+</head>
+<body style="margin:0;padding:0;background:#FAFAF7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0A0A0A;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FAFAF7;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;background:#FAFAF7;">
+
+          <!-- Logo -->
+          <tr>
+            <td align="center" style="padding:8px 0 32px;">
+              <img
+                src="{{ .SiteURL }}/logo-stacked.png"
+                alt="Batus"
+                width="88"
+                height="88"
+                style="display:block;border:0;outline:none;text-decoration:none;height:88px;width:auto;"
+              >
+            </td>
+          </tr>
+
+          <!-- Headline -->
+          <tr>
+            <td align="center" style="padding:0 8px 20px;">
+              <h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:700;letter-spacing:0.04em;line-height:1.2;color:#0A0A0A;text-transform:uppercase;">
+                Repor palavra-passe
+              </h1>
+            </td>
+          </tr>
+
+          <!-- Body copy -->
+          <tr>
+            <td style="padding:0 8px 32px;font-size:16px;line-height:1.6;color:#0A0A0A;">
+              <p style="margin:0 0 14px;">Olá,</p>
+              <p style="margin:0;">
+                Pediste para repor a tua palavra-passe no <strong>Batus</strong>.
+                Carrega no botão abaixo para definires uma nova:
+              </p>
+            </td>
+          </tr>
+
+          <!-- CTA button (table-based for Outlook) -->
+          <tr>
+            <td align="center" style="padding:0 8px 28px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td bgcolor="#0A0A0A" style="border-radius:6px;">
+                    <a
+                      href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=recovery"
+                      style="display:inline-block;padding:16px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;letter-spacing:0.08em;color:#FAFAF7;text-decoration:none;text-transform:uppercase;border-radius:6px;mso-padding-alt:0;"
+                    >
+                      Repor palavra-passe →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Fallback link (some email clients block buttons) -->
+          <tr>
+            <td style="padding:0 8px 32px;font-size:12px;line-height:1.6;color:#777;">
+              <p style="margin:0 0 6px;">Se o botão não funcionar, copia este link para o browser:</p>
+              <p style="margin:0;word-break:break-all;">
+                <a
+                  href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=recovery"
+                  style="color:#777;text-decoration:underline;"
+                >{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=recovery</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Disclaimer -->
+          <tr>
+            <td style="padding:20px 8px 0;border-top:1px solid #E5E5E0;">
+              <p style="margin:0;font-size:13px;line-height:1.6;color:#777;">
+                Se não foste tu a pedir, podes ignorar este email — a tua palavra-passe atual continua a funcionar.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding:32px 8px 8px;font-size:11px;letter-spacing:0.2em;line-height:1.7;text-transform:uppercase;color:#999;">
+              Batus Boxing &amp; Training<br>
+              <span style="color:#bbb;">Robert Baltaru · Braga</span>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
