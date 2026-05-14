@@ -390,58 +390,34 @@ export default async function PagamentosPage({
         </TabLink>
       </div>
 
-      {/* Compact summary line — counts only, no €. Revenue lives in the chart below. */}
-      {tab === "grupo" ? (
-        groupRows.length > 0 && (
-          <p className="mt-6 text-sm text-muted-foreground tabular-nums">
-            <span className="font-medium text-foreground">{groupRows.length}</span>{" "}
-            {groupRows.length === 1 ? "aluno" : "alunos"}
-            {" · "}
-            <span className="font-medium text-foreground">{groupPaid}</span>{" "}
-            pagos
-            {" · "}
-            <span className="font-medium text-foreground">{groupUnpaid}</span>{" "}
-            por pagar
-            {groupPaused > 0 && (
-              <>
-                {" · "}
-                <span className="font-medium text-foreground">{groupPaused}</span>{" "}
-                em pausa
-              </>
-            )}
-          </p>
-        )
-      ) : (
-        soloRows.length > 0 && (
-          <p className="mt-6 text-sm text-muted-foreground tabular-nums">
-            <span className="font-medium text-foreground">{soloRows.length}</span>{" "}
-            {soloRows.length === 1 ? "aluno" : "alunos"}
-            {" · "}
-            <span className="font-medium text-foreground">
-              {soloTotalSessions}
-            </span>{" "}
-            {soloTotalSessions === 1 ? "sessão" : "sessões"} este mês
-            {soloMonthlyTracked > 0 && (
-              <>
-                {" · "}
-                <span className="font-medium text-foreground">
-                  {soloMonthlyTracked}
-                </span>{" "}
-                mensal{soloMonthlyTracked === 1 ? "" : "s"}
-              </>
-            )}
-            {soloPerSession > 0 && (
-              <>
-                {" · "}
-                <span className="font-medium text-foreground">
-                  {soloPerSession}
-                </span>{" "}
-                à sessão
-              </>
-            )}
-          </p>
-        )
-      )}
+      {/* Stats — typographic only, no cards, no colours. Numbers carry weight
+          via display font + size; labels recede in muted small-caps. */}
+      {tab === "grupo"
+        ? groupRows.length > 0 && (
+            <dl className="mt-8 flex flex-wrap items-end gap-x-8 gap-y-4 sm:gap-x-12">
+              <Stat n={groupRows.length} label="alunos" />
+              <Stat n={groupPaid} label="pagos" />
+              <Stat n={groupUnpaid} label="por pagar" />
+              {groupPaused > 0 && (
+                <Stat n={groupPaused} label="em pausa" />
+              )}
+            </dl>
+          )
+        : soloRows.length > 0 && (
+            <dl className="mt-8 flex flex-wrap items-end gap-x-8 gap-y-4 sm:gap-x-12">
+              <Stat n={soloRows.length} label="alunos" />
+              <Stat
+                n={soloTotalSessions}
+                label={soloTotalSessions === 1 ? "sessão" : "sessões"}
+              />
+              {soloMonthlyTracked > 0 && (
+                <Stat n={soloMonthlyTracked} label="mensal" />
+              )}
+              {soloPerSession > 0 && (
+                <Stat n={soloPerSession} label="à sessão" />
+              )}
+            </dl>
+          )}
 
       {/* Board */}
       {tab === "grupo" ? (
@@ -501,6 +477,19 @@ export default async function PagamentosPage({
           Mensalidades pagas + receita de 1:1s (one-off + recorrentes).
         </p>
       </section>
+    </div>
+  );
+}
+
+function Stat({ n, label }: { n: number; label: string }) {
+  return (
+    <div>
+      <dd className="font-display text-3xl tabular-nums tracking-[0.04em] sm:text-4xl">
+        {n}
+      </dd>
+      <dt className="mt-1 text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        {label}
+      </dt>
     </div>
   );
 }

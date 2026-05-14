@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  Sheet,
-  SheetContent,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -221,17 +221,16 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
     notes !== initialNotes;
 
   return (
-    <Sheet
+    <Dialog
       open={!!student}
       onOpenChange={(v: boolean) => {
         if (!v) onClose();
       }}
     >
-      <SheetContent
-        side="right"
-        className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
+      <DialogContent
+        className="flex max-h-[calc(100dvh-2rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
       >
-        {/* Header — pr-12 leaves room for Sheet's built-in close button (top-3 right-3) */}
+        {/* Header — pr-12 leaves room for Dialog's built-in close button (top-2 right-2) */}
         <div className="px-6 pr-12 pb-4 pt-6">
           <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             {monthLabel} · {isSolo ? "1:1" : "Aulas de grupo"}
@@ -436,9 +435,9 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
           </section>
         </div>
 
-        {/* Sticky save bar (only when there's something to save) */}
+        {/* Save bar (only when there's something to save) */}
         {showsPaymentForm && (
-          <footer className="sticky bottom-0 border-t border-border/60 bg-popover px-6 py-4">
+          <footer className="border-t border-border/60 bg-popover px-6 py-4">
             <Button
               onClick={handleSave}
               disabled={pending || !hasChanges}
@@ -452,7 +451,7 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
             </Button>
           </footer>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
