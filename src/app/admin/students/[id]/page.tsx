@@ -6,11 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatEuro, formatMonthYear } from "@/lib/money";
+import { StatusPill } from "@/app/admin/pagamentos/status-pill";
+import type { PaymentStatus } from "@/app/admin/pagamentos/actions";
 import {
   togglePaymentStatus,
   updateStudentNotesAndGoals,
   upsertPaymentRecord,
 } from "./actions";
+
+const SELECT_CLASSES =
+  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +95,26 @@ export default async function StudentDetailPage({
             </div>
           </div>
           <div className="space-y-2">
+            <Label htmlFor="monthly_fee">Mensalidade (€)</Label>
+            <Input
+              id="monthly_fee"
+              name="monthly_fee"
+              inputMode="decimal"
+              defaultValue={
+                profile.monthly_fee_cents != null
+                  ? (profile.monthly_fee_cents / 100)
+                      .toFixed(2)
+                      .replace(".", ",")
+                  : ""
+              }
+              placeholder="Deixar em branco para usar o valor padrão"
+            />
+            <p className="text-xs text-muted-foreground">
+              Valor cobrado a este aluno. Se em branco, usa a mensalidade padrão
+              definida em Pagamentos.
+            </p>
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="goals">Objetivos</Label>
             <Textarea
               id="goals"
@@ -120,6 +145,17 @@ export default async function StudentDetailPage({
           Pagamentos
         </h2>
 
+        <p className="mt-4 text-xs text-muted-foreground">
+          Vista detalhada por aluno. Para marcar pagamentos do mês em massa, usa{" "}
+          <Link
+            href="/admin/pagamentos"
+            className="underline hover:text-foreground"
+          >
+            Pagamentos
+          </Link>
+          .
+        </p>
+
         {payments.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">
             Sem registos de pagamento.
@@ -138,7 +174,9 @@ export default async function StudentDetailPage({
               </thead>
               <tbody className="divide-y divide-border/60">
                 {payments.map((p) => {
-                  const isPaid = !!p.paid_at;
+                  const status: PaymentStatus =
+                    (p.status as PaymentStatus | undefined) ??
+                    (p.paid_at ? "paid" : "unpaid");
                   return (
                     <tr key={p.id}>
                       <td className="px-4 py-2 font-medium">
@@ -148,16 +186,15 @@ export default async function StudentDetailPage({
                         {formatEuro(p.amount_cents)}
                       </td>
                       <td className="px-4 py-2">
-                        {isPaid ? (
-                          <span className="text-foreground">
-                            Pago em{" "}
-                            {new Date(p.paid_at!).toLocaleDateString("pt-PT")}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">
-                            Por pagar
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <StatusPill status={status} />
+                          {status === "paid" && p.paid_at && (
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              em{" "}
+                              {new Date(p.paid_at).toLocaleDateString("pt-PT")}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-2 text-muted-foreground">
                         {p.notes || "—"}
@@ -172,11 +209,11 @@ export default async function StudentDetailPage({
                           />
                           <input
                             type="hidden"
-                            name="currently_paid"
-                            value={isPaid ? "true" : "false"}
+                            name="current_status"
+                            value={status}
                           />
                           <Button type="submit" variant="outline" size="sm">
-                            {isPaid ? "Marcar por pagar" : "Marcar pago"}
+                            Mudar estado
                           </Button>
                         </form>
                       </td>
@@ -209,7 +246,13 @@ export default async function StudentDetailPage({
             <Label htmlFor="amount" className="text-xs">
               Valor (€)
             </Label>
-            <Input id="amount" name="amount" placeholder="50" required />
+            <Input
+              id="amount"
+              name="amount"
+              inputMode="decimal"
+              placeholder="50"
+              required
+            />
           </div>
           <div className="space-y-1 sm:col-span-2">
             <Label htmlFor="payment_notes" className="text-xs">
@@ -218,11 +261,19 @@ export default async function StudentDetailPage({
             <Input id="payment_notes" name="notes" placeholder="opcional" />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Pago?</Label>
-            <label className="flex h-9 items-center gap-2 text-sm">
-              <input type="checkbox" name="paid" />
-              <span>Sim</span>
-            </label>
+            <Label htmlFor="status" className="text-xs">
+              Estado
+            </Label>
+            <select
+              id="status"
+              name="status"
+              defaultValue="paid"
+              className={SELECT_CLASSES}
+            >
+              <option value="paid">Pago</option>
+              <option value="unpaid">Por pagar</option>
+              <option value="paused">Em pausa</option>
+            </select>
           </div>
           <Button type="submit" size="sm" className="sm:col-span-5 sm:w-fit">
             Guardar pagamento

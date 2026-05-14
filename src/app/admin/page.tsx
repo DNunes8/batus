@@ -75,7 +75,7 @@ export default async function AdminDashboardPage() {
       .from("payment_records")
       .select("amount_cents")
       .gte("month", monthStart)
-      .not("paid_at", "is", null),
+      .eq("status", "paid"),
     admin
       .from("solo_sessions")
       .select("price_cents")
@@ -118,7 +118,7 @@ export default async function AdminDashboardPage() {
           icon={TrendingUp}
           label="Receitas este mês"
           value={formatEuro(monthEarnings)}
-          href="/admin/earnings"
+          href="/admin/pagamentos"
         />
         <DashboardCard
           icon={Calendar}

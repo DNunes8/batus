@@ -13,17 +13,22 @@ export async function updateStudentNotesAndGoals(formData: FormData) {
     null;
   const phone = ((formData.get("phone") as string | null) ?? "").trim() || null;
 
+  // Per-student monthly fee override. Empty input → fall back to studio default.
+  const feeRaw = ((formData.get("monthly_fee") as string | null) ?? "").trim();
+  const monthly_fee_cents = feeRaw === "" ? null : parseEuroToCents(feeRaw);
+
   if (!id) throw new Error("ID em falta.");
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("profiles")
-    .update({ notes, goals, full_name, phone })
+    .update({ notes, goals, full_name, phone, monthly_fee_cents })
     .eq("id", id);
 
   if (error) throw new Error(error.message);
 
   revalidatePath(`/admin/students/${id}`);
+  revalidatePath("/admin/pagamentos");
   redirect(`/admin/students/${id}?saved=1`);
 }
 
@@ -32,7 +37,10 @@ export async function upsertPaymentRecord(formData: FormData) {
   const month = formData.get("month") as string | null;
   const priceRaw = (formData.get("amount") as string | null) ?? "0";
   const amount_cents = parseEuroToCents(priceRaw);
-  const paidChecked = formData.get("paid") === "on";
+  const statusRaw = (formData.get("status") as string | null) ?? "unpaid";
+  const status = ["paid", "unpaid", "paused"].includes(statusRaw)
+    ? statusRaw
+    : "unpaid";
   const notes = ((formData.get("notes") as string | null) ?? "").trim() || null;
 
   if (!user_id || !month) throw new Error("Dados em falta.");
@@ -45,7 +53,8 @@ export async function upsertPaymentRecord(formData: FormData) {
       user_id,
       month: monthDate,
       amount_cents,
-      paid_at: paidChecked ? new Date().toISOString() : null,
+      status,
+      paid_at: status === "paid" ? new Date().toISOString() : null,
       notes,
     },
     { onConflict: "user_id,month" },
@@ -54,27 +63,38 @@ export async function upsertPaymentRecord(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/admin/students/${user_id}`);
-  revalidatePath("/admin/earnings");
+  revalidatePath("/admin/pagamentos");
   redirect(`/admin/students/${user_id}?saved=1`);
 }
 
+// Toggle through paid → unpaid → paused → paid on a single row.
+// Used by the legacy inline button on the student detail page so the coach
+// can flip a payment status without opening the full editor.
 export async function togglePaymentStatus(formData: FormData) {
   const id = formData.get("id") as string | null;
   const user_id = formData.get("user_id") as string | null;
-  const currentlyPaid = formData.get("currently_paid") === "true";
+  const currentStatus = (formData.get("current_status") as string | null) ?? "unpaid";
 
   if (!id || !user_id) throw new Error("Dados em falta.");
+
+  const next: "paid" | "unpaid" | "paused" =
+    currentStatus === "paid"
+      ? "unpaid"
+      : currentStatus === "unpaid"
+        ? "paused"
+        : "paid";
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("payment_records")
     .update({
-      paid_at: currentlyPaid ? null : new Date().toISOString(),
+      status: next,
+      paid_at: next === "paid" ? new Date().toISOString() : null,
     })
     .eq("id", id);
 
   if (error) throw new Error(error.message);
 
   revalidatePath(`/admin/students/${user_id}`);
-  revalidatePath("/admin/earnings");
+  revalidatePath("/admin/pagamentos");
 }

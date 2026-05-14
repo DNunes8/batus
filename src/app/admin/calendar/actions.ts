@@ -222,7 +222,7 @@ export async function createSoloFromCalendar(
   if (error) return { error: error.message };
 
   revalidatePath("/admin/calendar");
-  revalidatePath("/admin/earnings");
+  revalidatePath("/admin/pagamentos");
   revalidatePath("/perfil");
   return { success: true };
 }
@@ -246,7 +246,7 @@ export async function cancelSoloInstance(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/admin/calendar");
-  revalidatePath("/admin/earnings");
+  revalidatePath("/admin/pagamentos");
 }
 
 export async function restoreSoloInstance(formData: FormData) {
@@ -267,7 +267,7 @@ export async function restoreSoloInstance(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/admin/calendar");
-  revalidatePath("/admin/earnings");
+  revalidatePath("/admin/pagamentos");
 }
 
 export async function rescheduleSoloInstance(formData: FormData) {

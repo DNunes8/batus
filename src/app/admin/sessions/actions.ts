@@ -62,6 +62,6 @@ export async function createSoloSession(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/admin/sessions");
-  revalidatePath("/admin/earnings");
+  revalidatePath("/admin/pagamentos");
   redirect("/admin/sessions");
 }
