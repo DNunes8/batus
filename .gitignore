@@ -37,9 +37,12 @@ yarn-error.log*
 # vercel
 .vercel
 
-# stray IMG_*.PNG at project root (e.g. unprocessed screenshots)
+# stray screenshots / phone exports at project root
 /IMG_*.PNG
 /IMG_*.png
+/WhatsApp Image *.jpeg
+/WhatsApp Image *.jpg
+/Batus Logo_*.png
 
 # typescript
 *.tsbuildinfo
