@@ -26,25 +26,19 @@ export type HeaderUser = {
 } | null;
 
 function Wordmark() {
-  if (studio.brand.logo_url) {
+  const horizontal = studio.brand.logo?.horizontal;
+  if (horizontal) {
     return (
-      <span className="flex items-center gap-3">
-        {/* Crop into the center via rounded-full mask + scale, since the
-           source PNG is an Instagram zoom screenshot with a gray border
-           around the actual logo circle. */}
-        <span className="relative -my-3 size-14 shrink-0 overflow-hidden rounded-full bg-white">
-          <Image
-            src={studio.brand.logo_url}
-            alt={studio.fullName}
-            fill
-            quality={95}
-            sizes="56px"
-            className="scale-[1.18] object-cover"
-          />
-        </span>
-        <span className="hidden font-display text-2xl tracking-[0.08em] leading-none sm:inline">
-          {studio.name.toUpperCase()}
-        </span>
+      <span className="flex items-center transition-opacity hover:opacity-80">
+        <Image
+          src={horizontal}
+          alt={studio.fullName}
+          width={520}
+          height={120}
+          priority
+          quality={95}
+          className="h-9 w-auto sm:h-10"
+        />
       </span>
     );
   }

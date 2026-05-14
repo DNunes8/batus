@@ -206,13 +206,13 @@ export default async function Home() {
 
       {/* SCHEDULE PREVIEW — light side with subtle logo watermark */}
       <section className="relative overflow-hidden border-b border-border/60">
-        {studio.brand.logo_url && (
+        {studio.brand.logo?.stacked && (
           <div
             aria-hidden
             className="pointer-events-none absolute -right-20 top-1/2 hidden -translate-y-1/2 opacity-[0.04] lg:block"
           >
             <Image
-              src={studio.brand.logo_url}
+              src={studio.brand.logo.stacked}
               alt=""
               width={520}
               height={520}
@@ -288,17 +288,17 @@ export default async function Home() {
         )}
 
         <div className="relative mx-auto max-w-7xl px-6 py-24 sm:px-12 sm:py-32 lg:px-16">
-          {studio.brand.logo_url && (
-            <span className="relative mb-10 block size-32 overflow-hidden rounded-full">
+          {studio.brand.logo?.horizontal && (
+            <div className="mb-10 max-w-md">
               <Image
-                src={studio.brand.logo_url}
+                src={studio.brand.logo.horizontal}
                 alt=""
-                fill
+                width={520}
+                height={120}
                 quality={95}
-                sizes="128px"
-                className="scale-[1.18] object-cover invert"
+                className="h-12 w-auto invert sm:h-14"
               />
-            </span>
+            </div>
           )}
 
           <div className="grid items-end gap-12 lg:grid-cols-2">

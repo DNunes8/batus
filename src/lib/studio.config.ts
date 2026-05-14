@@ -29,7 +29,18 @@ export const studio = {
     accent: "#C9A227",     // champion gold (placeholder pending decision)
     // Optional asset paths (relative to /public). Set when files are saved.
     // Components fall back to typographic + plain backgrounds if nullish.
-    logo_url: "/batus-logo.png" as string | null,
+    logo: {
+      // Wide horizontal lockup: Spartan B + "BATUS BOXING & TRAINING /
+      // ROBERT BALTARU" in one line. Best for headers, footers, and dark
+      // CTA bands (with `invert`).
+      horizontal: "/logo-horizontal.png" as string | null,
+      // Stacked: prominent Spartan B mark above the wordmark. Best for
+      // splash/loading, /login, /bem-vindo, large standalone uses.
+      stacked: "/logo-stacked.png" as string | null,
+    },
+    // Legacy single-file alias — points at the stacked file for any
+    // older callers. Prefer logo.horizontal / logo.stacked going forward.
+    logo_url: "/logo-stacked.png" as string | null,
     hero_image_url: "/hero.png" as string | null,
     coach_image_url: "/coach.png" as string | null,
   },

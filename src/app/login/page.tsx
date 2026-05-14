@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { studio } from "@/lib/studio.config";
@@ -44,14 +45,28 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center px-4 py-10 sm:py-16">
       <Link
         href="/"
-        className="block text-center animate-in fade-in slide-in-from-bottom-2 duration-500"
+        className="block animate-in fade-in slide-in-from-bottom-2 duration-500"
+        aria-label={studio.fullName}
       >
-        <span className="font-display text-3xl tracking-[0.08em]">
-          {studio.name.toUpperCase()}
-        </span>
-        <span className="mt-1 block text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          Boxing &amp; Training
-        </span>
+        {studio.brand.logo?.stacked ? (
+          <Image
+            src={studio.brand.logo.stacked}
+            alt={studio.fullName}
+            width={320}
+            height={320}
+            priority
+            className="size-24 object-contain sm:size-28"
+          />
+        ) : (
+          <div className="text-center">
+            <span className="font-display text-3xl tracking-[0.08em]">
+              {studio.name.toUpperCase()}
+            </span>
+            <span className="mt-1 block text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              Boxing &amp; Training
+            </span>
+          </div>
+        )}
       </Link>
 
       <div className="mt-10 w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-700">
