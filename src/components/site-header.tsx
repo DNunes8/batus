@@ -97,45 +97,86 @@ export function SiteHeader({ user }: { user: HeaderUser }) {
         <Sheet>
           <SheetTrigger
             aria-label="Abrir menu"
-            className="inline-flex size-9 items-center justify-center rounded-md hover:bg-muted md:hidden"
+            className="inline-flex size-10 items-center justify-center rounded-md hover:bg-muted md:hidden"
           >
-            <Menu className="size-5" />
+            <Menu className="size-6" />
           </SheetTrigger>
-          <SheetContent side="right" className="w-72 p-6">
-            <div className="flex h-full flex-col">
-              <div className="flex items-baseline gap-2">
-                <span className="font-display text-2xl tracking-[0.08em]">
-                  {studio.name.toUpperCase()}
-                </span>
-                <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                  Menu
-                </span>
-              </div>
+          <SheetContent
+            side="right"
+            className="flex w-full flex-col gap-0 overflow-y-auto p-0"
+          >
+            {/* Top: stacked logo. pr-14 leaves room for the built-in X close
+                button (top-3 right-3) so it doesn't collide with the brand. */}
+            <div className="px-6 pb-8 pt-8 pr-14">
+              {studio.brand.logo?.stacked ? (
+                <Image
+                  src={studio.brand.logo.stacked}
+                  alt={studio.fullName}
+                  width={400}
+                  height={400}
+                  priority
+                  className="h-16 w-auto"
+                />
+              ) : (
+                <div>
+                  <span className="font-display text-3xl tracking-[0.08em]">
+                    {studio.name.toUpperCase()}
+                  </span>
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                    Boxing &amp; Training
+                  </p>
+                </div>
+              )}
+            </div>
 
-              <nav className="mt-10 flex flex-col gap-1">
-                {NAV.map((item) => (
-                  <SheetClose
-                    key={item.href}
-                    render={<Link href={item.href} />}
-                    className="rounded-md px-3 py-2 text-sm font-medium text-foreground/80 transition-colors hover:bg-muted hover:text-foreground"
-                  >
+            {/* Big editorial nav — large display type, numbered. Each row is
+                its own border-separated tappable strip. */}
+            <nav className="flex flex-col border-y border-border/40">
+              {NAV.map((item, i) => (
+                <SheetClose
+                  key={item.href}
+                  render={<Link href={item.href} />}
+                  className="group flex items-baseline justify-between gap-4 border-b border-border/40 px-6 py-5 transition-colors last:border-b-0 hover:bg-muted/40 active:bg-muted/60"
+                >
+                  <span className="font-display text-3xl uppercase tracking-[0.04em] sm:text-4xl">
                     {item.label}
-                  </SheetClose>
-                ))}
-              </nav>
+                  </span>
+                  <span className="font-display text-xs tabular-nums text-muted-foreground transition-transform group-hover:translate-x-1">
+                    {String(i + 1).padStart(2, "0")} →
+                  </span>
+                </SheetClose>
+              ))}
+            </nav>
 
-              <div className="mt-auto border-t border-border/60 pt-4">
-                {user ? (
-                  <MobileUserMenu user={user} />
-                ) : (
-                  <SheetClose
-                    render={<Link href="/login" />}
-                    className="block rounded-md bg-foreground px-3 py-2 text-center text-sm font-medium text-background"
-                  >
-                    Entrar
-                  </SheetClose>
-                )}
-              </div>
+            {/* Auth / user section */}
+            <div className="px-6 py-6">
+              {user ? (
+                <MobileUserMenu user={user} />
+              ) : (
+                <SheetClose
+                  render={<Link href="/login" />}
+                  className="flex h-14 w-full items-center justify-center rounded-md bg-foreground text-base font-medium uppercase tracking-[0.15em] text-background transition-opacity hover:opacity-90"
+                >
+                  Entrar
+                </SheetClose>
+              )}
+            </div>
+
+            {/* Footer — Instagram link + location for personality */}
+            <div className="mt-auto border-t border-border/40 px-6 py-5">
+              {studio.social.instagram && (
+                <a
+                  href={`https://instagram.com/${studio.social.instagram}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground"
+                >
+                  Instagram @{studio.social.instagram} →
+                </a>
+              )}
+              <p className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground/70">
+                {studio.city} · {studio.country}
+              </p>
             </div>
           </SheetContent>
         </Sheet>
@@ -185,37 +226,40 @@ function DesktopUserMenu({ user }: { user: NonNullable<HeaderUser> }) {
 
 function MobileUserMenu({ user }: { user: NonNullable<HeaderUser> }) {
   return (
-    <div className="space-y-2">
-      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-        Sessão
-      </p>
-      <p className="truncate text-sm">{user.email}</p>
-      <div className="flex flex-col gap-1 pt-2">
+    <div className="space-y-4">
+      <div>
+        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          Sessão iniciada
+        </p>
+        <p className="mt-1 truncate text-sm font-medium">{user.email}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
         {user.is_admin && (
           <SheetClose
             render={<Link href="/admin" />}
-            className="rounded-md px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-muted hover:text-foreground"
+            className="flex h-12 items-center justify-center rounded-md border border-foreground/60 text-sm font-medium uppercase tracking-[0.1em] text-foreground hover:bg-muted/40"
           >
             Admin
           </SheetClose>
         )}
         <SheetClose
           render={<Link href="/perfil" />}
-          className="rounded-md px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-muted hover:text-foreground"
+          className={`flex h-12 items-center justify-center rounded-md border border-border/60 text-sm font-medium uppercase tracking-[0.1em] hover:bg-muted/40 ${
+            user.is_admin ? "" : "col-span-2"
+          }`}
         >
           Perfil
         </SheetClose>
-        <form action={signOut}>
-          <Button
-            type="submit"
-            variant="outline"
-            size="sm"
-            className="mt-1 w-full"
-          >
-            Sair
-          </Button>
-        </form>
       </div>
+      <form action={signOut}>
+        <Button
+          type="submit"
+          variant="outline"
+          className="h-12 w-full text-sm uppercase tracking-[0.1em]"
+        >
+          Terminar sessão
+        </Button>
+      </form>
     </div>
   );
 }
