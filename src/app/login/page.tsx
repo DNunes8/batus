@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { Mail } from "lucide-react";
 import { studio } from "@/lib/studio.config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +50,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center px-4 py-10 sm:py-16">
       <Link
         href="/"
-        className="block animate-in fade-in slide-in-from-bottom-2 duration-500"
+        className="flex flex-col items-center animate-in fade-in slide-in-from-bottom-2 duration-500"
         aria-label={studio.fullName}
       >
         {studio.brand.logo?.stacked ? (
@@ -62,15 +63,13 @@ export default function LoginPage() {
             className="size-24 object-contain sm:size-28"
           />
         ) : (
-          <div className="text-center">
-            <span className="font-display text-3xl tracking-[0.08em]">
-              {studio.name.toUpperCase()}
-            </span>
-            <span className="mt-1 block text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              Boxing &amp; Training
-            </span>
-          </div>
+          <span className="font-display text-3xl tracking-[0.08em]">
+            {studio.name.toUpperCase()}
+          </span>
         )}
+        <p className="mt-3 text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+          Boxe &amp; Kickboxing · {studio.city}
+        </p>
       </Link>
 
       <div className="mt-10 w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -128,10 +127,12 @@ function Tabs({
   mode: "signin" | "signup";
   onChange: (m: "signin" | "signup") => void;
 }) {
+  // iOS-style segmented control. Filled pill for the active state makes the
+  // selected mode unmistakable — much clearer than a thin bottom-border.
   return (
     <div
       role="tablist"
-      className="grid grid-cols-2 gap-0 border-b border-border"
+      className="flex rounded-md border border-border/60 bg-muted/40 p-1"
     >
       <TabButton active={mode === "signin"} onClick={() => onChange("signin")}>
         Entrar
@@ -158,10 +159,10 @@ function TabButton({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`pb-3 pt-1 text-sm font-medium tracking-wide transition-colors ${
+      className={`flex-1 rounded-sm py-2.5 text-sm font-medium transition-colors ${
         active
-          ? "border-b-2 border-foreground text-foreground"
-          : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
+          ? "bg-background text-foreground shadow-sm ring-1 ring-foreground/10"
+          : "text-muted-foreground hover:text-foreground"
       }`}
     >
       {children}
@@ -206,9 +207,18 @@ function SignInForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="signin-password" className="text-base">
-          Palavra-passe
-        </Label>
+        <div className="flex items-baseline justify-between gap-2">
+          <Label htmlFor="signin-password" className="text-base">
+            Palavra-passe
+          </Label>
+          <button
+            type="button"
+            onClick={onForgot}
+            className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          >
+            Esqueci-me
+          </button>
+        </div>
         <PasswordInput
           id="signin-password"
           autoComplete="current-password"
@@ -226,14 +236,6 @@ function SignInForm({
       >
         {pending ? "A entrar…" : "Entrar"}
       </Button>
-
-      <button
-        type="button"
-        onClick={onForgot}
-        className="block w-full text-center text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground"
-      >
-        Esqueci-me da palavra-passe →
-      </button>
     </form>
   );
 }
@@ -280,9 +282,6 @@ function SignUpForm({
           autoComplete="new-password"
           placeholder="Mínimo 6 caracteres"
         />
-        <p className="text-xs text-muted-foreground">
-          Carrega em 👁 para veres o que estás a escrever.
-        </p>
       </div>
 
       {state?.error && (
@@ -385,8 +384,8 @@ function MagicForm({
 function MagicSentState({ email }: { email: string }) {
   return (
     <div className="text-center">
-      <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-foreground/5 text-2xl">
-        📧
+      <div className="mx-auto flex size-14 items-center justify-center rounded-full border border-border/60 bg-muted/40">
+        <Mail className="size-6 text-foreground" />
       </div>
       <h1 className="mt-6 font-display text-2xl tracking-wide">
         ENVIÁMOS-TE UM EMAIL
