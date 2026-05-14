@@ -150,10 +150,15 @@ export async function sendMagicLink(
   const supabase = await createClient();
   const origin = await originFromRequest();
 
+  // After verifying the OTP, route the user to /perfil?reset=1. That page
+  // pops a banner and auto-scrolls them to the "Alterar palavra-passe"
+  // section so the magic-link flow actually finishes with a password set.
+  const next = encodeURIComponent("/perfil?reset=1");
+
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${origin}/auth/confirm`,
+      emailRedirectTo: `${origin}/auth/confirm?next=${next}`,
       shouldCreateUser: false,
     },
   });

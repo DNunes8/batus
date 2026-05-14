@@ -11,6 +11,7 @@ import { getStudentStats } from "@/lib/stats";
 import { cancelBooking } from "@/app/(public)/aulas/actions";
 import { updateOwnProfile } from "./actions";
 import { ChangePasswordForm } from "./change-password-form";
+import { AutoScrollTo } from "./auto-scroll";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,14 @@ function formatBookingDate(s: string): string {
   }`;
 }
 
-export default async function PerfilPage() {
+export default async function PerfilPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ reset?: string }>;
+}) {
+  const params = (await searchParams) ?? {};
+  const isReset = params.reset === "1";
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -65,6 +73,8 @@ export default async function PerfilPage() {
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
+      {isReset && <AutoScrollTo targetId="palavra-passe" />}
+
       <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
         Perfil
       </p>
@@ -74,6 +84,22 @@ export default async function PerfilPage() {
       <p className="mt-2 text-sm text-muted-foreground">
         {profile?.email} · Aluno desde {since}
       </p>
+
+      {isReset && (
+        <div className="mt-8 rounded-md border border-foreground/30 bg-foreground/5 p-4 sm:p-5">
+          <p className="font-medium">Define a tua nova palavra-passe</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Estás dentro graças ao link mágico. Para entrares no futuro sem
+            esperar por um email, define agora uma palavra-passe em baixo.
+          </p>
+          <a
+            href="#palavra-passe"
+            className="mt-3 inline-block text-xs uppercase tracking-[0.2em] underline-offset-4 hover:underline"
+          >
+            Ir para Palavra-passe ↓
+          </a>
+        </div>
+      )}
 
       <div className="mt-12 grid gap-4 sm:grid-cols-3">
         <StatCard label="Aulas este mês" value={stats.attended_this_month} />
@@ -178,14 +204,18 @@ export default async function PerfilPage() {
         </form>
       </section>
 
-      <section className="mt-16">
+      <section id="palavra-passe" className="mt-16 scroll-mt-8">
         <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           Palavra-passe
         </h2>
         <p className="mt-2 text-xs text-muted-foreground">
           Define uma nova palavra-passe para as próximas entradas.
         </p>
-        <div className="mt-4 rounded-md border border-border/60 p-4">
+        <div
+          className={`mt-4 rounded-md border p-4 ${
+            isReset ? "border-foreground/30 bg-foreground/[0.03]" : "border-border/60"
+          }`}
+        >
           <ChangePasswordForm />
         </div>
       </section>
