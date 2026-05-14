@@ -132,10 +132,19 @@ export async function signUpWithPassword(
   redirect("/bem-vindo");
 }
 
-// Fallback for the rare "forgot password" / "can't remember it" case.
-// Sends a one-shot magic link the user can click to get back in, then
-// optionally set a new password from /perfil.
-export async function sendMagicLink(
+// "Forgot password" flow. Uses Supabase's dedicated recovery flow (not
+// signInWithOtp / magic link) because:
+//   1. Magic-link emails go through Supabase's /auth/v1/verify endpoint which
+//      delivers the session in a URL hash fragment — invisible to the server,
+//      so our /auth/confirm route can't read it and the SSR session never
+//      gets set on our domain. Admin users then bounce to /admin via the
+//      already-authenticated cookie, never reaching /perfil to set a password.
+//   2. resetPasswordForEmail produces a `type=recovery` URL that lands on
+//      /auth/confirm directly with a `token_hash` query param. Our route
+//      verifyOtp's it server-side, gets a real session cookie, then forces
+//      /perfil?reset=1 (hardcoded in /auth/confirm — does NOT rely on the
+//      email template carrying a `next` param).
+export async function sendPasswordReset(
   _prev: AuthState,
   formData: FormData,
 ): Promise<AuthState> {
@@ -150,17 +159,11 @@ export async function sendMagicLink(
   const supabase = await createClient();
   const origin = await originFromRequest();
 
-  // After verifying the OTP, route the user to /perfil?reset=1. That page
-  // pops a banner and auto-scrolls them to the "Alterar palavra-passe"
-  // section so the magic-link flow actually finishes with a password set.
-  const next = encodeURIComponent("/perfil?reset=1");
-
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: `${origin}/auth/confirm?next=${next}`,
-      shouldCreateUser: false,
-    },
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    // The recovery email's link routes here. /auth/confirm sees type=recovery
+    // and forces /perfil?reset=1, so the destination is encoded in our code,
+    // not in the email template.
+    redirectTo: `${origin}/auth/confirm`,
   });
 
   if (error) {
@@ -171,6 +174,10 @@ export async function sendMagicLink(
 
   return { status: "sent", email };
 }
+
+// Back-compat alias: anything still importing the old name keeps working.
+// Remove once we've migrated all callers.
+export const sendMagicLink = sendPasswordReset;
 
 // Kept for future use (provider can be re-enabled). UI no longer surfaces it.
 export async function signInWithGoogle() {

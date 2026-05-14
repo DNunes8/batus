@@ -331,11 +331,11 @@ function MagicForm({
     <div>
       <div className="text-center">
         <h1 className="font-display text-2xl tracking-wide">
-          ENTRAR SEM PALAVRA-PASSE
+          REPOR PALAVRA-PASSE
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          Esquecemo-nos todos. Vamos enviar-te um link para entrares, e podes
-          definir uma nova palavra-passe depois.
+          Esquecemo-nos todos. Vamos enviar-te um email com um link para
+          definires uma nova palavra-passe.
         </p>
       </div>
 
@@ -408,13 +408,13 @@ function MagicSentState({ email }: { email: string }) {
           <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] text-background">
             2
           </span>
-          <span>Procura por um email do Batus (assunto "Entra no Batus").</span>
+          <span>Procura por um email do Batus.</span>
         </li>
         <li className="flex gap-3">
           <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] text-background">
             3
           </span>
-          <span>Carrega no link — ficas dentro.</span>
+          <span>Carrega no link e define a nova palavra-passe.</span>
         </li>
       </ol>
 
