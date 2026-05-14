@@ -21,6 +21,10 @@ const initial: AuthState = null;
 
 export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("signin");
+  // Lift email up so it survives wrong-password retries, tab switches,
+  // and the "Esqueci-me" sub-flow without making the user re-type it.
+  // Password stays uncontrolled — that one should clear on failure.
+  const [email, setEmail] = useState("");
 
   const [signinState, signinAction, signinPending] = useActionState(
     signInWithPassword,
@@ -71,12 +75,14 @@ export default function LoginPage() {
 
       <div className="mt-10 w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-700">
         {mode === "magic-sent" ? (
-          <MagicSentState email={magicState?.email ?? ""} />
+          <MagicSentState email={magicState?.email ?? email} />
         ) : mode === "magic" ? (
           <MagicForm
             action={magicAction}
             state={magicState}
             pending={magicPending}
+            email={email}
+            onEmailChange={setEmail}
             onBack={() => setMode("signin")}
           />
         ) : (
@@ -88,6 +94,8 @@ export default function LoginPage() {
                 action={signinAction}
                 state={signinState}
                 pending={signinPending}
+                email={email}
+                onEmailChange={setEmail}
                 onForgot={() => setMode("magic")}
               />
             ) : (
@@ -95,6 +103,8 @@ export default function LoginPage() {
                 action={signupAction}
                 state={signupState}
                 pending={signupPending}
+                email={email}
+                onEmailChange={setEmail}
               />
             )}
           </>
@@ -164,11 +174,15 @@ function SignInForm({
   action,
   state,
   pending,
+  email,
+  onEmailChange,
   onForgot,
 }: {
   action: (formData: FormData) => void;
   state: AuthState;
   pending: boolean;
+  email: string;
+  onEmailChange: (v: string) => void;
   onForgot: () => void;
 }) {
   return (
@@ -186,6 +200,8 @@ function SignInForm({
           inputMode="email"
           placeholder="o.teu@email.com"
           className="h-12 text-base"
+          value={email}
+          onChange={(e) => onEmailChange(e.target.value)}
         />
       </div>
 
@@ -226,10 +242,14 @@ function SignUpForm({
   action,
   state,
   pending,
+  email,
+  onEmailChange,
 }: {
   action: (formData: FormData) => void;
   state: AuthState;
   pending: boolean;
+  email: string;
+  onEmailChange: (v: string) => void;
 }) {
   return (
     <form action={action} className="mt-8 space-y-4">
@@ -246,6 +266,8 @@ function SignUpForm({
           inputMode="email"
           placeholder="o.teu@email.com"
           className="h-12 text-base"
+          value={email}
+          onChange={(e) => onEmailChange(e.target.value)}
         />
       </div>
 
@@ -294,11 +316,15 @@ function MagicForm({
   action,
   state,
   pending,
+  email,
+  onEmailChange,
   onBack,
 }: {
   action: (formData: FormData) => void;
   state: AuthState;
   pending: boolean;
+  email: string;
+  onEmailChange: (v: string) => void;
   onBack: () => void;
 }) {
   return (
@@ -327,6 +353,8 @@ function MagicForm({
             inputMode="email"
             placeholder="o.teu@email.com"
             className="h-12 text-base"
+            value={email}
+            onChange={(e) => onEmailChange(e.target.value)}
           />
         </div>
 
