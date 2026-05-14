@@ -129,21 +129,17 @@ export function SiteHeader({ user }: { user: HeaderUser }) {
               )}
             </div>
 
-            {/* Big editorial nav — large display type, numbered. Each row is
-                its own border-separated tappable strip. */}
+            {/* Editorial nav — big enough to feel deliberate, quiet enough
+                not to shout. Display serif at text-xl, border-separated rows,
+                generous tap target via py-4. */}
             <nav className="flex flex-col border-y border-border/40">
-              {NAV.map((item, i) => (
+              {NAV.map((item) => (
                 <SheetClose
                   key={item.href}
                   render={<Link href={item.href} />}
-                  className="group flex items-baseline justify-between gap-4 border-b border-border/40 px-6 py-5 transition-colors last:border-b-0 hover:bg-muted/40 active:bg-muted/60"
+                  className="border-b border-border/40 px-6 py-4 font-display text-xl uppercase tracking-[0.04em] transition-colors last:border-b-0 hover:bg-muted/40 active:bg-muted/60"
                 >
-                  <span className="font-display text-3xl uppercase tracking-[0.04em] sm:text-4xl">
-                    {item.label}
-                  </span>
-                  <span className="font-display text-xs tabular-nums text-muted-foreground transition-transform group-hover:translate-x-1">
-                    {String(i + 1).padStart(2, "0")} →
-                  </span>
+                  {item.label}
                 </SheetClose>
               ))}
             </nav>
