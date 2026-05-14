@@ -10,6 +10,7 @@ import { formatTime } from "@/lib/schedule";
 import { getStudentStats } from "@/lib/stats";
 import { cancelBooking } from "@/app/(public)/aulas/actions";
 import { updateOwnProfile } from "./actions";
+import { ChangePasswordForm } from "./change-password-form";
 
 export const dynamic = "force-dynamic";
 
@@ -175,6 +176,18 @@ export default async function PerfilPage() {
             Guardar
           </SubmitButton>
         </form>
+      </section>
+
+      <section className="mt-16">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+          Palavra-passe
+        </h2>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Define uma nova palavra-passe para as próximas entradas.
+        </p>
+        <div className="mt-4 rounded-md border border-border/60 p-4">
+          <ChangePasswordForm />
+        </div>
       </section>
     </section>
   );

@@ -4,6 +4,49 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
+export type ChangePasswordState = {
+  error?: string;
+} | null;
+
+export async function changePassword(
+  _prev: ChangePasswordState,
+  formData: FormData,
+): Promise<ChangePasswordState> {
+  const newPassword = (formData.get("new_password") as string | null) ?? "";
+  const confirmPassword =
+    (formData.get("confirm_password") as string | null) ?? "";
+
+  if (!newPassword || !confirmPassword) {
+    return { error: "Preenche os dois campos." };
+  }
+
+  if (newPassword !== confirmPassword) {
+    return { error: "As palavras-passe não coincidem." };
+  }
+
+  if (newPassword.length < 6) {
+    return { error: "Palavra-passe demasiado curta — usa 6 ou mais." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login?next=/perfil");
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/perfil");
+  redirect("/perfil?password=1");
+}
+
 export async function updateOwnProfile(formData: FormData) {
   const supabase = await createClient();
   const {

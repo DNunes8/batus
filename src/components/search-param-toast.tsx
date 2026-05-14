@@ -38,6 +38,11 @@ const TOAST_BY_PARAM: Record<string, ToastConfig> = {
     message: "Bem-vindo ao Batus!",
     description: "Marca a tua primeira aula em baixo.",
   },
+  password: {
+    type: "success",
+    message: "Palavra-passe alterada.",
+    description: "Da próxima vez, usa a nova para entrares.",
+  },
 };
 
 export function SearchParamToast() {
