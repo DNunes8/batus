@@ -148,6 +148,56 @@ export async function setStudentMonthlyFee(formData: FormData) {
 }
 
 // ----------------------------------------------------------------------------
+// Move a student between the "Aulas de grupo" and "1:1s" tabs.
+// Just flips profiles.service_type — payment history is preserved either way.
+// ----------------------------------------------------------------------------
+export async function setStudentServiceType(input: {
+  user_id: string;
+  service_type: "group" | "solo";
+}) {
+  const { user_id, service_type } = input;
+  if (!user_id) throw new Error("ID em falta.");
+  if (!["group", "solo"].includes(service_type)) {
+    throw new Error("Tipo inválido.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ service_type })
+    .eq("id", user_id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin/pagamentos");
+  revalidatePath(`/admin/students/${user_id}`);
+}
+
+// ----------------------------------------------------------------------------
+// For a 1:1 student: opt them in/out of monthly payment tracking.
+// false → "pays per session, cash on the day" — no payment_record needed.
+// true  → "has a fixed monthly fee" — same Pago/Por pagar UX as mensalistas.
+// ----------------------------------------------------------------------------
+export async function setStudentHasMonthlyFee(input: {
+  user_id: string;
+  has_monthly_fee: boolean;
+}) {
+  const { user_id, has_monthly_fee } = input;
+  if (!user_id) throw new Error("ID em falta.");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ has_monthly_fee })
+    .eq("id", user_id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin/pagamentos");
+  revalidatePath(`/admin/students/${user_id}`);
+}
+
+// ----------------------------------------------------------------------------
 // Set the studio-wide default fee (form action). Stored in the settings table.
 // ----------------------------------------------------------------------------
 export async function setDefaultMonthlyFee(formData: FormData) {

@@ -1,6 +1,9 @@
 // Six-month strip used in the drawer + the student detail page.
-// Each square reflects the status of one month so the coach can spot patterns
-// at a glance (3 paid months, paused, then unpaid → "they took a break").
+// Monochrome by design: shape encodes state, not colour.
+//   ▣ filled  = pago
+//   ▢ outline = por pagar (had a row, but didn't pay)
+//   ◌ dashed  = em pausa
+//   · light   = sem registo (no row at all that month)
 
 import { formatMonthYear } from "@/lib/money";
 import type { PaymentStatus } from "./actions";
@@ -30,54 +33,42 @@ function shortMonth(month: string): string {
   return SHORT_PT_MONTHS[m - 1];
 }
 
-function colorFor(status: PaymentStatus | null): string {
+function cellClasses(status: PaymentStatus | null): string {
   switch (status) {
     case "paid":
-      return "bg-emerald-500/80 text-emerald-50";
-    case "paused":
-      return "bg-amber-400/70 text-amber-950";
+      return "bg-foreground border-foreground";
     case "unpaid":
-      return "bg-rose-400/60 text-rose-950";
+      return "border-foreground/60";
+    case "paused":
+      return "border-muted-foreground/40 border-dashed";
     default:
-      return "bg-muted text-muted-foreground/40";
+      return "border-muted-foreground/15";
   }
 }
 
-export function HistoryStrip({ cells }: { cells: HistoryCell[] }) {
-  return (
-    <div className="grid grid-cols-6 gap-1.5">
-      {cells.map((c) => (
-        <div
-          key={c.month}
-          title={`${formatMonthYear(c.month)} — ${labelFor(c.status)}`}
-          className="flex flex-col items-center gap-1"
-        >
-          <div
-            className={`flex h-10 w-full items-center justify-center rounded-sm text-[10px] font-medium uppercase tracking-wider ${colorFor(
-              c.status,
-            )}`}
-          >
-            {iconFor(c.status)}
-          </div>
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {shortMonth(c.month)}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function iconFor(status: PaymentStatus | null): string {
+function glyph(status: PaymentStatus | null): string {
   switch (status) {
     case "paid":
       return "✓";
-    case "paused":
-      return "II";
     case "unpaid":
       return "!";
+    case "paused":
+      return "II";
     default:
-      return "—";
+      return "·";
+  }
+}
+
+function glyphColor(status: PaymentStatus | null): string {
+  switch (status) {
+    case "paid":
+      return "text-background";
+    case "unpaid":
+      return "text-foreground";
+    case "paused":
+      return "text-muted-foreground";
+    default:
+      return "text-muted-foreground/40";
   }
 }
 
@@ -92,4 +83,29 @@ function labelFor(status: PaymentStatus | null): string {
     default:
       return "Sem registo";
   }
+}
+
+export function HistoryStrip({ cells }: { cells: HistoryCell[] }) {
+  return (
+    <div className="grid grid-cols-6 gap-1.5">
+      {cells.map((c) => (
+        <div
+          key={c.month}
+          title={`${formatMonthYear(c.month)} — ${labelFor(c.status)}`}
+          className="flex flex-col items-center gap-1"
+        >
+          <div
+            className={`flex h-10 w-full items-center justify-center rounded-sm border text-[10px] font-medium ${cellClasses(
+              c.status,
+            )} ${glyphColor(c.status)}`}
+          >
+            {glyph(c.status)}
+          </div>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {shortMonth(c.month)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }

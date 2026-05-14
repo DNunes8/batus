@@ -94,26 +94,57 @@ export default async function StudentDetailPage({
               />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="monthly_fee">Mensalidade (€)</Label>
-            <Input
-              id="monthly_fee"
-              name="monthly_fee"
-              inputMode="decimal"
-              defaultValue={
-                profile.monthly_fee_cents != null
-                  ? (profile.monthly_fee_cents / 100)
-                      .toFixed(2)
-                      .replace(".", ",")
-                  : ""
-              }
-              placeholder="Deixar em branco para usar o valor padrão"
-            />
-            <p className="text-xs text-muted-foreground">
-              Valor cobrado a este aluno. Se em branco, usa a mensalidade padrão
-              definida em Pagamentos.
-            </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="service_type">Tipo</Label>
+              <select
+                id="service_type"
+                name="service_type"
+                defaultValue={profile.service_type ?? "group"}
+                className={SELECT_CLASSES}
+              >
+                <option value="group">Aulas de grupo</option>
+                <option value="solo">1:1s</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Determina o separador onde o aluno aparece em Pagamentos.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="monthly_fee">Mensalidade (€)</Label>
+              <Input
+                id="monthly_fee"
+                name="monthly_fee"
+                inputMode="decimal"
+                defaultValue={
+                  profile.monthly_fee_cents != null
+                    ? (profile.monthly_fee_cents / 100)
+                        .toFixed(2)
+                        .replace(".", ",")
+                    : ""
+                }
+                placeholder="Em branco = padrão"
+              />
+              <p className="text-xs text-muted-foreground">
+                Em branco usa a mensalidade padrão definida em Pagamentos.
+              </p>
+            </div>
           </div>
+          <label className="flex items-start gap-2 rounded-md border border-border/60 p-3 text-sm">
+            <input
+              type="checkbox"
+              name="has_monthly_fee"
+              defaultChecked={profile.has_monthly_fee ?? true}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium">Tem pagamento mensal</span>
+              <span className="block text-xs text-muted-foreground">
+                Desliga só para alunos 1:1 que pagam à sessão (cash no dia). Nesse
+                caso a Pagamentos não exige Marcar pago todos os meses.
+              </span>
+            </span>
+          </label>
           <div className="space-y-2">
             <Label htmlFor="goals">Objetivos</Label>
             <Textarea

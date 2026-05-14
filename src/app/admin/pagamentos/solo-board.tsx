@@ -17,17 +17,24 @@ import { bulkSetPaymentStatus, type PaymentStatus } from "./actions";
 import { PaymentDrawer, type DrawerStudent } from "./payment-drawer";
 import { StatusPill } from "./status-pill";
 
-export type BoardRow = DrawerStudent & {
+export type SoloBoardRow = DrawerStudent & {
   effectiveStatus: PaymentStatus;
 };
 
 type BulkAction = { status: PaymentStatus; ids: string[] } | null;
 
-export function PaymentsBoard({
+function formatShortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-PT", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+export function SoloBoard({
   rows,
   month,
 }: {
-  rows: BoardRow[];
+  rows: SoloBoardRow[];
   month: string;
 }) {
   const router = useRouter();
@@ -49,6 +56,13 @@ export function PaymentsBoard({
     });
   }, [query, rows]);
 
+  // Only monthly-fee students are selectable — bulk-mark-paid is meaningless
+  // for per-session payers.
+  const selectableFiltered = useMemo(
+    () => filtered.filter((r) => r.has_monthly_fee),
+    [filtered],
+  );
+
   function toggleOne(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -59,14 +73,15 @@ export function PaymentsBoard({
   }
 
   function selectAllFiltered() {
-    const allFilteredSelected = filtered.every((r) => selectedIds.has(r.id));
+    const allSelected = selectableFiltered.every((r) =>
+      selectedIds.has(r.id),
+    );
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (allFilteredSelected) {
-        // Toggle off everything currently visible
-        for (const r of filtered) next.delete(r.id);
+      if (allSelected) {
+        for (const r of selectableFiltered) next.delete(r.id);
       } else {
-        for (const r of filtered) next.add(r.id);
+        for (const r of selectableFiltered) next.add(r.id);
       }
       return next;
     });
@@ -107,8 +122,9 @@ export function PaymentsBoard({
   }
 
   const selectedCount = selectedIds.size;
-  const allFilteredSelected =
-    filtered.length > 0 && filtered.every((r) => selectedIds.has(r.id));
+  const allSelectableSelected =
+    selectableFiltered.length > 0 &&
+    selectableFiltered.every((r) => selectedIds.has(r.id));
 
   const bulkLabel = bulkConfirm
     ? bulkConfirm.status === "paid"
@@ -149,17 +165,21 @@ export function PaymentsBoard({
         </p>
       </div>
 
-      {/* Select-all / clear-selection toolbar */}
+      {/* Select-all toolbar (only if there's anything selectable) */}
       <div className="mt-4 flex items-center justify-between border-b border-border/40 pb-3">
-        <label className="flex cursor-pointer items-center gap-2 text-xs uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground">
-          <input
-            type="checkbox"
-            checked={allFilteredSelected}
-            onChange={selectAllFiltered}
-            className="size-4"
-          />
-          Selecionar todos
-        </label>
+        {selectableFiltered.length > 0 ? (
+          <label className="flex cursor-pointer items-center gap-2 text-xs uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground">
+            <input
+              type="checkbox"
+              checked={allSelectableSelected}
+              onChange={selectAllFiltered}
+              className="size-4"
+            />
+            Selecionar todos com mensalidade
+          </label>
+        ) : (
+          <span />
+        )}
         {selectedCount > 0 && (
           <button
             type="button"
@@ -179,20 +199,27 @@ export function PaymentsBoard({
       ) : (
         <ul className="mt-2 divide-y divide-border/40 pb-32">
           {filtered.map((r) => {
+            const isMonthly = r.has_monthly_fee;
             const selected = selectedIds.has(r.id);
-            const amount = r.record?.amount_cents ?? r.resolvedFee;
-            const isPaid = r.effectiveStatus === "paid";
+            const activity = r.solo_activity;
+            const sessions = activity?.sessions_this_month ?? 0;
+            const revenue = activity?.revenue_this_month ?? 0;
+            const isPaidMonthly =
+              isMonthly && r.effectiveStatus === "paid";
             return (
               <li key={r.id}>
                 <div className="flex items-center gap-3 py-3">
                   <label
-                    className="flex shrink-0 cursor-pointer items-center pl-1"
+                    className={`flex shrink-0 items-center pl-1 ${
+                      isMonthly ? "cursor-pointer" : "opacity-30"
+                    }`}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <input
                       type="checkbox"
                       checked={selected}
-                      onChange={() => toggleOne(r.id)}
+                      onChange={() => isMonthly && toggleOne(r.id)}
+                      disabled={!isMonthly}
                       className="size-5"
                       aria-label={`Selecionar ${r.full_name ?? r.email}`}
                     />
@@ -205,30 +232,42 @@ export function PaymentsBoard({
                     <div className="min-w-0 flex-1">
                       <p
                         className={`truncate text-sm font-medium ${
-                          isPaid ? "text-muted-foreground" : "text-foreground"
+                          isPaidMonthly
+                            ? "text-muted-foreground"
+                            : "text-foreground"
                         }`}
                       >
                         {r.full_name?.trim() || r.email}
                       </p>
                       <div className="mt-1 flex items-center gap-2">
-                        <StatusPill status={r.effectiveStatus} />
-                        {r.record?.notes && (
-                          <span className="truncate text-xs text-muted-foreground">
-                            · {r.record.notes}
+                        {isMonthly ? (
+                          <StatusPill status={r.effectiveStatus} />
+                        ) : (
+                          <span className="inline-flex items-center rounded-full border border-muted-foreground/30 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                            Pago à sessão
                           </span>
                         )}
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {sessions}{" "}
+                          {sessions === 1 ? "sessão" : "sessões"}
+                        </span>
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
                       <p
                         className={`text-sm font-medium tabular-nums ${
-                          isPaid
-                            ? "text-muted-foreground line-through"
+                          isPaidMonthly
+                            ? "text-muted-foreground"
                             : "text-foreground"
                         }`}
                       >
-                        {formatEuro(amount)}
+                        {formatEuro(revenue)}
                       </p>
+                      {activity?.last_session_date && (
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground tabular-nums">
+                          {formatShortDate(activity.last_session_date)}
+                        </p>
+                      )}
                     </div>
                   </button>
                 </div>
@@ -238,12 +277,13 @@ export function PaymentsBoard({
         </ul>
       )}
 
-      {/* Sticky bulk action bar */}
+      {/* Sticky bulk action bar — only for monthly-fee selections */}
       {selectedCount > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
           <div className="mx-auto flex max-w-4xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm font-medium">
-              {selectedCount} {selectedCount === 1 ? "selecionado" : "selecionados"}
+              {selectedCount}{" "}
+              {selectedCount === 1 ? "selecionado" : "selecionados"}
             </p>
             <div className="flex gap-2">
               <Button

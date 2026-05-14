@@ -4,13 +4,16 @@ import { createClient } from "@/lib/supabase/server";
 import { formatEuro, formatMonthYear, monthKey } from "@/lib/money";
 import { addDays, dayOfWeek, todayLisbon } from "@/lib/schedule";
 import { PaymentsBoard, type BoardRow } from "./payments-board";
+import { SoloBoard, type SoloBoardRow } from "./solo-board";
 import { DefaultFeeButton } from "./default-fee-button";
 import type { PaymentStatus } from "./actions";
 import type { HistoryCell } from "./history-strip";
 
 export const dynamic = "force-dynamic";
 
-// Returns the YYYY-MM-01 month string `n` months before the input month.
+type Tab = "grupo" | "solo";
+
+// Returns the YYYY-MM-01 month string `n` months relative to the input.
 function shiftMonth(monthIso: string, delta: number): string {
   const [y, m] = monthIso.split("-").map(Number);
   const d = new Date(Date.UTC(y, m - 1 + delta, 1));
@@ -20,7 +23,6 @@ function shiftMonth(monthIso: string, delta: number): string {
 }
 
 function parseMonthParam(input: string | undefined): string {
-  // Accepts "YYYY-MM" or "YYYY-MM-01". Defaults to current month.
   if (input && /^\d{4}-\d{2}(-\d{2})?$/.test(input)) {
     return `${input.slice(0, 7)}-01`;
   }
@@ -28,25 +30,28 @@ function parseMonthParam(input: string | undefined): string {
   return monthKey(now);
 }
 
+// Last day of the given month, as YYYY-MM-DD.
+function lastDayOfMonth(monthIso: string): string {
+  const [y, m] = monthIso.split("-").map(Number);
+  // Date.UTC month is 0-based; passing our 1-based m and day=0 lands on
+  // the last day of the previous month, which is what we want.
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+}
+
 export default async function PagamentosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; tab?: string }>;
 }) {
   const params = await searchParams;
   const selectedMonth = parseMonthParam(params.month);
+  const tab: Tab = params.tab === "solo" ? "solo" : "grupo";
   const oldestMonth = shiftMonth(selectedMonth, -5);
+  const monthStart = selectedMonth;
+  const monthEnd = lastDayOfMonth(selectedMonth);
 
-  // Use the session-based client (not the service-role admin client). The
-  // admin layout already guards this page so we know the caller is an admin,
-  // and the RLS policies on profiles / payment_records / settings all grant
-  // admins full read access. This avoids depending on SUPABASE_SERVICE_ROLE_KEY
-  // being present in Vercel env — when that's missing, createAdminClient()
-  // queries fail silently and every list on the page comes back empty, which
-  // is exactly the bug we hit on the first deploy.
   const supabase = await createClient();
 
-  // ---- Pull everything we need in parallel ----
   const [
     profilesRes,
     recordsRes,
@@ -58,7 +63,7 @@ export default async function PagamentosPage({
     supabase
       .from("profiles")
       .select(
-        "id, email, full_name, phone, monthly_fee_cents, goals, notes, joined_at, is_admin, is_blocked",
+        "id, email, full_name, phone, monthly_fee_cents, goals, notes, joined_at, is_admin, is_blocked, service_type, has_monthly_fee",
       )
       .eq("is_admin", false)
       .eq("is_blocked", false),
@@ -74,11 +79,13 @@ export default async function PagamentosPage({
       .single(),
     supabase
       .from("solo_sessions")
-      .select("session_date, price_cents")
+      .select("user_id, session_date, price_cents")
       .gte("session_date", `${oldestMonth}T00:00:00`),
     supabase
       .from("solo_session_templates")
-      .select("id, day_of_week, price_cents, active_from, active_until"),
+      .select(
+        "id, user_id, day_of_week, price_cents, active_from, active_until",
+      ),
     supabase
       .from("solo_session_overrides")
       .select("template_id, instance_date, cancelled")
@@ -88,8 +95,10 @@ export default async function PagamentosPage({
   const profiles = profilesRes.data ?? [];
   const allRecords = recordsRes.data ?? [];
   const defaultFee = Number(settingRes.data?.value ?? 0);
+  const oneOffSolos = oneOffSolosRes.data ?? [];
+  const soloTemplates = soloTemplatesRes.data ?? [];
+  const soloOverrides = soloOverridesRes.data ?? [];
 
-  // Build the 6-month window (oldest → selected).
   const months: string[] = [];
   for (let i = 5; i >= 0; i--) months.push(shiftMonth(selectedMonth, -i));
 
@@ -104,45 +113,126 @@ export default async function PagamentosPage({
     recordsByUser.set(r.user_id, map);
   }
 
-  // Compose per-student rows for the selected month.
-  const rows: BoardRow[] = profiles
-    .map((p) => {
-      const userRecords = recordsByUser.get(p.id);
-      const currentRecord = userRecords?.get(selectedMonth) ?? null;
-      const resolvedFee = p.monthly_fee_cents ?? defaultFee;
-      const effectiveStatus: PaymentStatus =
-        (currentRecord?.status as PaymentStatus | undefined) ?? "unpaid";
+  // ---- Solo activity per student for the selected month ----
+  // Aggregates from one-off solo_sessions AND from recurring solo_session_templates
+  // (generating instances inside the month, skipping cancelled overrides).
+  const today = todayLisbon();
+  const activityCutoff = monthEnd < today ? monthEnd : today;
 
-      const history: HistoryCell[] = months.map((m) => {
-        const rec = userRecords?.get(m);
-        return {
-          month: m,
-          status: rec ? (rec.status as PaymentStatus) : null,
-        };
-      });
+  type ActivityAcc = {
+    sessions_this_month: number;
+    revenue_this_month: number;
+    last_session_date: string | null;
+  };
+  const activityByUser = new Map<string, ActivityAcc>();
 
+  function bump(
+    uid: string | null,
+    date: string,
+    priceCents: number,
+  ) {
+    if (!uid) return;
+    if (date < monthStart || date > activityCutoff) return;
+    const acc = activityByUser.get(uid) ?? {
+      sessions_this_month: 0,
+      revenue_this_month: 0,
+      last_session_date: null,
+    };
+    acc.sessions_this_month += 1;
+    acc.revenue_this_month += priceCents;
+    if (!acc.last_session_date || date > acc.last_session_date) {
+      acc.last_session_date = date;
+    }
+    activityByUser.set(uid, acc);
+  }
+
+  // One-off solo_sessions (legacy)
+  for (const row of oneOffSolos) {
+    const date = row.session_date.slice(0, 10);
+    bump(row.user_id, date, row.price_cents ?? 0);
+  }
+
+  // Recurring solo_session_templates: walk weekly within the month, skipping cancellations.
+  for (const tpl of soloTemplates) {
+    if (!tpl.user_id) continue;
+    if (tpl.active_from > monthEnd) continue;
+    if (tpl.active_until && tpl.active_until < monthStart) continue;
+    const start = tpl.active_from > monthStart ? tpl.active_from : monthStart;
+    const end =
+      tpl.active_until && tpl.active_until < activityCutoff
+        ? tpl.active_until
+        : activityCutoff;
+
+    let cursor = start;
+    while (cursor <= end && dayOfWeek(cursor) !== tpl.day_of_week) {
+      cursor = addDays(cursor, 1);
+    }
+    while (cursor <= end) {
+      const ov = soloOverrides.find(
+        (o) =>
+          o.template_id === tpl.id && o.instance_date === cursor,
+      );
+      if (!ov?.cancelled) {
+        bump(tpl.user_id, cursor, tpl.price_cents ?? 0);
+      }
+      cursor = addDays(cursor, 7);
+    }
+  }
+
+  // ---- Build rows for both tabs ----
+  function buildBoardRow(
+    p: (typeof profiles)[number],
+  ): BoardRow {
+    const userRecords = recordsByUser.get(p.id);
+    const currentRecord = userRecords?.get(selectedMonth) ?? null;
+    const resolvedFee = p.monthly_fee_cents ?? defaultFee;
+    const effectiveStatus: PaymentStatus =
+      (currentRecord?.status as PaymentStatus | undefined) ?? "unpaid";
+
+    const history: HistoryCell[] = months.map((m) => {
+      const rec = userRecords?.get(m);
       return {
-        id: p.id,
-        full_name: p.full_name,
-        email: p.email,
-        phone: p.phone,
-        goals: p.goals,
-        notes: p.notes,
-        joined_at: p.joined_at,
-        record: currentRecord
-          ? {
-              status: currentRecord.status as PaymentStatus,
-              amount_cents: currentRecord.amount_cents,
-              notes: currentRecord.notes,
-            }
-          : null,
-        resolvedFee,
-        history,
-        effectiveStatus,
+        month: m,
+        status: rec ? (rec.status as PaymentStatus) : null,
       };
-    })
-    // Sort: unpaid first (action items), then paid, then paused. Within each
-    // group, alphabetical by name.
+    });
+
+    const activity = activityByUser.get(p.id);
+
+    return {
+      id: p.id,
+      full_name: p.full_name,
+      email: p.email,
+      phone: p.phone,
+      goals: p.goals,
+      notes: p.notes,
+      joined_at: p.joined_at,
+      service_type: (p.service_type as "group" | "solo") ?? "group",
+      has_monthly_fee: p.has_monthly_fee ?? true,
+      record: currentRecord
+        ? {
+            status: currentRecord.status as PaymentStatus,
+            amount_cents: currentRecord.amount_cents,
+            notes: currentRecord.notes,
+          }
+        : null,
+      resolvedFee,
+      history,
+      solo_activity: activity,
+      effectiveStatus,
+    };
+  }
+
+  const sortAlpha = (a: BoardRow, b: BoardRow) => {
+    const an = (a.full_name ?? a.email).toLowerCase();
+    const bn = (b.full_name ?? b.email).toLowerCase();
+    return an.localeCompare(bn, "pt");
+  };
+
+  // Group tab: pay-status-first sort (unpaid → paid → paused)
+  const groupRows: BoardRow[] = profiles
+    .filter((p) => (p.service_type ?? "group") === "group")
+    .map(buildBoardRow)
     .sort((a, b) => {
       const order: Record<PaymentStatus, number> = {
         unpaid: 0,
@@ -151,24 +241,43 @@ export default async function PagamentosPage({
       };
       const diff = order[a.effectiveStatus] - order[b.effectiveStatus];
       if (diff !== 0) return diff;
-      const an = (a.full_name ?? a.email).toLowerCase();
-      const bn = (b.full_name ?? b.email).toLowerCase();
-      return an.localeCompare(bn, "pt");
+      return sortAlpha(a, b);
     });
 
-  // ---- Stats for the selected month ----
-  const paid = rows.filter((r) => r.effectiveStatus === "paid").length;
-  const unpaid = rows.filter((r) => r.effectiveStatus === "unpaid").length;
-  const paused = rows.filter((r) => r.effectiveStatus === "paused").length;
+  // Solo tab: most-active-first (more sessions = top), alpha fallback
+  const soloRows: SoloBoardRow[] = profiles
+    .filter((p) => p.service_type === "solo")
+    .map(buildBoardRow)
+    .sort((a, b) => {
+      const aSessions = a.solo_activity?.sessions_this_month ?? 0;
+      const bSessions = b.solo_activity?.sessions_this_month ?? 0;
+      if (aSessions !== bSessions) return bSessions - aSessions;
+      return sortAlpha(a, b);
+    });
 
-  const expectedCents = rows
+  // ---- Stats per tab ----
+  const groupPaid = groupRows.filter((r) => r.effectiveStatus === "paid").length;
+  const groupUnpaid = groupRows.filter((r) => r.effectiveStatus === "unpaid").length;
+  const groupPaused = groupRows.filter((r) => r.effectiveStatus === "paused").length;
+  const groupExpected = groupRows
     .filter((r) => r.effectiveStatus !== "paused")
-    .reduce((sum, r) => sum + (r.record?.amount_cents ?? r.resolvedFee), 0);
-  const receivedCents = rows
+    .reduce((s, r) => s + (r.record?.amount_cents ?? r.resolvedFee), 0);
+  const groupReceived = groupRows
     .filter((r) => r.effectiveStatus === "paid")
-    .reduce((sum, r) => sum + (r.record?.amount_cents ?? r.resolvedFee), 0);
+    .reduce((s, r) => s + (r.record?.amount_cents ?? r.resolvedFee), 0);
 
-  // ---- Earnings chart (last 6 months: mensalidades + solos) ----
+  const soloTotalSessions = soloRows.reduce(
+    (s, r) => s + (r.solo_activity?.sessions_this_month ?? 0),
+    0,
+  );
+  const soloTotalRevenue = soloRows.reduce(
+    (s, r) => s + (r.solo_activity?.revenue_this_month ?? 0),
+    0,
+  );
+  const soloMonthlyTracked = soloRows.filter((r) => r.has_monthly_fee).length;
+  const soloPerSession = soloRows.length - soloMonthlyTracked;
+
+  // ---- Earnings history chart ----
   type MonthlyTotals = {
     month: string;
     payments_cents: number;
@@ -178,26 +287,18 @@ export default async function PagamentosPage({
   for (const m of months) {
     totals[m] = { month: m, payments_cents: 0, solos_cents: 0 };
   }
-
   for (const r of allRecords) {
     if (r.status === "paid" && totals[r.month]) {
       totals[r.month].payments_cents += r.amount_cents ?? 0;
     }
   }
-
-  // One-off solo sessions (from /admin/sessions/new — kept for legacy).
-  for (const row of oneOffSolosRes.data ?? []) {
+  for (const row of oneOffSolos) {
     const sessionMonth = monthKey(new Date(row.session_date));
     if (totals[sessionMonth]) {
       totals[sessionMonth].solos_cents += row.price_cents ?? 0;
     }
   }
-
-  // Recurring 1:1 instances: generate occurrences from templates, skip
-  // cancelled overrides, sum at the template price.
-  const today = todayLisbon();
-  const soloOverrides = soloOverridesRes.data ?? [];
-  for (const tpl of soloTemplatesRes.data ?? []) {
+  for (const tpl of soloTemplates) {
     const startDate =
       tpl.active_from > oldestMonth ? tpl.active_from : oldestMonth;
     const endDate =
@@ -217,7 +318,6 @@ export default async function PagamentosPage({
       cursor = addDays(cursor, 7);
     }
   }
-
   const orderedTotals = months.map((m) => totals[m]);
   const total6m = orderedTotals.reduce(
     (s, m) => s + m.payments_cents + m.solos_cents,
@@ -231,20 +331,28 @@ export default async function PagamentosPage({
   const prevMonth = shiftMonth(selectedMonth, -1);
   const nextMonth = shiftMonth(selectedMonth, 1);
 
+  const buildHref = (overrides: Partial<{ tab: Tab; month: string }>) => {
+    const next = {
+      tab: overrides.tab ?? tab,
+      month: overrides.month ?? selectedMonth.slice(0, 7),
+    };
+    return `/admin/pagamentos?tab=${next.tab}&month=${next.month}`;
+  };
+
   return (
     <div className="p-6 sm:p-10">
       <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
         Pagamentos
       </p>
       <h1 className="mt-4 font-display text-3xl tracking-[0.04em] sm:text-4xl">
-        MENSALIDADES
+        {tab === "grupo" ? "AULAS DE GRUPO" : "1:1S"}
       </h1>
 
       {/* Month picker */}
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-4">
         <div className="flex items-center gap-1">
           <Link
-            href={`/admin/pagamentos?month=${prevMonth.slice(0, 7)}`}
+            href={buildHref({ month: prevMonth.slice(0, 7) })}
             aria-label="Mês anterior"
             className="inline-flex size-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
           >
@@ -254,7 +362,7 @@ export default async function PagamentosPage({
             {formatMonthYear(selectedMonth).toUpperCase()}
           </p>
           <Link
-            href={`/admin/pagamentos?month=${nextMonth.slice(0, 7)}`}
+            href={buildHref({ month: nextMonth.slice(0, 7) })}
             aria-label="Mês seguinte"
             className="inline-flex size-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
           >
@@ -264,29 +372,71 @@ export default async function PagamentosPage({
         <DefaultFeeButton currentCents={defaultFee} />
       </div>
 
-      {/* Stats */}
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard
-          label="Pagos"
-          value={`${paid}/${rows.length - paused}`}
-          tone="emerald"
-        />
-        <StatCard label="Por pagar" value={`${unpaid}`} tone="rose" />
-        <StatCard label="Em pausa" value={`${paused}`} tone="amber" />
-        <StatCard
-          label="Recebido este mês"
-          value={formatEuro(receivedCents)}
-          sub={`de ${formatEuro(expectedCents)}`}
-        />
+      {/* Tabs */}
+      <div className="mt-6 flex gap-1 border-b border-border/40" role="tablist">
+        <TabLink
+          href={buildHref({ tab: "grupo" })}
+          active={tab === "grupo"}
+          count={groupRows.length}
+        >
+          Aulas de grupo
+        </TabLink>
+        <TabLink
+          href={buildHref({ tab: "solo" })}
+          active={tab === "solo"}
+          count={soloRows.length}
+        >
+          1:1s
+        </TabLink>
       </div>
 
+      {/* Stats — content varies per tab */}
+      {tab === "grupo" ? (
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            label="Pagos"
+            value={`${groupPaid}/${groupRows.length - groupPaused}`}
+          />
+          <StatCard label="Por pagar" value={`${groupUnpaid}`} />
+          <StatCard label="Em pausa" value={`${groupPaused}`} />
+          <StatCard
+            label="Recebido este mês"
+            value={formatEuro(groupReceived)}
+            sub={`de ${formatEuro(groupExpected)}`}
+          />
+        </div>
+      ) : (
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label="Alunos 1:1" value={`${soloRows.length}`} />
+          <StatCard label="Sessões este mês" value={`${soloTotalSessions}`} />
+          <StatCard
+            label="Receita 1:1"
+            value={formatEuro(soloTotalRevenue)}
+          />
+          <StatCard
+            label="Pagam mensal / à sessão"
+            value={`${soloMonthlyTracked} / ${soloPerSession}`}
+          />
+        </div>
+      )}
+
       {/* Board */}
-      {rows.length === 0 ? (
+      {tab === "grupo" ? (
+        groupRows.length === 0 ? (
+          <p className="mt-12 text-center text-sm text-muted-foreground">
+            Sem alunos de aulas de grupo. Move algum aluno de 1:1s para cá pelo
+            menu do perfil ou pelo drawer.
+          </p>
+        ) : (
+          <PaymentsBoard rows={groupRows} month={selectedMonth} />
+        )
+      ) : soloRows.length === 0 ? (
         <p className="mt-12 text-center text-sm text-muted-foreground">
-          Sem alunos ativos para mostrar.
+          Sem alunos de 1:1s. Move algum aluno de Aulas de grupo para cá pelo
+          drawer ou pelo perfil do aluno.
         </p>
       ) : (
-        <PaymentsBoard rows={rows} month={selectedMonth} />
+        <SoloBoard rows={soloRows} month={selectedMonth} />
       )}
 
       {/* Earnings history */}
@@ -325,11 +475,44 @@ export default async function PagamentosPage({
           })}
         </div>
         <p className="mt-4 text-xs text-muted-foreground">
-          Apenas mensalidades marcadas como pagas contam. 1:1s contam pelo valor
-          do modelo.
+          Mensalidades pagas + receita de 1:1s (one-off + recorrentes).
         </p>
       </section>
     </div>
+  );
+}
+
+function TabLink({
+  href,
+  active,
+  count,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  count: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      role="tab"
+      aria-selected={active}
+      className={`relative px-4 py-3 text-sm font-medium tracking-wide transition-colors ${
+        active
+          ? "border-b-2 border-foreground -mb-px text-foreground"
+          : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {children}
+      <span
+        className={`ml-2 text-[10px] tabular-nums ${
+          active ? "text-muted-foreground" : "text-muted-foreground/60"
+        }`}
+      >
+        {count}
+      </span>
+    </Link>
   );
 }
 
@@ -337,23 +520,13 @@ function StatCard({
   label,
   value,
   sub,
-  tone,
 }: {
   label: string;
   value: string;
   sub?: string;
-  tone?: "emerald" | "rose" | "amber";
 }) {
-  const toneCls =
-    tone === "emerald"
-      ? "border-emerald-500/30 bg-emerald-500/5"
-      : tone === "rose"
-        ? "border-rose-500/30 bg-rose-500/5"
-        : tone === "amber"
-          ? "border-amber-500/30 bg-amber-500/5"
-          : "border-border/60";
   return (
-    <div className={`rounded-md border p-4 ${toneCls}`}>
+    <div className="rounded-md border border-border/60 p-4">
       <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
         {label}
       </p>

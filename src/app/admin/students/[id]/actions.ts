@@ -17,12 +17,28 @@ export async function updateStudentNotesAndGoals(formData: FormData) {
   const feeRaw = ((formData.get("monthly_fee") as string | null) ?? "").trim();
   const monthly_fee_cents = feeRaw === "" ? null : parseEuroToCents(feeRaw);
 
+  // Which Pagamentos tab this student belongs to + whether their monthly
+  // payment is tracked (relevant for 1:1 students who pay per-session).
+  const service_type =
+    ((formData.get("service_type") as string | null) ?? "group") === "solo"
+      ? "solo"
+      : "group";
+  const has_monthly_fee = formData.get("has_monthly_fee") === "on";
+
   if (!id) throw new Error("ID em falta.");
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("profiles")
-    .update({ notes, goals, full_name, phone, monthly_fee_cents })
+    .update({
+      notes,
+      goals,
+      full_name,
+      phone,
+      monthly_fee_cents,
+      service_type,
+      has_monthly_fee,
+    })
     .eq("id", id);
 
   if (error) throw new Error(error.message);
