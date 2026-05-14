@@ -65,9 +65,10 @@ export default async function Home() {
               Boxing &amp; Training
             </p>
             <p className="mt-10 max-w-md text-lg text-foreground/80">
-              Estúdio de boxe e kickboxing em {studio.city} com o treinador{" "}
-              <span className="text-foreground">{studio.coach}</span>. Aulas de
-              grupo e sessões individuais.
+              Treino de boxe e kickboxing no centro de {studio.city}. Aulas de
+              grupo e sessões 1:1 com{" "}
+              <span className="text-foreground">{studio.coach}</span>,
+              pugilista profissional.
             </p>
             <div className="mt-10 flex flex-wrap items-center gap-3">
               <Button
@@ -85,6 +86,17 @@ export default async function Home() {
               >
                 Contactar
               </Button>
+            </div>
+
+            {/* Modalities marquee — subtle motion + brand-defining keywords */}
+            <div className="mt-12 flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+              <span>Boxe</span>
+              <span className="text-foreground/30">·</span>
+              <span>Kickboxing</span>
+              <span className="text-foreground/30">·</span>
+              <span>Combate</span>
+              <span className="text-foreground/30">·</span>
+              <span>Sessões 1:1</span>
             </div>
           </div>
 
@@ -110,12 +122,29 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* CHARACTER STRIP — dark band gives the page weight + rhythm */}
-      <section className="border-b border-border/60 bg-foreground text-background">
-        <div className="mx-auto grid max-w-7xl divide-y divide-background/15 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          <Stat label="Modalidades" value="Boxe · Kickboxing" />
-          <Stat label="Aulas" value="Grupo · Individuais" />
-          <Stat label="Estúdio" value={`${studio.city}, ${studio.country}`} />
+      {/* MANIFESTO — three power-words on a dark band. Replaces a generic
+          stats strip with something that actually says what BATUS stands for. */}
+      <section className="relative border-b border-border/60 bg-foreground text-background">
+        <div className="mx-auto max-w-7xl px-6 py-20 sm:px-12 sm:py-28 lg:px-16 lg:py-32">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-background/50">
+            Manifesto
+          </p>
+          <div className="mt-6 grid gap-y-2 sm:gap-y-4">
+            <h2 className="font-display text-5xl leading-none tracking-[0.04em] sm:text-7xl xl:text-8xl">
+              TÉCNICA.
+            </h2>
+            <h2 className="font-display text-5xl leading-none tracking-[0.04em] text-background/85 sm:text-7xl xl:text-8xl">
+              RITMO.
+            </h2>
+            <h2 className="font-display text-5xl leading-none tracking-[0.04em] text-background/65 sm:text-7xl xl:text-8xl">
+              DISCIPLINA.
+            </h2>
+          </div>
+          <p className="mt-10 max-w-xl text-base leading-relaxed text-background/70 sm:text-lg">
+            Boxe e kickboxing ensinados com o rigor de quem treinou e competiu
+            ao mais alto nível. Turmas pequenas, atenção individual, sem
+            atalhos.
+          </p>
         </div>
       </section>
 
@@ -148,6 +177,14 @@ export default async function Home() {
             <h2 className="mt-4 font-display text-5xl leading-tight tracking-[0.04em] sm:text-6xl">
               {studio.coach.toUpperCase()}
             </h2>
+
+            <figure className="mt-10 border-l-2 border-foreground pl-5">
+              <blockquote className="font-display text-xl leading-snug tracking-[0.02em] sm:text-2xl">
+                "Treinar boxe é treinar a si próprio. <br className="hidden sm:block" />
+                A técnica vem depois — primeiro, o respeito pelo desporto."
+              </blockquote>
+            </figure>
+
             <div className="mt-8 space-y-4 text-base leading-relaxed text-foreground/80">
               <p>
                 Pugilista profissional e treinador em {studio.city},{" "}
@@ -271,6 +308,53 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* TESTIMONIAL — student video, vertical 9:16 phone-shot framed
+          alongside an editorial intro on the left. Real voices > stock copy. */}
+      <section className="border-b border-border/60 bg-muted/30">
+        <div className="mx-auto max-w-7xl px-6 py-20 sm:px-12 sm:py-24 lg:px-16">
+          <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                Testemunhos
+              </p>
+              <h2 className="mt-4 font-display text-5xl leading-tight tracking-[0.04em] sm:text-6xl">
+                EM QUEM<br />TREINA AQUI
+              </h2>
+              <p className="mt-8 max-w-md text-base leading-relaxed text-foreground/80 sm:text-lg">
+                Para teres uma ideia do que esperar antes de marcares a primeira
+                aula — um aluno fala sobre o que mudou desde que começou a
+                treinar com {studio.coach.split(" ")[0]}.
+              </p>
+              <Link
+                href="/contacto"
+                className="mt-10 inline-flex items-center gap-2 text-sm font-medium uppercase tracking-widest hover:underline"
+              >
+                Marcar primeira aula
+                <ArrowRight className="size-4" />
+              </Link>
+            </div>
+
+            <div className="mx-auto w-full max-w-[360px] sm:max-w-[400px]">
+              <div className="overflow-hidden rounded-lg bg-foreground shadow-2xl ring-1 ring-foreground/10">
+                <video
+                  controls
+                  playsInline
+                  preload="metadata"
+                  poster="/testimonial-poster.jpg"
+                  className="aspect-[9/16] w-full bg-foreground object-cover"
+                >
+                  <source src="/testimonial.mp4" type="video/mp4" />
+                  O teu browser não suporta vídeo embebido.
+                </video>
+              </div>
+              <p className="mt-3 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                Aluno do {studio.fullName}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA — full-bleed dark close with hero photo + prominent logo */}
       <section className="relative overflow-hidden bg-foreground text-background">
         {heroImage && (
@@ -329,6 +413,17 @@ export default async function Home() {
                   Contactar
                 </Button>
               </div>
+              {studio.social.instagram && (
+                <a
+                  href={`https://instagram.com/${studio.social.instagram}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 pt-2 text-xs uppercase tracking-[0.2em] text-background/60 hover:text-background"
+                >
+                  Instagram @{studio.social.instagram}
+                  <ArrowRight className="size-3" />
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -337,15 +432,3 @@ export default async function Home() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="px-6 py-10 sm:px-8 sm:py-12">
-      <p className="text-[10px] uppercase tracking-[0.3em] text-background/60">
-        {label}
-      </p>
-      <p className="mt-3 font-display text-2xl tracking-[0.04em] sm:text-3xl">
-        {value}
-      </p>
-    </div>
-  );
-}
