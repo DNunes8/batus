@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/password-input";
 import {
-  sendMagicLink,
+  sendPasswordReset,
   signInWithPassword,
   signUpWithPassword,
   type AuthState,
@@ -35,7 +35,7 @@ export default function LoginPage() {
     initial,
   );
   const [magicState, magicAction, magicPending] = useActionState(
-    sendMagicLink,
+    sendPasswordReset,
     initial,
   );
 

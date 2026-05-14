@@ -175,9 +175,6 @@ export async function sendPasswordReset(
   return { status: "sent", email };
 }
 
-// Back-compat alias: anything still importing the old name keeps working.
-// Remove once we've migrated all callers.
-export const sendMagicLink = sendPasswordReset;
 
 // Kept for future use (provider can be re-enabled). UI no longer surfaces it.
 export async function signInWithGoogle() {
