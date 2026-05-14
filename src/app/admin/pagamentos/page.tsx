@@ -390,34 +390,57 @@ export default async function PagamentosPage({
         </TabLink>
       </div>
 
-      {/* Stats — content varies per tab */}
+      {/* Compact summary line — counts only, no €. Revenue lives in the chart below. */}
       {tab === "grupo" ? (
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard
-            label="Pagos"
-            value={`${groupPaid}/${groupRows.length - groupPaused}`}
-          />
-          <StatCard label="Por pagar" value={`${groupUnpaid}`} />
-          <StatCard label="Em pausa" value={`${groupPaused}`} />
-          <StatCard
-            label="Recebido este mês"
-            value={formatEuro(groupReceived)}
-            sub={`de ${formatEuro(groupExpected)}`}
-          />
-        </div>
+        groupRows.length > 0 && (
+          <p className="mt-6 text-sm text-muted-foreground tabular-nums">
+            <span className="font-medium text-foreground">{groupRows.length}</span>{" "}
+            {groupRows.length === 1 ? "aluno" : "alunos"}
+            {" · "}
+            <span className="font-medium text-foreground">{groupPaid}</span>{" "}
+            pagos
+            {" · "}
+            <span className="font-medium text-foreground">{groupUnpaid}</span>{" "}
+            por pagar
+            {groupPaused > 0 && (
+              <>
+                {" · "}
+                <span className="font-medium text-foreground">{groupPaused}</span>{" "}
+                em pausa
+              </>
+            )}
+          </p>
+        )
       ) : (
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="Alunos 1:1" value={`${soloRows.length}`} />
-          <StatCard label="Sessões este mês" value={`${soloTotalSessions}`} />
-          <StatCard
-            label="Receita 1:1"
-            value={formatEuro(soloTotalRevenue)}
-          />
-          <StatCard
-            label="Pagam mensal / à sessão"
-            value={`${soloMonthlyTracked} / ${soloPerSession}`}
-          />
-        </div>
+        soloRows.length > 0 && (
+          <p className="mt-6 text-sm text-muted-foreground tabular-nums">
+            <span className="font-medium text-foreground">{soloRows.length}</span>{" "}
+            {soloRows.length === 1 ? "aluno" : "alunos"}
+            {" · "}
+            <span className="font-medium text-foreground">
+              {soloTotalSessions}
+            </span>{" "}
+            {soloTotalSessions === 1 ? "sessão" : "sessões"} este mês
+            {soloMonthlyTracked > 0 && (
+              <>
+                {" · "}
+                <span className="font-medium text-foreground">
+                  {soloMonthlyTracked}
+                </span>{" "}
+                mensal{soloMonthlyTracked === 1 ? "" : "s"}
+              </>
+            )}
+            {soloPerSession > 0 && (
+              <>
+                {" · "}
+                <span className="font-medium text-foreground">
+                  {soloPerSession}
+                </span>{" "}
+                à sessão
+              </>
+            )}
+          </p>
+        )
       )}
 
       {/* Board */}
@@ -516,28 +539,3 @@ function TabLink({
   );
 }
 
-function StatCard({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-}) {
-  return (
-    <div className="rounded-md border border-border/60 p-4">
-      <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-1 font-display text-2xl tabular-nums sm:text-3xl">
-        {value}
-      </p>
-      {sub && (
-        <p className="mt-0.5 text-[10px] text-muted-foreground tabular-nums">
-          {sub}
-        </p>
-      )}
-    </div>
-  );
-}

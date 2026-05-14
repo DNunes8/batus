@@ -4,10 +4,8 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Phone } from "lucide-react";
 import {
   Sheet,
-  SheetClose,
   SheetContent,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -21,7 +19,6 @@ import {
   setStudentServiceType,
   type PaymentStatus,
 } from "./actions";
-import { StatusPill } from "./status-pill";
 import { HistoryStrip, type HistoryCell } from "./history-strip";
 
 export type ServiceType = "group" | "solo";
@@ -36,17 +33,13 @@ export type DrawerStudent = {
   joined_at: string;
   service_type: ServiceType;
   has_monthly_fee: boolean;
-  // Current month's record, if any.
   record: {
     status: PaymentStatus;
     amount_cents: number;
     notes: string | null;
   } | null;
-  // Resolved amount when there's no record (default or per-student override).
   resolvedFee: number;
-  // 6-cell history including the selected month.
   history: HistoryCell[];
-  // Optional 1:1 activity context (only meaningful for solo students).
   solo_activity?: {
     sessions_this_month: number;
     revenue_this_month: number;
@@ -60,12 +53,6 @@ type Props = {
   onClose: () => void;
 };
 
-const STATUS_OPTIONS: { value: PaymentStatus; label: string; hint: string }[] = [
-  { value: "paid", label: "Pago", hint: "Pagamento recebido" },
-  { value: "unpaid", label: "Por pagar", hint: "Mensalidade em dívida" },
-  { value: "paused", label: "Em pausa", hint: "Não paga este mês" },
-];
-
 function eurosFromCents(cents: number): string {
   return (cents / 100).toFixed(2).replace(".", ",");
 }
@@ -73,7 +60,7 @@ function eurosFromCents(cents: number): string {
 function formatJoined(joined: string): string {
   return new Date(joined).toLocaleDateString("pt-PT", {
     year: "numeric",
-    month: "long",
+    month: "short",
   });
 }
 
@@ -82,6 +69,32 @@ function formatShortDate(iso: string): string {
     day: "numeric",
     month: "short",
   });
+}
+
+// Three big status buttons in a row, like a segmented control.
+// One tap selects; Guardar in the footer commits.
+function StatusButton({
+  selected,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex h-12 items-center justify-center rounded-md border text-sm font-medium transition-colors ${
+        selected
+          ? "border-foreground bg-foreground text-background"
+          : "border-border/60 text-foreground hover:bg-muted/40"
+      }`}
+    >
+      {children}
+    </button>
+  );
 }
 
 export function PaymentDrawer({ student, month, onClose }: Props) {
@@ -101,7 +114,6 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
   const [amount, setAmount] = useState(initialAmount);
   const [notes, setNotes] = useState(initialNotes);
 
-  // Reset internal state every time the drawer opens with a different student.
   useEffect(() => {
     if (!student) return;
     setStatus(student.record?.status ?? "unpaid");
@@ -118,8 +130,6 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
   const name = student.full_name?.trim() || student.email;
   const monthLabel = formatMonthYear(month);
   const isSolo = student.service_type === "solo";
-  // For solo students who pay per-session, the whole payment form is hidden —
-  // there's nothing to track monthly.
   const showsPaymentForm = !isSolo || student.has_monthly_fee;
 
   function handleSave() {
@@ -184,6 +194,7 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
 
   function handleHasMonthlyFeeToggle(value: boolean) {
     if (!student) return;
+    if (student.has_monthly_fee === value) return;
     startMoving(async () => {
       try {
         await setStudentHasMonthlyFee({
@@ -218,204 +229,63 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
     >
       <SheetContent
         side="right"
-        className="flex w-full flex-col gap-0 overflow-y-auto p-0 sm:max-w-md"
+        className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
       >
-        {/* Header */}
-        <header className="border-b border-border/60 px-6 pb-4 pt-6">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              {monthLabel}
-            </p>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              {isSolo ? "1:1" : "Aulas de grupo"}
-            </p>
-          </div>
+        {/* Header — pr-12 leaves room for Sheet's built-in close button (top-3 right-3) */}
+        <div className="px-6 pr-12 pb-4 pt-6">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            {monthLabel} · {isSolo ? "1:1" : "Aulas de grupo"}
+          </p>
           <h2 className="mt-1 font-display text-2xl tracking-[0.04em]">
             {name}
           </h2>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {showsPaymentForm ? (
-              <StatusPill status={status} />
-            ) : (
-              <span className="inline-flex items-center rounded-full border border-muted-foreground/30 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                Pago à sessão
-              </span>
-            )}
+          <p className="mt-1 truncate text-xs text-muted-foreground">
             {student.phone && (
-              <a
-                href={`tel:${student.phone.replace(/\s/g, "")}`}
-                className="inline-flex items-center gap-1 hover:text-foreground"
-              >
-                <Phone className="size-3" />
-                {student.phone}
-              </a>
+              <>
+                <a
+                  href={`tel:${student.phone.replace(/\s/g, "")}`}
+                  className="hover:text-foreground"
+                >
+                  {student.phone}
+                </a>
+                {" · "}
+              </>
             )}
-            <span>Aluno desde {formatJoined(student.joined_at)}</span>
-          </div>
-        </header>
+            desde {formatJoined(student.joined_at)}
+          </p>
+        </div>
 
-        {/* Body */}
-        <div className="flex-1 space-y-6 px-6 py-5">
-          {/* Solo activity rollup */}
-          {isSolo && student.solo_activity && (
-            <section className="rounded-md border border-border/60 p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Atividade em {monthLabel}
-              </p>
-              <div className="mt-2 grid grid-cols-3 gap-3">
-                <div>
-                  <p className="font-display text-xl tabular-nums">
-                    {student.solo_activity.sessions_this_month}
-                  </p>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                    sessões
-                  </p>
-                </div>
-                <div>
-                  <p className="font-display text-xl tabular-nums">
-                    {formatEuro(student.solo_activity.revenue_this_month)}
-                  </p>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                    receita
-                  </p>
-                </div>
-                <div>
-                  <p className="font-display text-xl tabular-nums">
-                    {student.solo_activity.last_session_date
-                      ? formatShortDate(
-                          student.solo_activity.last_session_date,
-                        )
-                      : "—"}
-                  </p>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                    última
-                  </p>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Recent payment history (only if monthly tracking is on) */}
+        {/* Scrollable body — main action up top, context below */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Primary action: status buttons (only when tracking monthly) */}
           {showsPaymentForm && (
-            <section>
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Últimos 6 meses
-              </p>
-              <HistoryStrip cells={student.history} />
-            </section>
-          )}
-
-          {/* Profile context */}
-          {(student.goals || student.notes) && (
-            <section className="rounded-md border border-border/60 bg-muted/30 p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Sobre o aluno
-              </p>
-              {student.goals && (
-                <p className="mt-2 text-sm">
-                  <span className="text-muted-foreground">Objetivos: </span>
-                  {student.goals}
-                </p>
-              )}
-              {student.notes && (
-                <p className="mt-1 text-sm">
-                  <span className="text-muted-foreground">Notas: </span>
-                  {student.notes}
-                </p>
-              )}
-              <Link
-                href={`/admin/students/${student.id}`}
-                className="mt-3 inline-block text-xs uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground"
-              >
-                Editar perfil →
-              </Link>
-            </section>
-          )}
-
-          {/* Solo-only: monthly tracking toggle */}
-          {isSolo && (
-            <section className="space-y-2">
+            <section className="border-t border-border/60 px-6 py-5">
               <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                Pagamento mensal fixo?
+                Estado
               </Label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    student.has_monthly_fee || handleHasMonthlyFeeToggle(true)
-                  }
-                  disabled={moving}
-                  className={`rounded-md border p-3 text-left transition-colors ${
-                    student.has_monthly_fee
-                      ? "border-foreground bg-foreground/5"
-                      : "border-border/60 hover:bg-muted/40"
-                  }`}
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <StatusButton
+                  selected={status === "paid"}
+                  onClick={() => setStatus("paid")}
                 >
-                  <p className="text-sm font-medium">Sim</p>
-                  <p className="text-xs text-muted-foreground">
-                    Mensalidade ou bulk pré-pago
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    !student.has_monthly_fee ||
-                    handleHasMonthlyFeeToggle(false)
-                  }
-                  disabled={moving}
-                  className={`rounded-md border p-3 text-left transition-colors ${
-                    !student.has_monthly_fee
-                      ? "border-foreground bg-foreground/5"
-                      : "border-border/60 hover:bg-muted/40"
-                  }`}
+                  Pago
+                </StatusButton>
+                <StatusButton
+                  selected={status === "unpaid"}
+                  onClick={() => setStatus("unpaid")}
                 >
-                  <p className="text-sm font-medium">Não</p>
-                  <p className="text-xs text-muted-foreground">
-                    Paga à sessão (cash)
-                  </p>
-                </button>
-              </div>
-            </section>
-          )}
-
-          {/* This month form — only when we actually track monthly */}
-          {showsPaymentForm && (
-            <section className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                  Estado em {monthLabel}
-                </Label>
-                <div className="grid grid-cols-1 gap-2">
-                  {STATUS_OPTIONS.map((opt) => (
-                    <label
-                      key={opt.value}
-                      className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${
-                        status === opt.value
-                          ? "border-foreground bg-foreground/5"
-                          : "border-border/60 hover:bg-muted/40"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="status"
-                        value={opt.value}
-                        checked={status === opt.value}
-                        onChange={() => setStatus(opt.value)}
-                        className="mt-1"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">{opt.label}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {opt.hint}
-                        </p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
+                  Por pagar
+                </StatusButton>
+                <StatusButton
+                  selected={status === "paused"}
+                  onClick={() => setStatus("paused")}
+                >
+                  Pausa
+                </StatusButton>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="space-y-1">
                   <Label htmlFor="amount" className="text-xs">
                     Valor (€)
                   </Label>
@@ -424,70 +294,164 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     inputMode="decimal"
-                    placeholder="0,00"
                     disabled={status === "paused"}
-                    className="h-11 text-base sm:h-9 sm:text-sm"
+                    className="h-11 text-base sm:h-10 sm:text-sm"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Mensalidade base</Label>
-                  <p className="flex h-11 items-center text-sm text-muted-foreground sm:h-9">
+                <div className="space-y-1">
+                  <Label className="text-xs">Padrão</Label>
+                  <p className="flex h-11 items-center text-sm text-muted-foreground sm:h-10">
                     {formatEuro(student.resolvedFee)}
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="mt-3 space-y-1">
                 <Label htmlFor="payment-notes" className="text-xs">
-                  Notas do pagamento
+                  Notas (opcional)
                 </Label>
                 <Textarea
                   id="payment-notes"
                   rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="ex: pago em dinheiro, 4 sessões em Maio…"
+                  placeholder="ex: cash, 4 sessões…"
                 />
               </div>
             </section>
           )}
 
-          {/* Move to other tab */}
-          <section className="border-t border-border/40 pt-4">
-            <button
-              type="button"
-              onClick={handleMove}
-              disabled={moving}
-              className="text-xs uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground disabled:opacity-50"
-            >
-              {moving
-                ? "A mover…"
-                : isSolo
-                  ? "← Mover para Aulas de grupo"
-                  : "Mover para 1:1s →"}
-            </button>
+          {/* For solo per-session payers: there's no payment form. Show why. */}
+          {!showsPaymentForm && (
+            <section className="border-t border-border/60 bg-muted/30 px-6 py-5 text-sm">
+              <p className="font-medium">Paga à sessão</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Sem mensalidade fixa. O coach recebe na sessão, sem registo
+                mensal para preencher.
+              </p>
+            </section>
+          )}
+
+          {/* Solo activity rollup — compact, one line */}
+          {isSolo && student.solo_activity && (
+            <section className="border-t border-border/60 px-6 py-4">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                Em {monthLabel}
+              </p>
+              <p className="mt-1 text-sm">
+                <strong className="tabular-nums">
+                  {student.solo_activity.sessions_this_month}
+                </strong>{" "}
+                {student.solo_activity.sessions_this_month === 1
+                  ? "sessão"
+                  : "sessões"}{" "}
+                ·{" "}
+                <strong className="tabular-nums">
+                  {formatEuro(student.solo_activity.revenue_this_month)}
+                </strong>
+                {student.solo_activity.last_session_date && (
+                  <>
+                    {" "}
+                    · última{" "}
+                    <span className="tabular-nums">
+                      {formatShortDate(
+                        student.solo_activity.last_session_date,
+                      )}
+                    </span>
+                  </>
+                )}
+              </p>
+            </section>
+          )}
+
+          {/* Solo: monthly-fee toggle, two compact buttons */}
+          {isSolo && (
+            <section className="border-t border-border/60 px-6 py-4">
+              <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                Pagamento mensal fixo?
+              </Label>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleHasMonthlyFeeToggle(true)}
+                  disabled={moving}
+                  className={`rounded-md border p-2 text-sm transition-colors ${
+                    student.has_monthly_fee
+                      ? "border-foreground bg-foreground/5 font-medium"
+                      : "border-border/60 text-muted-foreground hover:bg-muted/40"
+                  }`}
+                >
+                  Sim, mensal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleHasMonthlyFeeToggle(false)}
+                  disabled={moving}
+                  className={`rounded-md border p-2 text-sm transition-colors ${
+                    !student.has_monthly_fee
+                      ? "border-foreground bg-foreground/5 font-medium"
+                      : "border-border/60 text-muted-foreground hover:bg-muted/40"
+                  }`}
+                >
+                  Não, à sessão
+                </button>
+              </div>
+            </section>
+          )}
+
+          {/* History strip — only when we track monthly */}
+          {showsPaymentForm && (
+            <section className="border-t border-border/60 px-6 py-4">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                Últimos 6 meses
+              </p>
+              <div className="mt-2">
+                <HistoryStrip cells={student.history} />
+              </div>
+            </section>
+          )}
+
+          {/* Footer links: profile + move-between-tabs */}
+          <section className="border-t border-border/60 px-6 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+              <Link
+                href={`/admin/students/${student.id}`}
+                className="uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground"
+              >
+                Ver perfil →
+              </Link>
+              <button
+                type="button"
+                onClick={handleMove}
+                disabled={moving}
+                className="uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground disabled:opacity-50"
+              >
+                {moving
+                  ? "A mover…"
+                  : isSolo
+                    ? "← Mover para Aulas de grupo"
+                    : "Mover para 1:1s →"}
+              </button>
+            </div>
           </section>
         </div>
 
-        {/* Footer */}
-        <footer className="sticky bottom-0 flex gap-3 border-t border-border/60 bg-popover px-6 py-4">
-          <SheetClose
-            render={
-              <Button variant="outline" className="h-12 flex-1 text-base">
-                Fechar
-              </Button>
-            }
-          />
-          {showsPaymentForm && (
+        {/* Sticky save bar (only when there's something to save) */}
+        {showsPaymentForm && (
+          <footer className="sticky bottom-0 border-t border-border/60 bg-popover px-6 py-4">
             <Button
               onClick={handleSave}
               disabled={pending || !hasChanges}
-              className="h-12 flex-1 text-base"
+              className="h-12 w-full text-base"
             >
-              {pending ? "A guardar…" : "Guardar"}
+              {pending
+                ? "A guardar…"
+                : hasChanges
+                  ? "Guardar"
+                  : "Sem alterações"}
             </Button>
-          )}
-        </footer>
+          </footer>
+        )}
       </SheetContent>
     </Sheet>
   );
