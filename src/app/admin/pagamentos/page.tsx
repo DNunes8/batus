@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { formatEuro, formatMonthYear, monthKey } from "@/lib/money";
 import { addDays, dayOfWeek, todayLisbon } from "@/lib/schedule";
 import { PaymentsBoard, type BoardRow } from "./payments-board";
@@ -37,7 +37,14 @@ export default async function PagamentosPage({
   const selectedMonth = parseMonthParam(params.month);
   const oldestMonth = shiftMonth(selectedMonth, -5);
 
-  const admin = createAdminClient();
+  // Use the session-based client (not the service-role admin client). The
+  // admin layout already guards this page so we know the caller is an admin,
+  // and the RLS policies on profiles / payment_records / settings all grant
+  // admins full read access. This avoids depending on SUPABASE_SERVICE_ROLE_KEY
+  // being present in Vercel env — when that's missing, createAdminClient()
+  // queries fail silently and every list on the page comes back empty, which
+  // is exactly the bug we hit on the first deploy.
+  const supabase = await createClient();
 
   // ---- Pull everything we need in parallel ----
   const [
@@ -48,31 +55,31 @@ export default async function PagamentosPage({
     soloTemplatesRes,
     soloOverridesRes,
   ] = await Promise.all([
-    admin
+    supabase
       .from("profiles")
       .select(
         "id, email, full_name, phone, monthly_fee_cents, goals, notes, joined_at, is_admin, is_blocked",
       )
       .eq("is_admin", false)
       .eq("is_blocked", false),
-    admin
+    supabase
       .from("payment_records")
       .select("id, user_id, month, amount_cents, status, paid_at, notes")
       .gte("month", oldestMonth)
       .lte("month", selectedMonth),
-    admin
+    supabase
       .from("settings")
       .select("value")
       .eq("key", "default_monthly_fee_cents")
       .single(),
-    admin
+    supabase
       .from("solo_sessions")
       .select("session_date, price_cents")
       .gte("session_date", `${oldestMonth}T00:00:00`),
-    admin
+    supabase
       .from("solo_session_templates")
       .select("id, day_of_week, price_cents, active_from, active_until"),
-    admin
+    supabase
       .from("solo_session_overrides")
       .select("template_id, instance_date, cancelled")
       .gte("instance_date", oldestMonth),
