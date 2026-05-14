@@ -66,47 +66,93 @@ export default async function SessionsPage() {
           </Button>
         </div>
       ) : (
-        <div className="mt-10 overflow-x-auto rounded-md border border-border/60">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3 font-medium">Data</th>
-                <th className="px-4 py-3 font-medium">Aluno</th>
-                <th className="hidden px-4 py-3 font-medium md:table-cell">Duração</th>
-                <th className="px-4 py-3 font-medium">Valor</th>
-                <th className="hidden px-4 py-3 font-medium lg:table-cell">Notas</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60">
-              {rows.map((s) => {
-                const name =
-                  s.profile?.full_name ||
-                  s.profile?.email ||
-                  s.student_name ||
-                  "—";
-                const date = new Date(s.session_date).toLocaleString("pt-PT", {
-                  dateStyle: "short",
-                  timeStyle: "short",
-                });
-                return (
-                  <tr key={s.id} className="hover:bg-muted/30">
-                    <td className="px-4 py-3 tabular-nums">{date}</td>
-                    <td className="px-4 py-3 font-medium">{name}</td>
-                    <td className="hidden px-4 py-3 md:table-cell">
-                      {s.duration_minutes} min
-                    </td>
-                    <td className="px-4 py-3 tabular-nums">
-                      {formatEuro(s.price_cents)}
-                    </td>
-                    <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">
-                      {s.notes || "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* Desktop: table */}
+          <div className="mt-10 hidden overflow-x-auto rounded-md border border-border/60 md:block">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Data</th>
+                  <th className="px-4 py-3 font-medium">Aluno</th>
+                  <th className="hidden px-4 py-3 font-medium md:table-cell">Duração</th>
+                  <th className="px-4 py-3 font-medium">Valor</th>
+                  <th className="hidden px-4 py-3 font-medium lg:table-cell">Notas</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {rows.map((s) => {
+                  const name =
+                    s.profile?.full_name ||
+                    s.profile?.email ||
+                    s.student_name ||
+                    "—";
+                  const date = new Date(s.session_date).toLocaleString("pt-PT", {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  });
+                  return (
+                    <tr key={s.id} className="hover:bg-muted/30">
+                      <td className="px-4 py-3 tabular-nums">{date}</td>
+                      <td className="px-4 py-3 font-medium">{name}</td>
+                      <td className="hidden px-4 py-3 md:table-cell">
+                        {s.duration_minutes} min
+                      </td>
+                      <td className="px-4 py-3 tabular-nums">
+                        {formatEuro(s.price_cents)}
+                      </td>
+                      <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">
+                        {s.notes || "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile: card list */}
+          <ul className="mt-8 space-y-3 md:hidden">
+            {rows.map((s) => {
+              const name =
+                s.profile?.full_name ||
+                s.profile?.email ||
+                s.student_name ||
+                "—";
+              const date = new Date(s.session_date).toLocaleString("pt-PT", {
+                dateStyle: "short",
+                timeStyle: "short",
+              });
+              return (
+                <li
+                  key={s.id}
+                  className="rounded-md border border-border/60 bg-background p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{name}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                        {date}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="font-medium tabular-nums">
+                        {formatEuro(s.price_cents)}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                        {s.duration_minutes} min
+                      </p>
+                    </div>
+                  </div>
+                  {s.notes && (
+                    <p className="mt-3 border-t border-border/40 pt-2 text-xs text-muted-foreground">
+                      {s.notes}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
     </div>
   );

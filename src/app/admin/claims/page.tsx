@@ -71,80 +71,153 @@ export default async function ClaimsPage({
           </p>
         </div>
       ) : (
-        <div className="mt-8 overflow-x-auto rounded-md border border-border/60">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3 font-medium">Aluno</th>
-                <th className="px-4 py-3 font-medium">Artigo</th>
-                <th className="px-4 py-3 font-medium">Qt</th>
-                <th className="px-4 py-3 font-medium">Valor</th>
-                <th className="px-4 py-3 font-medium">Pedido</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60">
-              {claims.map((c) => {
-                const profile = c.profile as unknown as {
-                  full_name: string | null;
-                  email: string;
-                };
-                const item = c.item as unknown as {
-                  name: string;
-                  price_cents: number;
-                };
-                const when = new Date(c.claimed_at).toLocaleString("pt-PT", {
-                  dateStyle: "short",
-                  timeStyle: "short",
-                });
-                return (
-                  <tr key={c.id} className="hover:bg-muted/30">
-                    <td className="px-4 py-3">
-                      {profile?.full_name || profile?.email || "—"}
-                    </td>
-                    <td className="px-4 py-3 font-medium">{item?.name}</td>
-                    <td className="px-4 py-3 tabular-nums">{c.quantity}</td>
-                    <td className="px-4 py-3 tabular-nums">
-                      {formatEuro((item?.price_cents ?? 0) * c.quantity)}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground tabular-nums">
-                      {when}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {status === "pending" && (
-                        <div className="flex justify-end gap-2">
-                          <form action={fulfillClaim}>
-                            <input type="hidden" name="id" value={c.id} />
-                            <Button type="submit" size="sm">
-                              Entregue
-                            </Button>
-                          </form>
-                          <form action={cancelClaim}>
-                            <input type="hidden" name="id" value={c.id} />
-                            <Button
-                              type="submit"
-                              variant="outline"
-                              size="sm"
-                              className="text-destructive"
-                            >
-                              Cancelar
-                            </Button>
-                          </form>
-                        </div>
-                      )}
-                      {status === "fulfilled" && c.fulfilled_at && (
-                        <span className="text-xs text-muted-foreground">
-                          em{" "}
-                          {new Date(c.fulfilled_at).toLocaleDateString("pt-PT")}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* Desktop: table */}
+          <div className="mt-8 hidden overflow-x-auto rounded-md border border-border/60 md:block">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Aluno</th>
+                  <th className="px-4 py-3 font-medium">Artigo</th>
+                  <th className="px-4 py-3 font-medium">Qt</th>
+                  <th className="px-4 py-3 font-medium">Valor</th>
+                  <th className="px-4 py-3 font-medium">Pedido</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {claims.map((c) => {
+                  const profile = c.profile as unknown as {
+                    full_name: string | null;
+                    email: string;
+                  };
+                  const item = c.item as unknown as {
+                    name: string;
+                    price_cents: number;
+                  };
+                  const when = new Date(c.claimed_at).toLocaleString("pt-PT", {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  });
+                  return (
+                    <tr key={c.id} className="hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        {profile?.full_name || profile?.email || "—"}
+                      </td>
+                      <td className="px-4 py-3 font-medium">{item?.name}</td>
+                      <td className="px-4 py-3 tabular-nums">{c.quantity}</td>
+                      <td className="px-4 py-3 tabular-nums">
+                        {formatEuro((item?.price_cents ?? 0) * c.quantity)}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground tabular-nums">
+                        {when}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {status === "pending" && (
+                          <div className="flex justify-end gap-2">
+                            <form action={fulfillClaim}>
+                              <input type="hidden" name="id" value={c.id} />
+                              <Button type="submit" size="sm">
+                                Entregue
+                              </Button>
+                            </form>
+                            <form action={cancelClaim}>
+                              <input type="hidden" name="id" value={c.id} />
+                              <Button
+                                type="submit"
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive"
+                              >
+                                Cancelar
+                              </Button>
+                            </form>
+                          </div>
+                        )}
+                        {status === "fulfilled" && c.fulfilled_at && (
+                          <span className="text-xs text-muted-foreground">
+                            em{" "}
+                            {new Date(c.fulfilled_at).toLocaleDateString("pt-PT")}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile: card list */}
+          <ul className="mt-6 space-y-3 md:hidden">
+            {claims.map((c) => {
+              const profile = c.profile as unknown as {
+                full_name: string | null;
+                email: string;
+              };
+              const item = c.item as unknown as {
+                name: string;
+                price_cents: number;
+              };
+              const when = new Date(c.claimed_at).toLocaleString("pt-PT", {
+                dateStyle: "short",
+                timeStyle: "short",
+              });
+              return (
+                <li
+                  key={c.id}
+                  className="rounded-md border border-border/60 bg-background p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{item?.name}</p>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {profile?.full_name || profile?.email || "—"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                        {when}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="font-medium tabular-nums">
+                        {formatEuro((item?.price_cents ?? 0) * c.quantity)}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                        × {c.quantity}
+                      </p>
+                    </div>
+                  </div>
+                  {status === "pending" && (
+                    <div className="mt-3 flex gap-2 border-t border-border/40 pt-3">
+                      <form action={fulfillClaim} className="flex-1">
+                        <input type="hidden" name="id" value={c.id} />
+                        <Button type="submit" className="h-11 w-full text-base">
+                          Entregue
+                        </Button>
+                      </form>
+                      <form action={cancelClaim} className="flex-1">
+                        <input type="hidden" name="id" value={c.id} />
+                        <Button
+                          type="submit"
+                          variant="outline"
+                          className="h-11 w-full text-base text-destructive"
+                        >
+                          Cancelar
+                        </Button>
+                      </form>
+                    </div>
+                  )}
+                  {status === "fulfilled" && c.fulfilled_at && (
+                    <p className="mt-3 border-t border-border/40 pt-2 text-xs text-muted-foreground">
+                      Entregue em{" "}
+                      {new Date(c.fulfilled_at).toLocaleDateString("pt-PT")}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
     </div>
   );

@@ -58,8 +58,8 @@ export default async function MessagesPage() {
                     : "border-border/60"
                 }`}
               >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
                     <p className="font-medium">
                       {m.name}
                       {isUnread && (
@@ -69,22 +69,30 @@ export default async function MessagesPage() {
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {m.email}
-                      {m.phone && ` · ${m.phone}`} · {when}
+                      <span className="break-all">{m.email}</span>
+                      {m.phone && <> · {m.phone}</>} · {when}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex shrink-0 gap-2">
                     {isUnread ? (
-                      <form action={markMessageRead}>
+                      <form action={markMessageRead} className="flex-1 sm:flex-none">
                         <input type="hidden" name="id" value={m.id} />
-                        <Button type="submit" variant="outline" size="sm">
-                          Marcar como lida
+                        <Button
+                          type="submit"
+                          variant="outline"
+                          className="h-11 w-full text-base sm:h-9 sm:text-sm"
+                        >
+                          Marcar lida
                         </Button>
                       </form>
                     ) : (
-                      <form action={markMessageUnread}>
+                      <form action={markMessageUnread} className="flex-1 sm:flex-none">
                         <input type="hidden" name="id" value={m.id} />
-                        <Button type="submit" variant="outline" size="sm">
+                        <Button
+                          type="submit"
+                          variant="outline"
+                          className="h-11 w-full text-base sm:h-9 sm:text-sm"
+                        >
                           Marcar por ler
                         </Button>
                       </form>
@@ -92,13 +100,13 @@ export default async function MessagesPage() {
                     <ConfirmForm
                       message={`Apagar a mensagem de ${m.name}? Não dá para desfazer.`}
                       action={deleteMessage}
+                      className="flex-1 sm:flex-none"
                     >
                       <input type="hidden" name="id" value={m.id} />
                       <Button
                         type="submit"
                         variant="outline"
-                        size="sm"
-                        className="text-destructive"
+                        className="h-11 w-full text-base text-destructive sm:h-9 sm:text-sm"
                       >
                         Apagar
                       </Button>

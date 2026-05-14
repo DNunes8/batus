@@ -38,21 +38,21 @@ export default async function AdminLayout({
           className="block transition-opacity hover:opacity-80"
           aria-label={studio.fullName}
         >
-          {studio.brand.logo?.horizontal ? (
+          {studio.brand.logo?.stacked ? (
             <Image
-              src={studio.brand.logo.horizontal}
+              src={studio.brand.logo.stacked}
               alt={studio.fullName}
-              width={520}
-              height={120}
+              width={400}
+              height={400}
               priority
-              className="h-8 w-auto"
+              className="h-24 w-auto"
             />
           ) : (
             <span className="font-display text-2xl tracking-[0.08em]">
               BATUS
             </span>
           )}
-          <span className="mt-2 block text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <span className="mt-3 block text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Admin
           </span>
         </Link>
