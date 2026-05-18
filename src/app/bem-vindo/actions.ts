@@ -42,7 +42,20 @@ export async function completeProfile(
   revalidatePath("/perfil");
   revalidatePath("/admin/students");
 
-  // Welcome toast surfaces on the next page (default /aulas).
+  // Pending accounts go straight to /perfil — its panel explains that the
+  // coach has to approve them before they can book. No point sending them
+  // to the schedule with every button locked. Approved users get the normal
+  // welcome flow with the toast.
+  const { data: prof } = await supabase
+    .from("profiles")
+    .select("approved")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!prof?.approved) {
+    redirect("/perfil");
+  }
+
   const separator = next.includes("?") ? "&" : "?";
   redirect(`${next}${separator}welcome=1`);
 }

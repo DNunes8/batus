@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { studio } from "@/lib/studio.config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,6 +65,9 @@ export default async function PerfilPage({
 
   const stats = await getStudentStats(user.id);
 
+  // Admins are always treated as approved; everyone else needs the flag.
+  const isApproved = !!profile?.approved || !!profile?.is_admin;
+
   const since = profile
     ? new Date(profile.joined_at).toLocaleDateString("pt-PT", {
         year: "numeric",
@@ -101,60 +105,118 @@ export default async function PerfilPage({
         </div>
       )}
 
-      <div className="mt-12 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Aulas este mês" value={stats.attended_this_month} />
-        <StatCard label="Total" value={stats.total_attended} />
-        <StatCard label="Próximas" value={stats.upcoming.length} />
-      </div>
-
-      <section className="mt-16">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-          Próximas aulas
-        </h2>
-        {stats.upcoming.length === 0 ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            Sem aulas marcadas. <Link href="/aulas" className="hover:underline">Ver horário →</Link>
+      {/* Pending account — leads the page with a clear "what's next" panel
+          instead of stats/bookings the student can't have yet. */}
+      {!isApproved && (
+        <div className="mt-8 rounded-md border border-foreground/25 bg-muted/40 p-5 sm:p-6">
+          <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            Estado da conta
           </p>
-        ) : (
-          <ul className="mt-4 divide-y divide-border/60 rounded-md border border-border/60">
-            {stats.upcoming.map((b) => (
-              <li
-                key={b.id}
-                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+          <h2 className="mt-2 font-display text-2xl tracking-[0.04em] sm:text-3xl">
+            A AGUARDAR APROVAÇÃO
+          </h2>
+          <p className="mt-3 max-w-prose text-sm leading-relaxed text-foreground/80">
+            O {studio.name} aprova cada novo aluno antes da primeira aula. Já
+            temos o teu registo — falta só falares com o{" "}
+            {studio.coach.split(" ")[0]} para combinarem a tua entrada.
+          </p>
+          <div className="mt-4 rounded-md border border-border/60 bg-background p-4">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              Próximo passo
+            </p>
+            <p className="mt-1 text-sm text-foreground/80">
+              Contacta o treinador. Assim que aprovar a tua conta, podes marcar
+              aulas no horário — sem precisares de voltar a entrar.
+            </p>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {studio.social.instagram && (
+              <a
+                href={`https://instagram.com/${studio.social.instagram}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-11 items-center rounded-md border border-border/60 px-4 text-sm font-medium hover:bg-muted"
               >
-                <div className="flex items-baseline gap-3">
-                  <span className="font-display text-lg tracking-wider tabular-nums">
-                    {formatTime(b.start_time)}
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium">{b.template_name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatBookingDate(b.instance_date)} ·{" "}
-                      {b.duration_minutes} min
-                    </p>
-                  </div>
-                </div>
-                <form
-                  action={cancelBooking}
-                  className="flex items-center gap-2"
-                >
-                  <input type="hidden" name="booking_id" value={b.id} />
-                  <span className="text-xs uppercase tracking-widest text-muted-foreground">
-                    {b.status === "waitlisted" ? "Em espera" : "Marcado"}
-                  </span>
-                  <SubmitButton
-                    variant="outline"
-                    className="h-10 px-4"
-                    pendingText="A cancelar…"
+                Instagram @{studio.social.instagram}
+              </a>
+            )}
+            <Link
+              href="/contacto"
+              className="inline-flex h-11 items-center rounded-md bg-foreground px-4 text-sm font-medium text-background hover:opacity-90"
+            >
+              Contactar
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Stats + bookings only make sense once the student can actually book. */}
+      {isApproved && (
+        <>
+          <div className="mt-12 grid gap-4 sm:grid-cols-3">
+            <StatCard
+              label="Aulas este mês"
+              value={stats.attended_this_month}
+            />
+            <StatCard label="Total" value={stats.total_attended} />
+            <StatCard label="Próximas" value={stats.upcoming.length} />
+          </div>
+
+          <section className="mt-16">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Próximas aulas
+            </h2>
+            {stats.upcoming.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Sem aulas marcadas.{" "}
+                <Link href="/aulas" className="hover:underline">
+                  Ver horário →
+                </Link>
+              </p>
+            ) : (
+              <ul className="mt-4 divide-y divide-border/60 rounded-md border border-border/60">
+                {stats.upcoming.map((b) => (
+                  <li
+                    key={b.id}
+                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
                   >
-                    Cancelar
-                  </SubmitButton>
-                </form>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                    <div className="flex items-baseline gap-3">
+                      <span className="font-display text-lg tracking-wider tabular-nums">
+                        {formatTime(b.start_time)}
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium">
+                          {b.template_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatBookingDate(b.instance_date)} ·{" "}
+                          {b.duration_minutes} min
+                        </p>
+                      </div>
+                    </div>
+                    <form
+                      action={cancelBooking}
+                      className="flex items-center gap-2"
+                    >
+                      <input type="hidden" name="booking_id" value={b.id} />
+                      <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                        {b.status === "waitlisted" ? "Em espera" : "Marcado"}
+                      </span>
+                      <SubmitButton
+                        variant="outline"
+                        className="h-10 px-4"
+                        pendingText="A cancelar…"
+                      >
+                        Cancelar
+                      </SubmitButton>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
 
       <section className="mt-16">
         <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">

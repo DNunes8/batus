@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { ConfirmForm } from "@/components/confirm-form";
+import { approveStudent } from "./actions";
 
 export type StudentProfile = {
   id: string;
@@ -12,6 +14,7 @@ export type StudentProfile = {
   phone: string | null;
   is_admin: boolean;
   is_blocked: boolean;
+  approved: boolean;
   joined_at: string;
 };
 
@@ -20,6 +23,11 @@ function formatSince(joinedAt: string): string {
     year: "numeric",
     month: "short",
   });
+}
+
+// A non-admin account that the coach hasn't approved yet.
+function isPending(p: StudentProfile): boolean {
+  return !p.approved && !p.is_admin;
 }
 
 export function StudentsList({ profiles }: { profiles: StudentProfile[] }) {
@@ -62,12 +70,9 @@ export function StudentsList({ profiles }: { profiles: StudentProfile[] }) {
           )}
         </div>
         <p className="text-xs text-muted-foreground tabular-nums">
-          {filtered.length}{" "}
-          {filtered.length === 1 ? "aluno" : "alunos"}
+          {filtered.length} {filtered.length === 1 ? "aluno" : "alunos"}
           {query && (
-            <span className="hidden sm:inline">
-              {" "}de {profiles.length}
-            </span>
+            <span className="hidden sm:inline"> de {profiles.length}</span>
           )}
         </p>
       </div>
@@ -101,96 +106,161 @@ export function StudentsList({ profiles }: { profiles: StudentProfile[] }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {filtered.map((p) => (
-                  <tr key={p.id} className="hover:bg-muted/30">
-                    <td className="px-4 py-3 font-medium">
-                      {p.full_name || (
-                        <span className="text-muted-foreground">
-                          — sem nome —
-                        </span>
-                      )}
-                      {p.is_admin && (
-                        <span className="ml-2 inline-block rounded-sm bg-foreground px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-background">
-                          Admin
-                        </span>
-                      )}
-                      {p.is_blocked && (
-                        <span className="ml-2 inline-block rounded-sm bg-destructive/20 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-destructive">
-                          Bloqueado
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {p.email}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {p.phone || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground tabular-nums">
-                      {formatSince(p.joined_at)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/admin/students/${p.id}`}
-                        className="text-sm font-medium hover:underline"
-                      >
-                        Ver →
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map((p) => {
+                  const pending = isPending(p);
+                  return (
+                    <tr
+                      key={p.id}
+                      className={`hover:bg-muted/30 ${
+                        pending ? "bg-muted/20" : ""
+                      }`}
+                    >
+                      <td className="px-4 py-3 font-medium">
+                        {p.full_name || (
+                          <span className="text-muted-foreground">
+                            — sem nome —
+                          </span>
+                        )}
+                        {pending && (
+                          <span className="ml-2 inline-block rounded-sm border border-foreground/40 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-foreground">
+                            A aguardar
+                          </span>
+                        )}
+                        {p.is_admin && (
+                          <span className="ml-2 inline-block rounded-sm bg-foreground px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-background">
+                            Admin
+                          </span>
+                        )}
+                        {p.is_blocked && (
+                          <span className="ml-2 inline-block rounded-sm bg-destructive/20 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-destructive">
+                            Bloqueado
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {p.email}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {p.phone || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground tabular-nums">
+                        {formatSince(p.joined_at)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-3">
+                          {pending && (
+                            <ConfirmForm
+                              message={`Aprovar ${
+                                p.full_name || p.email
+                              }? Vai poder marcar aulas.`}
+                              action={approveStudent}
+                            >
+                              <input type="hidden" name="id" value={p.id} />
+                              <button
+                                type="submit"
+                                className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium uppercase tracking-wider text-background transition-opacity hover:opacity-90"
+                              >
+                                Aprovar
+                              </button>
+                            </ConfirmForm>
+                          )}
+                          <Link
+                            href={`/admin/students/${p.id}`}
+                            className="text-sm font-medium hover:underline"
+                          >
+                            Ver →
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {/* Mobile: card list */}
           <ul className="mt-6 space-y-3 md:hidden">
-            {filtered.map((p) => (
-              <li key={p.id}>
-                <Link
-                  href={`/admin/students/${p.id}`}
-                  className="block rounded-md border border-border/60 bg-background p-4 transition-colors hover:border-foreground/40 active:bg-muted/50"
+            {filtered.map((p) => {
+              const pending = isPending(p);
+              return (
+                <li
+                  key={p.id}
+                  className={`overflow-hidden rounded-md border bg-background ${
+                    pending ? "border-foreground/30" : "border-border/60"
+                  }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">
-                        {p.full_name || (
-                          <span className="text-muted-foreground">
-                            — sem nome —
+                  <Link
+                    href={`/admin/students/${p.id}`}
+                    className="block p-4 transition-colors hover:bg-muted/40 active:bg-muted/50"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">
+                          {p.full_name || (
+                            <span className="text-muted-foreground">
+                              — sem nome —
+                            </span>
+                          )}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {p.email}
+                        </p>
+                        {p.phone && (
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {p.phone}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        {pending && (
+                          <span className="rounded-sm border border-foreground/40 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-foreground">
+                            A aguardar
                           </span>
                         )}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {p.email}
-                      </p>
-                      {p.phone && (
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                          {p.phone}
-                        </p>
-                      )}
+                        {p.is_admin && (
+                          <span className="rounded-sm bg-foreground px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-background">
+                            Admin
+                          </span>
+                        )}
+                        {p.is_blocked && (
+                          <span className="rounded-sm bg-destructive/20 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-destructive">
+                            Bloqueado
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      {p.is_admin && (
-                        <span className="rounded-sm bg-foreground px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-background">
-                          Admin
-                        </span>
-                      )}
-                      {p.is_blocked && (
-                        <span className="rounded-sm bg-destructive/20 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-destructive">
-                          Bloqueado
-                        </span>
-                      )}
+                    <div className="mt-3 flex items-baseline justify-between border-t border-border/40 pt-2 text-xs text-muted-foreground">
+                      <span className="tabular-nums">
+                        Desde {formatSince(p.joined_at)}
+                      </span>
+                      <span className="text-foreground/70">Ver →</span>
                     </div>
-                  </div>
-                  <div className="mt-3 flex items-baseline justify-between border-t border-border/40 pt-2 text-xs text-muted-foreground">
-                    <span className="tabular-nums">
-                      Desde {formatSince(p.joined_at)}
-                    </span>
-                    <span className="text-foreground/70">Ver →</span>
-                  </div>
-                </Link>
-              </li>
-            ))}
+                  </Link>
+
+                  {/* Approve action sits outside the Link — can't nest a
+                      button inside an anchor. */}
+                  {pending && (
+                    <div className="border-t border-border/40 p-3">
+                      <ConfirmForm
+                        message={`Aprovar ${
+                          p.full_name || p.email
+                        }? Vai poder marcar aulas.`}
+                        action={approveStudent}
+                      >
+                        <input type="hidden" name="id" value={p.id} />
+                        <button
+                          type="submit"
+                          className="h-11 w-full rounded-md bg-foreground text-sm font-medium uppercase tracking-wider text-background transition-opacity hover:opacity-90"
+                        >
+                          Aprovar aluno
+                        </button>
+                      </ConfirmForm>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </>
       )}

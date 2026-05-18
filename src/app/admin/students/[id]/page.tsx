@@ -6,8 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatEuro, formatMonthYear } from "@/lib/money";
+import { ConfirmForm } from "@/components/confirm-form";
 import { StatusPill } from "@/app/admin/pagamentos/status-pill";
 import type { PaymentStatus } from "@/app/admin/pagamentos/actions";
+import { approveStudent } from "../actions";
 import {
   togglePaymentStatus,
   updateStudentNotesAndGoals,
@@ -64,6 +66,32 @@ export default async function StudentDetailPage({
       <p className="mt-1 text-sm text-muted-foreground">
         {profile.email} · Aluno desde {since}
       </p>
+
+      {/* Approval gate — a pending student can't book until approved here. */}
+      {!profile.approved && !profile.is_admin && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-foreground/30 bg-muted/40 p-4">
+          <div>
+            <p className="text-sm font-medium">Conta a aguardar aprovação</p>
+            <p className="text-xs text-muted-foreground">
+              Este aluno não pode marcar aulas enquanto não for aprovado.
+            </p>
+          </div>
+          <ConfirmForm
+            message={`Aprovar ${
+              profile.full_name || profile.email
+            }? Vai poder marcar aulas.`}
+            action={approveStudent}
+          >
+            <input type="hidden" name="id" value={profile.id} />
+            <button
+              type="submit"
+              className="h-11 rounded-md bg-foreground px-5 text-sm font-medium uppercase tracking-wider text-background transition-opacity hover:opacity-90"
+            >
+              Aprovar
+            </button>
+          </ConfirmForm>
+        </div>
+      )}
 
       <section className="mt-12">
         <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">

@@ -34,6 +34,19 @@ export default async function AulasPage({
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Approval status — a logged-in but unapproved student can browse the
+  // schedule but not book. Admins are always treated as approved.
+  let isApproved = false;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("approved, is_admin")
+      .eq("id", user.id)
+      .maybeSingle();
+    isApproved = !!profile?.approved || !!profile?.is_admin;
+  }
+  const isPending = !!user && !isApproved;
+
   const todayStr = todayLisbon();
   const prevWeek = addDays(weekStart, -7);
   const nextWeek = addDays(weekStart, 7);
@@ -84,19 +97,37 @@ export default async function AulasPage({
         </div>
       </header>
 
-      <p className="mt-6 max-w-2xl text-sm text-foreground/70">
-        Horário aberto a todos. Marca uma aula com um clique
-        {user
-          ? ". Para cancelar uma marcação, vai a "
-          : " (precisas de iniciar sessão). Para cancelar, vai a "}
-        <Link
-          href="/perfil"
-          className="font-medium text-foreground underline-offset-4 hover:underline"
-        >
-          Perfil
-        </Link>
-        .
-      </p>
+      {isPending ? (
+        <div className="mt-6 rounded-md border border-foreground/25 bg-muted/40 p-4 sm:p-5">
+          <p className="text-sm font-medium">
+            A tua conta está a aguardar aprovação
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Podes ver o horário, mas só marcas aulas depois de o treinador
+            aprovar a tua conta.{" "}
+            <Link
+              href="/perfil"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              O que falta?
+            </Link>
+          </p>
+        </div>
+      ) : (
+        <p className="mt-6 max-w-2xl text-sm text-foreground/70">
+          Horário aberto a todos. Marca uma aula com um clique
+          {user
+            ? ". Para cancelar uma marcação, vai a "
+            : " (precisas de iniciar sessão). Para cancelar, vai a "}
+          <Link
+            href="/perfil"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Perfil
+          </Link>
+          .
+        </p>
+      )}
 
       {(() => {
         const visibleDays = days.filter(
@@ -160,6 +191,7 @@ export default async function AulasPage({
                         <BookingControl
                           cls={c}
                           isLoggedIn={!!user}
+                          isApproved={isApproved}
                           isPast={isClassInPast(c.date, c.start_time)}
                         />
                       </li>
@@ -178,10 +210,12 @@ export default async function AulasPage({
 function BookingControl({
   cls,
   isLoggedIn,
+  isApproved,
   isPast,
 }: {
   cls: ScheduleClass;
   isLoggedIn: boolean;
+  isApproved: boolean;
   isPast: boolean;
 }) {
   if (cls.cancelled) {
@@ -217,6 +251,15 @@ function BookingControl({
       >
         Entrar para marcar
       </Button>
+    );
+  }
+
+  // Logged in but not yet approved — locked chip, never an active button.
+  if (!isApproved) {
+    return (
+      <span className="inline-flex h-10 items-center rounded-md border border-border/60 px-3 text-xs uppercase tracking-widest text-muted-foreground">
+        Aprovação pendente
+      </span>
     );
   }
 

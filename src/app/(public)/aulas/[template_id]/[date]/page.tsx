@@ -139,29 +139,40 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
   const isPast = isClassInPast(date, startTime);
   const isFull = bookedCount >= capacity;
 
-  // User's existing (non-cancelled) booking for this exact instance.
+  // User's existing (non-cancelled) booking for this exact instance, plus
+  // their approval status — an unapproved student can't book yet.
   let userBooking: {
     id: string;
     status: "booked" | "waitlisted";
     waitlist_position: number | null;
   } | null = null;
+  let isApproved = false;
   if (user) {
-    const { data } = await supabase
-      .from("bookings")
-      .select("id, status, waitlist_position")
-      .eq("template_id", template_id)
-      .eq("instance_date", date)
-      .eq("user_id", user.id)
-      .neq("status", "cancelled")
-      .maybeSingle();
+    const [bookingRes, profileRes] = await Promise.all([
+      supabase
+        .from("bookings")
+        .select("id, status, waitlist_position")
+        .eq("template_id", template_id)
+        .eq("instance_date", date)
+        .eq("user_id", user.id)
+        .neq("status", "cancelled")
+        .maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("approved, is_admin")
+        .eq("id", user.id)
+        .maybeSingle(),
+    ]);
 
-    if (data) {
+    if (bookingRes.data) {
       userBooking = {
-        id: data.id,
-        status: data.status as "booked" | "waitlisted",
-        waitlist_position: data.waitlist_position,
+        id: bookingRes.data.id,
+        status: bookingRes.data.status as "booked" | "waitlisted",
+        waitlist_position: bookingRes.data.waitlist_position,
       };
     }
+    isApproved =
+      !!profileRes.data?.approved || !!profileRes.data?.is_admin;
   }
 
   const backHref = `/aulas?week=${mondayOf(date)}`;
@@ -267,6 +278,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
           isPast={isPast}
           isFull={isFull}
           isLoggedIn={!!user}
+          isApproved={isApproved}
           userBooking={userBooking}
         />
       </div>
@@ -319,6 +331,7 @@ function BookingAction({
   isPast,
   isFull,
   isLoggedIn,
+  isApproved,
   userBooking,
 }: {
   template_id: string;
@@ -327,6 +340,7 @@ function BookingAction({
   isPast: boolean;
   isFull: boolean;
   isLoggedIn: boolean;
+  isApproved: boolean;
   userBooking: {
     id: string;
     status: "booked" | "waitlisted";
@@ -356,6 +370,29 @@ function BookingAction({
       >
         Entrar para marcar
       </Button>
+    );
+  }
+
+  // Logged in but not yet approved — explain instead of offering a button.
+  if (!isApproved) {
+    return (
+      <div className="rounded-md border border-foreground/25 bg-muted/30 p-6 text-center">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+          Conta
+        </p>
+        <p className="mt-2 font-display text-2xl tracking-wide">
+          A AGUARDAR APROVAÇÃO
+        </p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Vais poder marcar aulas assim que o treinador aprovar a tua conta.
+        </p>
+        <Link
+          href="/perfil"
+          className="mt-4 inline-flex h-10 items-center justify-center rounded-md border border-border/60 px-4 text-xs uppercase tracking-widest hover:bg-muted"
+        >
+          O que falta? →
+        </Link>
+      </div>
     );
   }
 

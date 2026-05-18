@@ -8,10 +8,25 @@ export default async function StudentsPage() {
   const supabase = await createClient();
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, email, full_name, phone, is_admin, is_blocked, joined_at")
+    .select(
+      "id, email, full_name, phone, is_admin, is_blocked, approved, joined_at",
+    )
     .order("joined_at", { ascending: false });
 
   const list = (profiles ?? []) as StudentProfile[];
+
+  // Float pending (unapproved, non-admin) accounts to the top so the coach
+  // sees who needs action first; the rest stay newest-first.
+  list.sort((a, b) => {
+    const aPending = !a.approved && !a.is_admin;
+    const bPending = !b.approved && !b.is_admin;
+    if (aPending !== bPending) return aPending ? -1 : 1;
+    return b.joined_at.localeCompare(a.joined_at);
+  });
+
+  const pendingCount = list.filter(
+    (p) => !p.approved && !p.is_admin,
+  ).length;
 
   return (
     <div className="p-4 sm:p-6 lg:p-10">
@@ -23,7 +38,16 @@ export default async function StudentsPage() {
           ALUNOS
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {list.length} {list.length === 1 ? "conta registada" : "contas registadas"}
+          {list.length}{" "}
+          {list.length === 1 ? "conta registada" : "contas registadas"}
+          {pendingCount > 0 && (
+            <>
+              {" · "}
+              <span className="font-medium text-foreground">
+                {pendingCount} a aguardar aprovação
+              </span>
+            </>
+          )}
         </p>
       </div>
 

@@ -48,6 +48,7 @@ export default async function AdminDashboardPage() {
     unreadMsgRes,
     paymentsThisMonthRes,
     solosThisMonthRes,
+    pendingApprovalsRes,
   ] = await Promise.all([
     supabase.auth.getUser(),
     supabase
@@ -80,6 +81,11 @@ export default async function AdminDashboardPage() {
       .from("solo_sessions")
       .select("price_cents")
       .gte("session_date", `${monthStart}T00:00:00`),
+    admin
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("approved", false)
+      .eq("is_admin", false),
   ]);
 
   const todayClasses = todayClassesRes.data ?? [];
@@ -88,6 +94,7 @@ export default async function AdminDashboardPage() {
   const todayOverrides = todayOverrideRes.data ?? [];
   const pendingClaims = pendingClaimsRes.count ?? 0;
   const unreadMessages = unreadMsgRes.count ?? 0;
+  const pendingApprovals = pendingApprovalsRes.count ?? 0;
 
   const monthEarnings =
     (paymentsThisMonthRes.data ?? []).reduce(
@@ -112,6 +119,28 @@ export default async function AdminDashboardPage() {
       <p className="mt-2 text-sm text-muted-foreground">
         {user?.email} · {dayName}, {formatDayHeader(today).split(", ")[1]}
       </p>
+
+      {/* New-account approvals — surfaced as an action item, not a stat,
+          because nobody can book until the coach acts on it. */}
+      {pendingApprovals > 0 && (
+        <Link
+          href="/admin/students"
+          className="mt-8 flex items-center justify-between gap-3 rounded-md border border-foreground/30 bg-muted/40 p-4 transition-colors hover:border-foreground/50"
+        >
+          <div>
+            <p className="text-sm font-medium">
+              {pendingApprovals}{" "}
+              {pendingApprovals === 1
+                ? "conta nova a aguardar aprovação"
+                : "contas novas a aguardar aprovação"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Aprova para o aluno poder marcar aulas.
+            </p>
+          </div>
+          <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+        </Link>
+      )}
 
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <DashboardCard

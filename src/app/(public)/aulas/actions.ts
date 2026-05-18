@@ -16,6 +16,19 @@ export async function bookClass(formData: FormData) {
     redirect("/login?next=/aulas");
   }
 
+  // Approval gate. New accounts can't book until the coach approves them.
+  // The UI already locks the button for pending users — this is the
+  // server-side backstop. Bounce them to /perfil, which explains the wait.
+  const { data: gateProfile } = await supabase
+    .from("profiles")
+    .select("approved, is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!gateProfile?.approved && !gateProfile?.is_admin) {
+    redirect("/perfil");
+  }
+
   const template_id = formData.get("template_id") as string | null;
   const instance_date = formData.get("instance_date") as string | null;
 

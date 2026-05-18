@@ -255,6 +255,10 @@ function SignUpForm({
 }) {
   return (
     <form action={action} className="mt-8 space-y-4">
+      <p className="rounded-md border border-border/60 bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
+        O treinador aprova a tua conta antes da primeira aula. Cria a conta
+        agora — marcas aulas assim que ele aprovar.
+      </p>
       <div className="space-y-2">
         <Label htmlFor="signup-email" className="text-base">
           Email
