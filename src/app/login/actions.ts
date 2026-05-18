@@ -4,7 +4,6 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 export type AuthState = {
   error?: string;
@@ -60,13 +59,15 @@ export async function signInWithPassword(
 
 // Primary signup flow: email + password.
 //
-// We deliberately route through the admin API (`admin.auth.admin.createUser`
-// with `email_confirm: true`) instead of `supabase.auth.signUp` so that the
-// account is created already-confirmed — no email round-trip required, no
-// dependency on whether the Supabase dashboard has "Confirm email" toggled
-// on or off. Critical for non-tech students who'd be lost in their inbox.
+// Uses the standard supabase.auth.signUp — only the anon key, no service-role
+// admin client. The studio runs Supabase with "Confirm email" turned OFF, so
+// signUp returns a live session immediately and the new student lands logged
+// in (no inbox round-trip — critical for non-tech users). If that setting were
+// ever switched back on, signUp returns no session and we tell them to verify.
 //
-// After creating, we sign in normally to get the session cookie.
+// (Previously this went through admin.auth.admin.createUser to force-confirm
+// the account, but that needed SUPABASE_SERVICE_ROLE_KEY — a fragile extra
+// dependency that broke signup whenever that env var was missing in prod.)
 export async function signUpWithPassword(
   _prev: AuthState,
   formData: FormData,
@@ -80,16 +81,11 @@ export async function signUpWithPassword(
     return { error: "Preenche email e palavra-passe." };
   }
 
-  const admin = createAdminClient();
-  const { data: created, error: createError } =
-    await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-    });
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signUp({ email, password });
 
-  if (createError) {
-    const msg = createError.message.toLowerCase();
+  if (error) {
+    const msg = error.message.toLowerCase();
     if (
       msg.includes("already") ||
       msg.includes("registered") ||
@@ -103,28 +99,26 @@ export async function signUpWithPassword(
     }
     if (
       msg.includes("password") &&
-      (msg.includes("short") || msg.includes("weak"))
+      (msg.includes("short") ||
+        msg.includes("weak") ||
+        msg.includes("least") ||
+        msg.includes("6"))
     ) {
       return { error: "Palavra-passe demasiado curta — usa 6 ou mais." };
     }
-    return { error: createError.message };
+    return { error: error.message };
   }
 
-  if (!created.user) {
+  if (!data.user) {
     return { error: "Não foi possível criar a conta. Tenta novamente." };
   }
 
-  // Create the session.
-  const supabase = await createClient();
-  const { error: signInError } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (signInError) {
+  // With "Confirm email" off, signUp returns a session and the cookie is set
+  // — the user is logged in. If confirmation is on, there's no session.
+  if (!data.session) {
     return {
       error:
-        "Conta criada, mas não conseguimos iniciar sessão. Tenta Entrar com a tua palavra-passe.",
+        "Conta criada. Confirma o email que te enviámos para poderes entrar.",
     };
   }
 
