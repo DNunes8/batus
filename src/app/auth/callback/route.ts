@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { todayLisbon } from "@/lib/schedule";
+import { safeRelativePath } from "@/lib/safe-redirect";
 
 // OAuth callback for Google sign-in (and any future providers).
 // Exchanges the ?code= for a session, prefills the profile name from
@@ -8,7 +9,8 @@ import { todayLisbon } from "@/lib/schedule";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const explicitNext = searchParams.get("next");
+  // Sanitised: only same-site relative paths survive, never an off-site URL.
+  const explicitNext = safeRelativePath(searchParams.get("next"));
 
   if (code) {
     const supabase = await createClient();

@@ -6,6 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { submitContactMessage } from "./actions";
 
+// force-dynamic so the form's render timestamp (the spam time-check) is
+// fresh per request instead of frozen at build time.
+export const dynamic = "force-dynamic";
+
 export default async function ContactoPage({
   searchParams,
 }: {
@@ -109,6 +113,24 @@ export default async function ContactoPage({
             </div>
           ) : (
             <form action={submitContactMessage} className="mt-4 space-y-4">
+              {/* Spam guards — the form's render time + a honeypot field
+                  hidden from people but tempting to bots. See the action. */}
+              <input
+                type="hidden"
+                name="form_loaded_at"
+                value={Date.now()}
+              />
+              <div className="hidden" aria-hidden="true">
+                <label htmlFor="website">Website</label>
+                <input
+                  id="website"
+                  type="text"
+                  name="website"
+                  tabIndex={-1}
+                  autoComplete="off"
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="name">Nome</Label>
                 <Input id="name" name="name" required />

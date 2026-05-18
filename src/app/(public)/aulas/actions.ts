@@ -19,14 +19,21 @@ export async function bookClass(formData: FormData) {
   // Approval gate. New accounts can't book until the coach approves them.
   // The UI already locks the button for pending users — this is the
   // server-side backstop. Bounce them to /perfil, which explains the wait.
+  // Also re-check is_blocked here: booking inserts now go through the
+  // service-role client (see below), which bypasses the RLS not-blocked
+  // check, so the action has to enforce it itself.
   const { data: gateProfile } = await supabase
     .from("profiles")
-    .select("approved, is_admin")
+    .select("approved, is_admin, is_blocked")
     .eq("id", user.id)
     .maybeSingle();
 
   if (!gateProfile?.approved && !gateProfile?.is_admin) {
     redirect("/perfil");
+  }
+
+  if (gateProfile?.is_blocked) {
+    throw new Error("A tua conta está bloqueada. Fala com o treinador.");
   }
 
   const template_id = formData.get("template_id") as string | null;
@@ -78,11 +85,14 @@ export async function bookClass(formData: FormData) {
     .eq("instance_date", instance_date)
     .maybeSingle();
 
+  // Booking writes go through the service-role client: capacity has already
+  // been checked above, and the RLS lockdown (migration 0010) blocks
+  // non-admins from creating or re-activating bookings directly.
   if (existing) {
     if (existing.status === "booked" || existing.status === "waitlisted") {
       throw new Error("Já tens marcação para esta aula.");
     }
-    const { error } = await supabase
+    const { error } = await admin
       .from("bookings")
       .update({
         status: isFull ? "waitlisted" : "booked",
@@ -94,7 +104,7 @@ export async function bookClass(formData: FormData) {
       .eq("id", existing.id);
     if (error) throw new Error(error.message);
   } else {
-    const { error } = await supabase.from("bookings").insert({
+    const { error } = await admin.from("bookings").insert({
       user_id: user.id,
       template_id,
       instance_date,

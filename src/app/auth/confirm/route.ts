@@ -2,12 +2,14 @@ import { type NextRequest, NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { todayLisbon } from "@/lib/schedule";
+import { safeRelativePath } from "@/lib/safe-redirect";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const explicitNext = searchParams.get("next");
+  // Sanitised: only same-site relative paths survive, never an off-site URL.
+  const explicitNext = safeRelativePath(searchParams.get("next"));
 
   if (token_hash && type) {
     const supabase = await createClient();

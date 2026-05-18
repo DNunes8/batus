@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { safeRelativePath } from "@/lib/safe-redirect";
 
 export type CompleteProfileState = {
   error?: string;
@@ -24,7 +25,9 @@ export async function completeProfile(
   const full_name =
     ((formData.get("full_name") as string | null) ?? "").trim() || null;
   const phone = ((formData.get("phone") as string | null) ?? "").trim() || null;
-  const next = (formData.get("next") as string | null) ?? "/aulas";
+  // Sanitised so a crafted ?next=https://evil.com can't redirect off-site.
+  const next =
+    safeRelativePath(formData.get("next") as string | null) ?? "/aulas";
 
   if (!full_name) {
     return { error: "Diz-nos o teu nome." };
