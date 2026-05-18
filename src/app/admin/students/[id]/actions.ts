@@ -3,9 +3,11 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { assertAdmin } from "@/lib/auth-guard";
 import { parseEuroToCents } from "@/lib/money";
 
 export async function updateStudentNotesAndGoals(formData: FormData) {
+  await assertAdmin();
   const id = formData.get("id") as string | null;
   const notes = ((formData.get("notes") as string | null) ?? "").trim() || null;
   const goals = ((formData.get("goals") as string | null) ?? "").trim() || null;
@@ -49,6 +51,7 @@ export async function updateStudentNotesAndGoals(formData: FormData) {
 }
 
 export async function upsertPaymentRecord(formData: FormData) {
+  await assertAdmin();
   const user_id = formData.get("user_id") as string | null;
   const month = formData.get("month") as string | null;
   const priceRaw = (formData.get("amount") as string | null) ?? "0";
@@ -87,6 +90,7 @@ export async function upsertPaymentRecord(formData: FormData) {
 // Used by the legacy inline button on the student detail page so the coach
 // can flip a payment status without opening the full editor.
 export async function togglePaymentStatus(formData: FormData) {
+  await assertAdmin();
   const id = formData.get("id") as string | null;
   const user_id = formData.get("user_id") as string | null;
   const currentStatus = (formData.get("current_status") as string | null) ?? "unpaid";

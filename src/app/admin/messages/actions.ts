@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { assertAdmin } from "@/lib/auth-guard";
 
 export async function markMessageRead(formData: FormData) {
+  await assertAdmin();
   const id = formData.get("id") as string | null;
   if (!id) throw new Error("ID em falta.");
 
@@ -18,6 +20,7 @@ export async function markMessageRead(formData: FormData) {
 }
 
 export async function markMessageUnread(formData: FormData) {
+  await assertAdmin();
   const id = formData.get("id") as string | null;
   if (!id) throw new Error("ID em falta.");
 
@@ -32,6 +35,7 @@ export async function markMessageUnread(formData: FormData) {
 }
 
 export async function deleteMessage(formData: FormData) {
+  await assertAdmin();
   const id = formData.get("id") as string | null;
   if (!id) throw new Error("ID em falta.");
 

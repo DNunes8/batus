@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { assertAdmin } from "@/lib/auth-guard";
 import { parseEuroToCents } from "@/lib/money";
 
 export type PaymentStatus = "paid" | "unpaid" | "paused";
@@ -18,6 +19,7 @@ export async function setPaymentStatus(input: {
   amount_cents: number;
   notes: string | null;
 }) {
+  await assertAdmin();
   const { user_id, month, status, amount_cents, notes } = input;
   if (!user_id || !month) throw new Error("Dados em falta.");
   if (!["paid", "unpaid", "paused"].includes(status)) {
@@ -54,6 +56,7 @@ export async function bulkSetPaymentStatus(input: {
   month: string;
   status: PaymentStatus;
 }) {
+  await assertAdmin();
   const { user_ids, month, status } = input;
   if (user_ids.length === 0) return { updated: 0 };
   if (!month) throw new Error("Mês em falta.");
@@ -129,6 +132,7 @@ export async function bulkSetPaymentStatus(input: {
 // Empty input → clears the override and student falls back to the studio default.
 // ----------------------------------------------------------------------------
 export async function setStudentMonthlyFee(formData: FormData) {
+  await assertAdmin();
   const user_id = formData.get("user_id") as string | null;
   const raw = ((formData.get("amount") as string | null) ?? "").trim();
   if (!user_id) throw new Error("ID em falta.");
@@ -155,6 +159,7 @@ export async function setStudentServiceType(input: {
   user_id: string;
   service_type: "group" | "solo";
 }) {
+  await assertAdmin();
   const { user_id, service_type } = input;
   if (!user_id) throw new Error("ID em falta.");
   if (!["group", "solo"].includes(service_type)) {
@@ -182,6 +187,7 @@ export async function setStudentHasMonthlyFee(input: {
   user_id: string;
   has_monthly_fee: boolean;
 }) {
+  await assertAdmin();
   const { user_id, has_monthly_fee } = input;
   if (!user_id) throw new Error("ID em falta.");
 
@@ -201,6 +207,7 @@ export async function setStudentHasMonthlyFee(input: {
 // Set the studio-wide default fee (form action). Stored in the settings table.
 // ----------------------------------------------------------------------------
 export async function setDefaultMonthlyFee(formData: FormData) {
+  await assertAdmin();
   const raw = ((formData.get("amount") as string | null) ?? "").trim();
   const cents = parseEuroToCents(raw);
 

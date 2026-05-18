@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { assertAdmin } from "@/lib/auth-guard";
 import { dayOfWeek as dowHelper } from "@/lib/schedule";
 import { parseEuroToCents } from "@/lib/money";
 
@@ -17,6 +18,7 @@ export async function createGroupInstanceFromTemplate(input: {
   template_id: string;
   date: string;
 }) {
+  await assertAdmin();
   const { template_id, date } = input;
   if (!template_id || !date) throw new Error("Pedido inválido.");
 
@@ -58,6 +60,7 @@ export async function createSoloInstanceFromTemplate(input: {
   template_id: string;
   date: string;
 }) {
+  await assertAdmin();
   const { template_id, date } = input;
   if (!template_id || !date) throw new Error("Pedido inválido.");
 
@@ -97,6 +100,7 @@ export async function createClassFromCalendar(
   _prev: CalendarActionState,
   formData: FormData,
 ): Promise<CalendarActionState> {
+  await assertAdmin();
   const date = formData.get("date") as string | null;
   const name = ((formData.get("name") as string | null) ?? "").trim();
   const start_time = formData.get("start_time") as string | null;
@@ -133,6 +137,7 @@ export async function createClassFromCalendar(
 }
 
 export async function setClosedDay(formData: FormData) {
+  await assertAdmin();
   const date = formData.get("date") as string | null;
   const reason = ((formData.get("reason") as string | null) ?? "").trim() ||
     "Fechado";
@@ -153,6 +158,7 @@ export async function setClosedDay(formData: FormData) {
 }
 
 export async function reopenDay(formData: FormData) {
+  await assertAdmin();
   const date = formData.get("date") as string | null;
   if (!date) throw new Error("Data inválida.");
 
@@ -166,6 +172,7 @@ export async function reopenDay(formData: FormData) {
 }
 
 export async function cancelClassInstance(formData: FormData) {
+  await assertAdmin();
   const template_id = formData.get("template_id") as string | null;
   const instance_date = formData.get("instance_date") as string | null;
   const reason = ((formData.get("reason") as string | null) ?? "").trim() ||
@@ -190,6 +197,7 @@ export async function cancelClassInstance(formData: FormData) {
 }
 
 export async function restoreClassInstance(formData: FormData) {
+  await assertAdmin();
   const template_id = formData.get("template_id") as string | null;
   const instance_date = formData.get("instance_date") as string | null;
 
@@ -215,6 +223,7 @@ export async function restoreClassInstance(formData: FormData) {
 // ============================================================================
 
 export async function rescheduleClassInstance(formData: FormData) {
+  await assertAdmin();
   const template_id = formData.get("template_id") as string | null;
   const instance_date = formData.get("instance_date") as string | null;
   const new_start_time = formData.get("new_start_time") as string | null;
@@ -248,6 +257,7 @@ export async function createSoloFromCalendar(
   _prev: CalendarActionState,
   formData: FormData,
 ): Promise<CalendarActionState> {
+  await assertAdmin();
   const date = formData.get("date") as string | null;
   const studentInput =
     ((formData.get("student") as string | null) ?? "").trim();
@@ -311,6 +321,7 @@ export async function createSoloFromCalendar(
 }
 
 export async function cancelSoloInstance(formData: FormData) {
+  await assertAdmin();
   const template_id = formData.get("template_id") as string | null;
   const instance_date = formData.get("instance_date") as string | null;
   const reason =
@@ -333,6 +344,7 @@ export async function cancelSoloInstance(formData: FormData) {
 }
 
 export async function restoreSoloInstance(formData: FormData) {
+  await assertAdmin();
   const template_id = formData.get("template_id") as string | null;
   const instance_date = formData.get("instance_date") as string | null;
 
@@ -354,6 +366,7 @@ export async function restoreSoloInstance(formData: FormData) {
 }
 
 export async function rescheduleSoloInstance(formData: FormData) {
+  await assertAdmin();
   const template_id = formData.get("template_id") as string | null;
   const instance_date = formData.get("instance_date") as string | null;
   const new_start_time = formData.get("new_start_time") as string | null;

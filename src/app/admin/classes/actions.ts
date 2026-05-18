@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { assertAdmin } from "@/lib/auth-guard";
 import { addDays, dayOfWeek as dowHelper, mondayOf } from "@/lib/schedule";
 
 export async function createClassTemplate(formData: FormData) {
+  await assertAdmin();
   const supabase = await createClient();
 
   const name = (formData.get("name") as string | null)?.trim();
@@ -55,6 +57,7 @@ export async function createClassTemplate(formData: FormData) {
 }
 
 export async function updateClassTemplate(formData: FormData) {
+  await assertAdmin();
   const supabase = await createClient();
 
   const id = formData.get("id") as string | null;
@@ -99,6 +102,7 @@ export async function updateClassTemplate(formData: FormData) {
 }
 
 export async function deleteClassTemplate(formData: FormData) {
+  await assertAdmin();
   const id = formData.get("id") as string | null;
   if (!id) throw new Error("ID em falta.");
 

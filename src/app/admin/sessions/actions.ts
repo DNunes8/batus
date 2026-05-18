@@ -3,9 +3,11 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { assertAdmin } from "@/lib/auth-guard";
 import { parseEuroToCents } from "@/lib/money";
 
 export async function createSoloSession(formData: FormData) {
+  await assertAdmin();
   const supabase = await createClient();
 
   const session_date = formData.get("session_date") as string | null;
