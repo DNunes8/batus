@@ -1,7 +1,11 @@
 import Link from "next/link";
-import { studio } from "@/lib/studio.config";
+import { studio, configured } from "@/lib/studio.config";
 
 export function SiteFooter() {
+  const email = configured(studio.contact.email);
+  const phone = configured(studio.contact.phone);
+  const address = configured(studio.contact.address);
+
   return (
     <footer className="border-t border-border/60 bg-background">
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -43,9 +47,34 @@ export function SiteFooter() {
           <div>
             <p className="text-sm font-semibold">Contacto</p>
             <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-              <li>{studio.contact.address}</li>
-              <li>{studio.contact.email}</li>
-              <li>{studio.contact.phone}</li>
+              <li>{address ?? `${studio.city}, ${studio.country}`}</li>
+              {email && (
+                <li>
+                  <a href={`mailto:${email}`} className="hover:text-foreground">
+                    {email}
+                  </a>
+                </li>
+              )}
+              {phone && (
+                <li>
+                  <a
+                    href={`tel:${phone.replace(/\s/g, "")}`}
+                    className="hover:text-foreground"
+                  >
+                    {phone}
+                  </a>
+                </li>
+              )}
+              <li>
+                <Link
+                  href={`https://instagram.com/${studio.social.instagram}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-foreground"
+                >
+                  @{studio.social.instagram}
+                </Link>
+              </li>
             </ul>
           </div>
         </div>

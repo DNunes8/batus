@@ -47,10 +47,7 @@ function BemVindoContent() {
 
       <div className="mt-12 w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div className="text-center">
-          <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-foreground/5 text-3xl">
-            👋
-          </div>
-          <h1 className="mt-6 font-display text-3xl leading-tight tracking-wide sm:text-4xl">
+          <h1 className="font-display text-3xl leading-tight tracking-wide sm:text-4xl">
             BEM-VINDO
             <br />
             AO BATUS

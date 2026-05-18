@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { studio } from "@/lib/studio.config";
+import { studio, configured } from "@/lib/studio.config";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +14,11 @@ export default async function ContactoPage({
   const params = await searchParams;
   const sent = params.sent === "1";
   const errorKey = params.error;
+
+  // Hide contact rows that are still "TBD" placeholders so the page never
+  // shows visitors an unfinished field.
+  const email = configured(studio.contact.email);
+  const phone = configured(studio.contact.phone);
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-16 sm:px-6 sm:py-24">
@@ -32,22 +37,40 @@ export default async function ContactoPage({
           <dl className="mt-4 space-y-4 text-sm">
             <div>
               <dt className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
-                Morada
+                Localização
               </dt>
-              <dd className="mt-1">{studio.contact.address}</dd>
+              <dd className="mt-1">
+                {configured(studio.contact.address) ??
+                  `${studio.city}, ${studio.country}`}
+              </dd>
             </div>
-            <div>
-              <dt className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
-                Email
-              </dt>
-              <dd className="mt-1">{studio.contact.email}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
-                Telefone
-              </dt>
-              <dd className="mt-1">{studio.contact.phone}</dd>
-            </div>
+            {email && (
+              <div>
+                <dt className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
+                  Email
+                </dt>
+                <dd className="mt-1">
+                  <a href={`mailto:${email}`} className="hover:underline">
+                    {email}
+                  </a>
+                </dd>
+              </div>
+            )}
+            {phone && (
+              <div>
+                <dt className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
+                  Telefone
+                </dt>
+                <dd className="mt-1">
+                  <a
+                    href={`tel:${phone.replace(/\s/g, "")}`}
+                    className="hover:underline"
+                  >
+                    {phone}
+                  </a>
+                </dd>
+              </div>
+            )}
             <div>
               <dt className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
                 Instagram

@@ -52,3 +52,11 @@ export const studio = {
 } as const;
 
 export type Studio = typeof studio;
+
+// Returns the value only if it's a real, configured value — null when it's
+// still a "TBD" placeholder. Lets the UI hide unset contact details instead
+// of rendering "TBD" to visitors before Baltaru hands over the real info.
+export function configured(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return /\bTBD\b/i.test(value) ? null : value;
+}
