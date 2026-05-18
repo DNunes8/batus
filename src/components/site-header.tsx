@@ -74,6 +74,10 @@ function Wordmark() {
 }
 
 export function SiteHeader({ user }: { user: HeaderUser }) {
+  // Logged-in users are already inside the app — hide the marketing
+  // "Sobre" page from the nav so it doesn't feel out of place.
+  const navItems = user ? NAV.filter((item) => item.href !== "/sobre") : NAV;
+
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
@@ -81,8 +85,8 @@ export function SiteHeader({ user }: { user: HeaderUser }) {
           <Wordmark />
         </Link>
 
-        <nav className="hidden items-center gap-7 md:flex">
-          {NAV.map((item) => (
+        <nav className="hidden items-center gap-6 md:flex">
+          {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -91,6 +95,7 @@ export function SiteHeader({ user }: { user: HeaderUser }) {
               {item.label}
             </Link>
           ))}
+          <span aria-hidden className="h-5 w-px bg-border" />
           {user ? <DesktopUserMenu user={user} /> : <DesktopLoginButton />}
         </nav>
 
@@ -133,10 +138,11 @@ export function SiteHeader({ user }: { user: HeaderUser }) {
                 not to shout. Display serif at text-xl, border-separated rows,
                 generous tap target via py-4. */}
             <nav className="flex flex-col border-y border-border/40">
-              {NAV.map((item) => (
+              {navItems.map((item) => (
                 <SheetClose
                   key={item.href}
                   render={<Link href={item.href} />}
+                  nativeButton={false}
                   className="border-b border-border/40 px-6 py-4 font-display text-xl uppercase tracking-[0.04em] transition-colors last:border-b-0 hover:bg-muted/40 active:bg-muted/60"
                 >
                   {item.label}
@@ -151,6 +157,7 @@ export function SiteHeader({ user }: { user: HeaderUser }) {
               ) : (
                 <SheetClose
                   render={<Link href="/login" />}
+                  nativeButton={false}
                   className="flex h-14 w-full items-center justify-center rounded-md bg-foreground text-base font-medium uppercase tracking-[0.15em] text-background transition-opacity hover:opacity-90"
                 >
                   Entrar
@@ -183,12 +190,7 @@ export function SiteHeader({ user }: { user: HeaderUser }) {
 
 function DesktopLoginButton() {
   return (
-    <Button
-      render={<Link href="/login" />}
-      nativeButton={false}
-      size="sm"
-      className="ml-2"
-    >
+    <Button render={<Link href="/login" />} nativeButton={false} size="sm">
       Entrar
     </Button>
   );
@@ -196,7 +198,7 @@ function DesktopLoginButton() {
 
 function DesktopUserMenu({ user }: { user: NonNullable<HeaderUser> }) {
   return (
-    <div className="ml-2 flex items-center gap-2">
+    <div className="flex items-center gap-6">
       {user.is_admin && (
         <Link
           href="/admin"
@@ -233,6 +235,7 @@ function MobileUserMenu({ user }: { user: NonNullable<HeaderUser> }) {
         {user.is_admin && (
           <SheetClose
             render={<Link href="/admin" />}
+            nativeButton={false}
             className="flex h-12 items-center justify-center rounded-md border border-foreground/60 text-sm font-medium uppercase tracking-[0.1em] text-foreground hover:bg-muted/40"
           >
             Admin
@@ -240,6 +243,7 @@ function MobileUserMenu({ user }: { user: NonNullable<HeaderUser> }) {
         )}
         <SheetClose
           render={<Link href="/perfil" />}
+          nativeButton={false}
           className={`flex h-12 items-center justify-center rounded-md border border-border/60 text-sm font-medium uppercase tracking-[0.1em] hover:bg-muted/40 ${
             user.is_admin ? "" : "col-span-2"
           }`}

@@ -20,6 +20,23 @@ export const studio = {
     facebook: "TBD",
   },
 
+  // Legal identification used by the Termos and Privacidade pages.
+  // `controller` / `taxId` / `registeredAddress` are filled in at hand-off.
+  // Until then `configured()` returns null and the Privacidade page shows the
+  // studio name plus a note that the full legal identification is pending.
+  legal: {
+    // Data controller: Baltaru's legal name, or the company name if Batus
+    // is incorporated — e.g. "Robert Baltaru" or "Batus Unipessoal, Lda."
+    controller: "TBD",
+    // NIF (sole trader) or NIPC (company) of the controller above.
+    taxId: "TBD",
+    // Registered address of the controller, if different from the studio.
+    registeredAddress: "TBD",
+    // Date the legal pages were last reviewed — shown as "Última atualização".
+    // Update this whenever you edit the Termos or Privacidade text.
+    lastUpdated: "18 de maio de 2026",
+  },
+
   // Monochrome system + single accent. Logo is pure black on white;
   // accent is gold (champion/laurel) — pending Diogo's confirmation between
   // gold and Portuguese red.
@@ -43,6 +60,12 @@ export const studio = {
     logo_url: "/logo-stacked.png" as string | null,
     hero_image_url: "/hero.png" as string | null,
     coach_image_url: "/coach.png" as string | null,
+    // Sobre-page media — empty until real assets exist. The matching
+    // gallery / video sections on /sobre render only once these are
+    // populated, so the page always looks complete. Add /public paths
+    // here when Baltaru's photos and intro video arrive.
+    about_gallery: [] as string[],
+    about_video_url: null as string | null,
   },
 
   locale: {
