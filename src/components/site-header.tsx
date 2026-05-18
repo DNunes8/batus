@@ -51,11 +51,11 @@ function Wordmark() {
           <Image
             src={horizontal}
             alt={studio.fullName}
-            width={520}
-            height={120}
+            width={640}
+            height={640}
             priority
             quality={95}
-            className={`${stacked ? "hidden md:block" : ""} h-10 w-auto`}
+            className={`${stacked ? "hidden md:block" : ""} h-14 w-auto`}
           />
         )}
       </span>
@@ -80,7 +80,7 @@ export function SiteHeader({ user }: { user: HeaderUser }) {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 md:h-20">
         <Link href="/" aria-label={studio.fullName}>
           <Wordmark />
         </Link>
