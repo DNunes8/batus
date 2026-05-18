@@ -1,102 +1,98 @@
 # Demo script — Batus walk-through with Baltaru
 
-A 10-minute path through the app. Have these tabs ready:
+_Updated 2026-05-18._ A ~10-minute path through the app. Tabs to have ready:
 
-1. https://batus-mu.vercel.app/ (public, incognito window helps for the "as a student" view)
-2. https://batus-mu.vercel.app/admin (logged in as you)
-3. (optional) Supabase dashboard — Table Editor — to show data is real
+1. https://batus-mu.vercel.app/ — the public site (an incognito window helps for the "as a student" view)
+2. https://batus-mu.vercel.app/admin — logged in as you
+3. (optional) Supabase dashboard → Table Editor — to show the data is real
 
 ---
 
-## 1. Public site (2 min)
+## 1. Public site (2–3 min)
 
-**Open https://batus-mu.vercel.app/**
-
-- Hero: BATUS wordmark + Boxing & Training + Braga · Portugal.
-- Coach section: brief intro to Baltaru (placeholder text — he provides real bio).
-- Horário semanal: live preview of class templates pulled from the database.
+**Home — https://batus-mu.vercel.app/**
+- Hero, manifesto band, coach section, a live weekly-schedule preview (pulled from the database), and a student testimonial.
 - CTAs: "Ver horário" → /aulas, "Contactar" → /contacto.
 
-**Click "Ver horário" → /aulas**
-- Weekly schedule grouped by day.
-- Prev / Hoje / Next week navigation.
-- Each class shows time, name, capacity (booked/total).
-- "Entrar para marcar" CTA (since incognito = not logged in).
+**/sobre** — the About page: hero, the studio story, a Robert Baltaru bio, the modalities, and "para quem". The copy is placeholder written in his voice — he supplies the real bio.
 
-**Click "Contacto"**
-- Contact form. Submit a test message — it lands in `/admin/messages`.
+**/aulas** — the weekly schedule, grouped by day, with prev / hoje / next navigation. Each class shows time, name and capacity (booked/total). Logged out, it shows an "Entrar para marcar" CTA.
+
+**/loja** — the merch store. Items with a stock count; a student reserves online and pays in person on pickup — no online payments.
+
+**/contacto** — contact form. Submit a test message; it lands in /admin/messages.
+
+**/termos & /privacidade** — Terms and Privacy Policy, RGPD-aligned, linked in the footer.
 
 ---
 
 ## 2. Student flow (2 min)
 
-**In your normal browser window (logged in as Diogo / admin):**
+**The approval gate — know this before you demo:** a brand-new signup lands *pending*. They can browse the site, but **cannot book a class until the coach approves them**. A pending student's /perfil shows an "A aguardar aprovação" panel instead of the booking tools.
 
-Show the booking flow:
-- /aulas → click "Marcar" on a class.
-- Page reloads, button now reads "Marcado" with a "Cancelar" option.
-- Click cancel — slot opens up. (If someone was on the waitlist, they get auto-promoted to booked.)
+→ For a smooth booking demo, use an account you've already approved. You can show the pending state and the approval step separately in the admin part.
 
-What students see vs. admins: students see only the count ("8/12") for privacy. Admins see the full roster (names) on `/admin/calendar`.
+With an approved account:
+- /aulas → "Marcar" on a class → the button becomes "Marcado" with a "Cancelar" option.
+- Cancel → the slot reopens; anyone on the waitlist is auto-promoted.
+- /perfil — the student's own page: stats (aulas this month, total, upcoming classes), plus where they edit their details and set a password.
+
+Privacy: students see only the count ("8/12"), never other students' names. Admins see the full roster on /admin/calendar.
 
 ---
 
 ## 3. Admin flow (5 min)
 
-**/admin** — dashboard (currently a placeholder welcome — Baltaru's daily-driver metrics go here when we know what he wants to see).
+The admin area has its own layout — a sidebar on desktop, a top bar on mobile — marked with an "Admin" badge.
 
-**/admin/calendar** — the main daily-use screen for him:
-- Same week view as public, but with rosters under each class.
-- "Fechar dia" form per day → upserts a closed_day, students see grey banner with reason.
-- "Cancelar aula" form per class instance → cancels just that occurrence, students see "Cancelada".
-- Reopen / Restaurar undoes either.
-- Note: closing a day cascades to public schedule immediately.
+**/admin — Dashboard.** A real daily-driver screen:
+- A banner when new accounts are waiting for approval.
+- Four metric cards: receitas este mês, aulas hoje, pedidos pendentes, mensagens por ler.
+- "Hoje" — today's classes with booked/capacity.
+- Shortcuts: nova aula, nova sessão 1:1, ver alunos, novo artigo.
 
-**/admin/classes (Modelos)** — recurring class templates:
-- Table of all weekly classes.
-- "Nova aula" → form (name, day, time, duration, capacity, active dates).
+**/admin/calendar — Calendário** (his main daily screen):
+- Week view, the same as the public one but with the roster under each class.
+- "Fechar dia" → students see a grey banner with the reason.
+- "Cancelar aula" → cancels a single occurrence. Reopen / Restaurar undoes either.
 
-**/admin/students (Alunos)** — registered users:
-- Table with name, email, phone, joined date.
-- Click a student → detail page:
-  - Edit name, phone, **goals**, **private notes** (admin-only — your student CRM).
-  - Payment ledger per month with "Marcar pago" toggle.
-  - Add a new month of payment with amount + paid status.
+**/admin/classes — Modelos** — recurring class templates. "Nova aula" → form (name, day, time, duration, capacity, active dates).
 
-**/admin/sessions (1:1s)** — solo sessions Baltaru manages directly:
-- Table of past + future 1:1s.
-- "Nova sessão" → form. Student input is fuzzy: matches existing accounts by email or name; if no match, stores as off-app name.
-- These feed the earnings dashboard alongside member payments.
+**/admin/students — Alunos** — registered students.
+- **Approve pending accounts here** — a new signup can't book until you do.
+- Click a student → detail page: name, phone, goals, private notes (your CRM), payment ledger.
 
-**/admin/earnings (Receitas)** — the feature he wanted that Regybox does poorly:
-- This-month total + 6-month total.
-- Split between mensalidades (member payments) and 1:1s.
-- Simple bar chart of monthly trend.
-- Counts only paid payment_records + all solo_sessions.
+**/admin/sessions — 1:1s** — solo sessions Baltaru runs directly. "Nova sessão" matches an existing account by email/name, or stores an off-app name. These feed the earnings.
 
-**/admin/messages (Mensagens)** — contact form inbox:
-- Unread highlighted with "Nova" badge.
-- Mark read/unread, delete.
+**/admin/pagamentos — Pagamentos** — payment tracking + earnings, the part Regybox does poorly:
+- Two tabs — "Aulas de grupo" and "1:1s".
+- A per-month board: each student's paid / por pagar / em pausa status, monthly fee, and a 6-month history strip.
+- "Receitas dos últimos 6 meses" — a bar chart of member payments + 1:1 revenue, with the running total.
+
+**/admin/messages — Mensagens** — the contact-form inbox. Unread highlighted; mark read/unread, delete.
+
+**/admin/merch — Loja** — merch items and stock. "Novo artigo" to add one.
+**/admin/claims — Pedidos** — the reservations students make from /loja; mark them fulfilled or cancelled.
 
 ---
 
-## 4. Things intentionally not built (TALK list)
+## 4. Decisions for Baltaru
 
-See [TALK_LIST.md](./TALK_LIST.md). These are decisions that need Baltaru's input before we build them:
-- Free / trial class rules
-- No-show policy
-- Real bio + photos + logo file
-- Color choice (gold currently — confirm or switch to red)
-- Domain choice (batusboxing.pt vs batusboxe.pt)
-- Existing student migration from Regybox
-- Liability waiver text
-- Privacy policy
+The app works today; these are the calls only he can make. Full list in [TALK_LIST.md](./TALK_LIST.md) — the headlines:
+
+- Real logo file, photos, and his bio for /sobre
+- Accent colour — gold (current) or Portuguese red
+- Domain — batusboxing.pt vs batusboxe.pt
+- Cancellation cutoff (currently 4h); public pricing yes/no
+- Free / trial-class rules; no-show policy
+- Importing the existing student list from Regybox
+- His legal name + NIF to complete the Terms / Privacy pages
 
 ---
 
 ## 5. Hand-off mechanics (1 min)
 
-- All infrastructure is owned by `batusboxing@gmail.com`. Hand him that Gmail's password and he owns Vercel + Supabase + (future domain).
-- Source code: public on github.com/DNunes8/batus. He doesn't need GitHub access to use the app.
+- All infrastructure sits under `batusboxing@gmail.com` — hand him that Gmail's password and he owns Vercel + Supabase + (future domain).
+- Source code: public on github.com/DNunes8/batus.
 - Cost today: €0/month (Vercel free + Supabase free). Domain when bought: ~€15/year.
 - See [HANDOVER.md](./HANDOVER.md) for the full transfer steps.

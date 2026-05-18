@@ -1,57 +1,62 @@
 # TALK list — open questions for Baltaru
 
-These are decisions intentionally deferred. The app works without them; Baltaru's answers shape the right implementation.
+_Updated 2026-05-18._ Decisions intentionally deferred — the app works without them. Baltaru's answers shape the right implementation.
 
 ## Branding & content
 
-- [ ] **Logo file** — we're using a screenshot of the Instagram logo. He has the proper SVG/PNG file?
-- [ ] **Bio text for /sobre** — currently a placeholder. Need 2–3 paragraphs in his voice.
-- [ ] **Studio address, email, phone** — placeholders in `studio.config.ts` and the footer.
-- [ ] **Photos for the landing** — Instagram videos he mentioned (originals from photographer, not Insta-compressed).
-- [ ] **Color choice** — gold accent (current) or Portuguese red. Look at the deploy and pick.
-- [ ] **Domain** — `batusboxing.pt` (matches the Gmail) or `batusboxe.pt` or other. Buy once decided.
+- [ ] **Logo file** — currently a square screenshot stand-in. Does he have the proper SVG/PNG? (The header logo and the PWA icons both need it.)
+- [ ] **Bio & studio story for /sobre** — the page is a full editorial layout now, but the copy is placeholder written in his voice. Need his real words.
+- [ ] **Studio address, email, phone** — still `TBD` in `studio.config.ts`; the footer and contact page hide them until they're set.
+- [ ] **Photos & video** — real photographer originals for the landing page and the /sobre gallery/video slots (they drop into `studio.config.ts`).
+- [ ] **Accent colour** — gold (current) or Portuguese red. Look at the live site and pick.
+- [ ] **Domain** — `batusboxing.pt` (matches the Gmail) or `batusboxe.pt`. Buy once decided.
 
 ## Configuration
 
-- [ ] **Cancellation cutoff** — currently 4h. Should it be 2h? 12h? 24h?
-- [ ] **Class roster privacy** — students currently see only count ("8/12"), not other students' names. Confirm that's right?
-- [ ] **Pricing display** — currently no public pricing. Show it on the site or "contact for pricing"?
-- [ ] **Default class capacity** — default is 12. Per-class today, or one global number?
+- [ ] **Cancellation cutoff** — currently 4h. 2h? 12h? 24h?
+- [ ] **Account approval** — new students land pending and the coach approves each one from /admin/students. Keep that, or auto-approve on signup?
+- [ ] **Class roster privacy** — students see only the count ("8/12"), not names. Confirm that's right.
+- [ ] **Pricing display** — no public pricing today. Show it on the site, or keep "contact for pricing"?
+- [ ] **Default class capacity** — currently 12.
 
 ## Free / trial classes
 
 - [ ] How does the "first class free" rule work today?
-- [ ] Should it auto-grant a one-time free booking on signup? Or stays manual (Baltaru waives payment)?
+- [ ] Auto-grant a one-time free booking on signup, or keep it manual (Baltaru just waives payment)?
 - [ ] Other free-class scenarios — referrals, promotions?
 
 ## No-show policy
 
 - [ ] What happens if a student doesn't cancel and doesn't show?
-- [ ] Strike system? Auto-block after N? Manual flag?
-- [ ] Should the system warn students who book and don't show?
+- [ ] Strike system, auto-block after N, or manual flag?
 
 ## Migration & data
 
-- [ ] **Existing student list** — want it imported from Regybox? CSV would do. Or fresh start.
-- [ ] **Existing schedule** — what classes does he run today? (Currently: empty unless we seeded.)
+- [ ] **Existing student list** — import from Regybox (a CSV would do), or fresh start?
+- [ ] **Existing schedule** — confirm the class templates already loaded match what he actually runs.
 - [ ] **Existing pricing** — monthly amount per modality, drop-in price.
 
 ## Legal
 
-- [ ] **Liability waiver text** — checkbox at signup ("understand the risks of contact sport"). His exact wording.
-- [ ] **Privacy policy** — GDPR. Need his legal name, contact email, data retention preferences.
-- [ ] **Studio insurance details** — if relevant to display.
+- [ ] **Data-controller details** — the Terms & Privacy pages are written and live, but need his legal name + NIF (the `legal` block in `studio.config.ts`) before public launch.
+- [ ] **Liability waiver** — the Terms page covers the risks of a contact sport. Decide whether to also add an explicit "I understand the risks" checkbox at signup.
+- [ ] **Studio insurance** — any details relevant to display?
 
-## Phase 2 (build only if he asks)
+## Merch store — content
 
-- [ ] **Merch store** — claim-and-pay-in-person, no payments, no shipping. Stock count + email-on-claim.
-- [ ] **Student stats** — attendance count, streaks, total since joining.
-- [ ] **WhatsApp/SMS notifications** — currently email-only. Useful for waitlist promotion?
+The store itself is built (public /loja, admin /admin/merch + /admin/claims; claim-and-pay-in-person, stock count, email-on-claim). Open:
+
+- [ ] Which items, prices and stock to load.
+- [ ] Which email address should be notified when a student reserves an item.
+
+## Future — build only if he asks
+
+- [ ] **WhatsApp / SMS notifications** — currently email-only. Useful for waitlist promotion?
 - [ ] **Class packs** — 10-class bundles with their own pricing.
-- [ ] **PWA polish** — manifest + icons (needs real logo), home-screen install.
+- [ ] **PWA polish** — manifest + icons (needs the real logo) for home-screen install.
 
-## Operational
+## Operational — before serious production use
 
-- [ ] **Email sender** — currently using Supabase's default email service (rate-limited 4/h). Once we have a domain, set up Resend SMTP for production-grade sending.
-- [ ] **Backups** — Supabase free tier doesn't include automated daily DB backups. Set up a weekly cron dump to Supabase Storage before serious production use.
-- [ ] **Custom domain in Vercel** — once bought, point DNS to Vercel + add to Supabase Site URL + redirect URLs.
+- [ ] **Email sender** — currently Supabase's default service (rate-limited). Once there's a domain, set up Resend SMTP.
+- [ ] **Backups** — the Supabase free tier has no automated daily DB backup. Set up a weekly dump.
+- [ ] **Custom domain** — once bought, point DNS to Vercel and add it to Supabase's Site URL + redirect URLs.
