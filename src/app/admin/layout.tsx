@@ -52,7 +52,7 @@ export default async function AdminLayout({
               BATUS
             </span>
           )}
-          <span className="mt-3 block text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <span className="mt-3 flex w-fit items-center rounded-full bg-foreground px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-background">
             Admin
           </span>
         </Link>
