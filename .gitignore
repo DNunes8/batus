@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# claude code — local agent worktrees, not part of the repo
+.claude/worktrees/
+
 # stray screenshots / phone exports at project root
 /IMG_*.PNG
 /IMG_*.png
