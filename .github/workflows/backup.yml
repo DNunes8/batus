@@ -40,9 +40,13 @@ jobs:
 
       - name: Dump the database
         env:
-          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          pg_dump \
+          # Strip any stray whitespace/newline that can sneak in when the
+          # password is pasted into the secret box.
+          CLEAN_PW="$(printf '%s' "$DB_PASSWORD" | tr -d ' \t\n\r')"
+          echo "Password length - stored: ${#DB_PASSWORD}, after trim: ${#CLEAN_PW}"
+          PGPASSWORD="$CLEAN_PW" pg_dump \
             --host=aws-1-eu-central-1.pooler.supabase.com \
             --port=5432 \
             --username=postgres.udgrwwkuvtycidxfaffx \
