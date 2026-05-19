@@ -6,8 +6,8 @@
 #   3. stores the encrypted file as a workflow artifact, kept for 90 days
 #
 # Required repo secrets (Settings -> Secrets and variables -> Actions):
-#   SUPABASE_DB_URL    - the Supabase "Session pooler" connection string
-#   BACKUP_PASSPHRASE  - the passphrase that encrypts/decrypts the backup
+#   SUPABASE_DB_PASSWORD - the Supabase database password
+#   BACKUP_PASSPHRASE    - the passphrase that encrypts/decrypts the backup
 #
 # To restore a backup:
 #   1. Actions tab -> open a backup run -> download the "db-backup" artifact
@@ -40,9 +40,13 @@ jobs:
 
       - name: Dump the database
         env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          pg_dump "$DB_URL" \
+          pg_dump \
+            --host=aws-1-eu-central-1.pooler.supabase.com \
+            --port=5432 \
+            --username=postgres.udgrwwkuvtycidxfaffx \
+            --dbname=postgres \
             --schema=public \
             --no-owner \
             --no-privileges \
