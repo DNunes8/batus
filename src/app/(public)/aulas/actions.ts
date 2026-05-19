@@ -53,65 +53,23 @@ export async function bookClass(formData: FormData) {
     throw new Error("Aula não encontrada.");
   }
 
-  // Service-role count for accurate capacity check (RLS hides other users' bookings).
+  // Capacity check, the booked-vs-waitlisted decision, and the write all
+  // happen atomically inside the book_class DB function (migration 0012):
+  // it serializes concurrent bookings for the same class instance with an
+  // advisory lock, so two students can't both take the last seat.
   const admin = createAdminClient();
-  const { count: bookedCount } = await admin
-    .from("bookings")
-    .select("*", { count: "exact", head: true })
-    .eq("template_id", template_id)
-    .eq("instance_date", instance_date)
-    .eq("status", "booked");
+  const { data: resultStatus, error } = await admin.rpc("book_class", {
+    p_user_id: user.id,
+    p_template_id: template_id,
+    p_instance_date: instance_date,
+    p_capacity: template.capacity,
+  });
 
-  const isFull = (bookedCount ?? 0) >= template.capacity;
-
-  let waitlist_position: number | null = null;
-  if (isFull) {
-    const { count: waitlistCount } = await admin
-      .from("bookings")
-      .select("*", { count: "exact", head: true })
-      .eq("template_id", template_id)
-      .eq("instance_date", instance_date)
-      .eq("status", "waitlisted");
-    waitlist_position = (waitlistCount ?? 0) + 1;
-  }
-
-  // Unique constraint on (user_id, template_id, instance_date) means we
-  // can't insert twice. If a cancelled row exists, update it back to active.
-  const { data: existing } = await supabase
-    .from("bookings")
-    .select("id, status")
-    .eq("user_id", user.id)
-    .eq("template_id", template_id)
-    .eq("instance_date", instance_date)
-    .maybeSingle();
-
-  // Booking writes go through the service-role client: capacity has already
-  // been checked above, and the RLS lockdown (migration 0010) blocks
-  // non-admins from creating or re-activating bookings directly.
-  if (existing) {
-    if (existing.status === "booked" || existing.status === "waitlisted") {
+  if (error) {
+    if (error.message.includes("BATUS_ALREADY_BOOKED")) {
       throw new Error("Já tens marcação para esta aula.");
     }
-    const { error } = await admin
-      .from("bookings")
-      .update({
-        status: isFull ? "waitlisted" : "booked",
-        waitlist_position,
-        cancelled_at: null,
-        cancelled_reason: null,
-        booked_at: new Date().toISOString(),
-      })
-      .eq("id", existing.id);
-    if (error) throw new Error(error.message);
-  } else {
-    const { error } = await admin.from("bookings").insert({
-      user_id: user.id,
-      template_id,
-      instance_date,
-      status: isFull ? "waitlisted" : "booked",
-      waitlist_position,
-    });
-    if (error) throw new Error(error.message);
+    throw new Error(error.message);
   }
 
   revalidatePath("/aulas");
@@ -121,7 +79,7 @@ export async function bookClass(formData: FormData) {
   // If the form told us where to return to (e.g. the class detail page),
   // bounce back there with the toast. Otherwise default to the schedule
   // pre-anchored to the right week.
-  const status_param = isFull ? "waitlist" : "booked";
+  const status_param = resultStatus === "waitlisted" ? "waitlist" : "booked";
   const return_to = (formData.get("return_to") as string | null)?.trim();
   if (return_to) {
     const separator = return_to.includes("?") ? "&" : "?";
