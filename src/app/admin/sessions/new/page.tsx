@@ -15,7 +15,7 @@ export default function NewSessionPage() {
   return (
     <div className="max-w-2xl p-6 sm:p-10">
       <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-        1:1s
+        PTs
       </p>
       <h1 className="mt-4 font-display text-3xl tracking-[0.04em] sm:text-4xl">
         NOVA SESSÃO

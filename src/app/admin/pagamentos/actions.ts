@@ -152,7 +152,7 @@ export async function setStudentMonthlyFee(formData: FormData) {
 }
 
 // ----------------------------------------------------------------------------
-// Move a student between the "Aulas de grupo" and "1:1s" tabs.
+// Move a student between the "Aulas de grupo" and "PTs" tabs.
 // Just flips profiles.service_type — payment history is preserved either way.
 // ----------------------------------------------------------------------------
 export async function setStudentServiceType(input: {
@@ -179,7 +179,7 @@ export async function setStudentServiceType(input: {
 }
 
 // ----------------------------------------------------------------------------
-// For a 1:1 student: opt them in/out of monthly payment tracking.
+// For a PT student: opt them in/out of monthly payment tracking.
 // false → "pays per session, cash on the day" — no payment_record needed.
 // true  → "has a fixed monthly fee" — same Pago/Por pagar UX as mensalistas.
 // ----------------------------------------------------------------------------

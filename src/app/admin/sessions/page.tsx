@@ -34,7 +34,7 @@ export default async function SessionsPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-            1:1s
+            PTs
           </p>
           <h1 className="mt-4 font-display text-3xl tracking-[0.04em] sm:text-4xl">
             SESSÕES INDIVIDUAIS
@@ -55,7 +55,7 @@ export default async function SessionsPage() {
             Ainda não tens sessões registadas.
           </p>
           <p className="mt-1 max-w-xs text-xs text-muted-foreground/70">
-            Sessões 1:1 são registadas aqui — ficam fora do horário público.
+            Sessões PT são registadas aqui — ficam fora do horário público.
           </p>
           <Button
             render={<Link href="/admin/sessions/new" />}

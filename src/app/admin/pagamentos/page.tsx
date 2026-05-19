@@ -345,7 +345,7 @@ export default async function PagamentosPage({
         Pagamentos
       </p>
       <h1 className="mt-4 font-display text-3xl tracking-[0.04em] sm:text-4xl">
-        {tab === "grupo" ? "AULAS DE GRUPO" : "1:1S"}
+        {tab === "grupo" ? "AULAS DE GRUPO" : "PTS"}
       </h1>
 
       {/* Month picker */}
@@ -386,7 +386,7 @@ export default async function PagamentosPage({
           active={tab === "solo"}
           count={soloRows.length}
         >
-          1:1s
+          PTs
         </TabLink>
       </div>
 
@@ -423,7 +423,7 @@ export default async function PagamentosPage({
       {tab === "grupo" ? (
         groupRows.length === 0 ? (
           <p className="mt-12 text-center text-sm text-muted-foreground">
-            Sem alunos de aulas de grupo. Move algum aluno de 1:1s para cá pelo
+            Sem alunos de aulas de grupo. Move algum aluno de PTs para cá pelo
             menu do perfil ou pelo drawer.
           </p>
         ) : (
@@ -431,7 +431,7 @@ export default async function PagamentosPage({
         )
       ) : soloRows.length === 0 ? (
         <p className="mt-12 text-center text-sm text-muted-foreground">
-          Sem alunos de 1:1s. Move algum aluno de Aulas de grupo para cá pelo
+          Sem alunos de PTs. Move algum aluno de Aulas de grupo para cá pelo
           drawer ou pelo perfil do aluno.
         </p>
       ) : (
@@ -474,7 +474,7 @@ export default async function PagamentosPage({
           })}
         </div>
         <p className="mt-4 text-xs text-muted-foreground">
-          Mensalidades pagas + receita de 1:1s (one-off + recorrentes).
+          Mensalidades pagas + receita de PTs (one-off + recorrentes).
         </p>
       </section>
     </div>

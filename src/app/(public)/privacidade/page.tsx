@@ -121,7 +121,7 @@ export default function PrivacidadePage() {
               <span className="font-medium text-foreground">
                 Sessões individuais
               </span>{" "}
-              — data, duração e valor de treinos 1:1, caso tenhas algum.
+              — data, duração e valor de PTs, caso tenhas algum.
             </li>
             <li>
               <span className="font-medium text-foreground">

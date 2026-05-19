@@ -26,7 +26,7 @@ const MODALITIES = [
     description: "Combinações, percussão e cardio em grupo.",
   },
   {
-    name: "1:1",
+    name: "PT",
     description: "Sessões individuais com foco específico — combate, recuperação ou forma.",
   },
   {
@@ -66,7 +66,7 @@ export default async function Home() {
             </p>
             <p className="mt-10 max-w-md text-lg text-foreground/80">
               Treino de boxe e kickboxing no centro de {studio.city}. Aulas de
-              grupo e sessões 1:1 com{" "}
+              grupo e sessões PT com{" "}
               <span className="text-foreground">{studio.coach}</span>,
               pugilista profissional.
             </p>
@@ -96,7 +96,7 @@ export default async function Home() {
               <span className="text-foreground/30">·</span>
               <span>Combate</span>
               <span className="text-foreground/30">·</span>
-              <span>Sessões 1:1</span>
+              <span>PT</span>
             </div>
           </div>
 

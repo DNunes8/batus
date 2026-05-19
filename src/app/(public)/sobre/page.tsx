@@ -25,7 +25,7 @@ const MODALIDADES = [
       "A arte das oito armas — punhos, cotovelos, joelhos e canelas. Técnica e clinch.",
   },
   {
-    name: "Sessões 1:1",
+    name: "PT",
     description:
       "Treino individual focado no que precisas — técnica, recuperação ou preparação de combate.",
   },

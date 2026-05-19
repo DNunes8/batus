@@ -312,7 +312,7 @@ export async function getWeekSchedule(
 }
 
 // Admin variant: uses service-role client so it can see all bookings + profiles.
-// Returns merged group-class + 1:1 entries per day, sorted by start_time.
+// Returns merged group-class + PT entries per day, sorted by start_time.
 export async function getAdminWeekSchedule(
   weekStart: string,
 ): Promise<AdminScheduleDay[]> {
@@ -461,7 +461,7 @@ export async function getAdminWeekSchedule(
       };
     });
 
-    // ---------- 1:1 instances ----------
+    // ---------- PT instances ----------
     const daySoloTemplates = soloTemplates.filter(
       (t) =>
         t.day_of_week === dow &&

@@ -125,7 +125,7 @@ export function AddClassDialog({
           template_id: t.id,
           date,
         });
-        toast.success(`1:1 com ${t.label} adicionado.`);
+        toast.success(`PT com ${t.label} adicionado.`);
         setOpen(false);
         router.refresh();
       } catch (err) {
@@ -266,7 +266,7 @@ function PickView({
       {soloTemplates.length > 0 && (
         <section>
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            1:1s
+            PTs
           </p>
           <ul className="mt-2 space-y-2">
             {soloTemplates.map((t) => (
@@ -316,7 +316,7 @@ function PickView({
           disabled={picking}
           className="h-11 w-full justify-start text-base"
         >
-          + 1:1 personalizado
+          + PT personalizado
         </Button>
       </section>
 
@@ -502,7 +502,7 @@ function SoloForm({
             placeholder="Email ou nome do aluno"
           />
           <p className="text-xs text-muted-foreground">
-            Se o email ou nome corresponder a uma conta existente, o 1:1 fica
+            Se o email ou nome corresponder a uma conta existente, o PT fica
             associado a esse aluno. Caso contrário, fica registado com o nome
             escrito.
           </p>
@@ -565,7 +565,7 @@ function SoloForm({
           <span>
             <span className="font-medium">Repetir todas as semanas</span>
             <span className="block text-xs text-muted-foreground">
-              1:1s costumam ser slots fixos. Desmarca se for único.
+              PTs costumam ser slots fixos. Desmarca se for único.
             </span>
           </span>
         </label>
@@ -584,7 +584,7 @@ function SoloForm({
             Voltar
           </Button>
           <SubmitButton className={BUTTON_MOBILE_CLASSES} pendingText="A criar…">
-            Criar 1:1
+            Criar PT
           </SubmitButton>
         </div>
       </form>

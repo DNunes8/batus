@@ -49,7 +49,7 @@ The admin area has its own layout — a sidebar on desktop, a top bar on mobile 
 - A banner when new accounts are waiting for approval.
 - Four metric cards: receitas este mês, aulas hoje, pedidos pendentes, mensagens por ler.
 - "Hoje" — today's classes with booked/capacity.
-- Shortcuts: nova aula, nova sessão 1:1, ver alunos, novo artigo.
+- Shortcuts: nova aula, nova sessão PT, ver alunos, novo artigo.
 
 **/admin/calendar — Calendário** (his main daily screen):
 - Week view, the same as the public one but with the roster under each class.
@@ -62,12 +62,12 @@ The admin area has its own layout — a sidebar on desktop, a top bar on mobile 
 - **Approve pending accounts here** — a new signup can't book until you do.
 - Click a student → detail page: name, phone, goals, private notes (your CRM), payment ledger.
 
-**/admin/sessions — 1:1s** — solo sessions Baltaru runs directly. "Nova sessão" matches an existing account by email/name, or stores an off-app name. These feed the earnings.
+**/admin/sessions — PTs** — solo sessions Baltaru runs directly. "Nova sessão" matches an existing account by email/name, or stores an off-app name. These feed the earnings.
 
 **/admin/pagamentos — Pagamentos** — payment tracking + earnings, the part Regybox does poorly:
-- Two tabs — "Aulas de grupo" and "1:1s".
+- Two tabs — "Aulas de grupo" and "PTs".
 - A per-month board: each student's paid / por pagar / em pausa status, monthly fee, and a 6-month history strip.
-- "Receitas dos últimos 6 meses" — a bar chart of member payments + 1:1 revenue, with the running total.
+- "Receitas dos últimos 6 meses" — a bar chart of member payments + PT revenue, with the running total.
 
 **/admin/messages — Mensagens** — the contact-form inbox. Unread highlighted; mark read/unread, delete.
 

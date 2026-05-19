@@ -132,7 +132,7 @@ export default async function StudentDetailPage({
                 className={SELECT_CLASSES}
               >
                 <option value="group">Aulas de grupo</option>
-                <option value="solo">1:1s</option>
+                <option value="solo">PTs</option>
               </select>
               <p className="text-xs text-muted-foreground">
                 Determina o separador onde o aluno aparece em Pagamentos.
@@ -168,7 +168,7 @@ export default async function StudentDetailPage({
             <span>
               <span className="font-medium">Tem pagamento mensal</span>
               <span className="block text-xs text-muted-foreground">
-                Desliga só para alunos 1:1 que pagam à sessão (cash no dia). Nesse
+                Desliga só para alunos PT que pagam à sessão (cash no dia). Nesse
                 caso a Pagamentos não exige Marcar pago todos os meses.
               </span>
             </span>

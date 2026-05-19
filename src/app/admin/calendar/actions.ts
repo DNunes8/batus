@@ -55,7 +55,7 @@ export async function createGroupInstanceFromTemplate(input: {
   revalidatePath("/aulas");
 }
 
-// Same as above but for 1:1 templates.
+// Same as above but for PT templates.
 export async function createSoloInstanceFromTemplate(input: {
   template_id: string;
   date: string;
@@ -250,7 +250,7 @@ export async function rescheduleClassInstance(formData: FormData) {
 }
 
 // ============================================================================
-// 1:1 recurring sessions on the calendar
+// PT recurring sessions on the calendar
 // ============================================================================
 
 export async function createSoloFromCalendar(

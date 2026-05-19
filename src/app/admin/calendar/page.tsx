@@ -615,7 +615,7 @@ function SoloBlock({ entry }: { entry: AdminSoloEntry }) {
           </span>
         </div>
         <p className="mt-1 text-sm font-medium text-destructive/90">
-          1:1 · {entry.student_name}
+          PT · {entry.student_name}
         </p>
         {entry.cancellation_reason && (
           <p className="mt-1 text-[11px] text-muted-foreground">
@@ -643,7 +643,7 @@ function SoloBlock({ entry }: { entry: AdminSoloEntry }) {
           {formatTime(entry.start_time)}
         </span>
         <span className="inline-flex items-center gap-1 rounded-sm border border-gold/50 px-1 py-0.5 text-[9px] uppercase tracking-[0.15em] text-foreground">
-          1:1
+          PT
         </span>
       </div>
       <p className="mt-1 text-sm font-medium leading-tight">
@@ -664,10 +664,10 @@ function SoloBlock({ entry }: { entry: AdminSoloEntry }) {
           template_id={entry.template_id}
           instance_date={entry.date}
           current_start_time={entry.start_time}
-          label={`1:1 · ${entry.student_name}`}
+          label={`PT · ${entry.student_name}`}
         />
         <ConfirmForm
-          message={`Cancelar 1:1 com ${entry.student_name} neste dia?`}
+          message={`Cancelar PT com ${entry.student_name} neste dia?`}
           action={cancelSoloInstance}
         >
           <input type="hidden" name="template_id" value={entry.template_id} />

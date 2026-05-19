@@ -20,7 +20,7 @@ export async function updateStudentNotesAndGoals(formData: FormData) {
   const monthly_fee_cents = feeRaw === "" ? null : parseEuroToCents(feeRaw);
 
   // Which Pagamentos tab this student belongs to + whether their monthly
-  // payment is tracked (relevant for 1:1 students who pay per-session).
+  // payment is tracked (relevant for PT students who pay per-session).
   const service_type =
     ((formData.get("service_type") as string | null) ?? "group") === "solo"
       ? "solo"

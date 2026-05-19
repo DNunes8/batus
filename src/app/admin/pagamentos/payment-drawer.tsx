@@ -179,7 +179,7 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
         });
         toast.success(
           target === "solo"
-            ? `${name} movido para 1:1s.`
+            ? `${name} movido para PTs.`
             : `${name} movido para Aulas de grupo.`,
         );
         router.refresh();
@@ -233,7 +233,7 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
         {/* Header — pr-12 leaves room for Dialog's built-in close button (top-2 right-2) */}
         <div className="px-6 pr-12 pb-4 pt-6">
           <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            {monthLabel} · {isSolo ? "1:1" : "Aulas de grupo"}
+            {monthLabel} · {isSolo ? "PT" : "Aulas de grupo"}
           </p>
           <h2 className="mt-1 font-display text-2xl tracking-[0.04em]">
             {name}
@@ -429,7 +429,7 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
                   ? "A mover…"
                   : isSolo
                     ? "← Mover para Aulas de grupo"
-                    : "Mover para 1:1s →"}
+                    : "Mover para PTs →"}
               </button>
             </div>
           </section>
