@@ -85,7 +85,7 @@ export default async function PagamentosPage({
     supabase
       .from("solo_session_templates")
       .select(
-        "id, user_id, day_of_week, price_cents, active_from, active_until",
+        "id, user_id, day_of_week, price_cents, active_from, active_until, is_preset",
       ),
     supabase
       .from("solo_session_overrides")
@@ -155,6 +155,7 @@ export default async function PagamentosPage({
 
   // Recurring solo_session_templates: walk weekly within the month, skipping cancellations.
   for (const tpl of soloTemplates) {
+    if (tpl.is_preset) continue; // presets aren't real sessions — no revenue
     if (!tpl.user_id) continue;
     if (tpl.active_from > monthEnd) continue;
     if (tpl.active_until && tpl.active_until < monthStart) continue;
@@ -301,6 +302,7 @@ export default async function PagamentosPage({
     }
   }
   for (const tpl of soloTemplates) {
+    if (tpl.is_preset) continue; // presets aren't real sessions — no revenue
     const startDate =
       tpl.active_from > oldestMonth ? tpl.active_from : oldestMonth;
     const endDate =

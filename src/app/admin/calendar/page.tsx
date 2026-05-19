@@ -80,9 +80,9 @@ export default async function AdminCalendarPage({
   const prevWeek = addDays(weekStart, -7);
   const nextWeek = addDays(weekStart, 7);
 
-  // Active "models" the coach can one-tap onto any day. Only recurring
-  // templates (active_until IS NULL) — one-off historical inserts shouldn't
-  // pollute the picker. Sorted by day_of_week + start_time for predictable order.
+  // Models the coach can one-tap onto any day. Group: active recurring class
+  // templates. PT: presets — reusable PT models that never auto-render on
+  // their own. Sorted by day_of_week + start_time for predictable order.
   const supabase = await createClient();
   const [groupTplRes, soloTplRes] = await Promise.all([
     supabase
@@ -97,8 +97,7 @@ export default async function AdminCalendarPage({
       .select(
         "id, student_name, day_of_week, start_time, duration_minutes, price_cents, profile:profiles(full_name)",
       )
-      .is("active_until", null)
-      .lte("active_from", todayStr)
+      .eq("is_preset", true)
       .order("day_of_week", { ascending: true })
       .order("start_time", { ascending: true }),
   ]);

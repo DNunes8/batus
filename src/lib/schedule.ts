@@ -349,7 +349,7 @@ export async function getAdminWeekSchedule(
     admin
       .from("solo_session_templates")
       .select(
-        `id, user_id, student_name, day_of_week, start_time, duration_minutes, price_cents, notes, active_from, active_until, profile:profiles(full_name)`,
+        `id, user_id, student_name, day_of_week, start_time, duration_minutes, price_cents, notes, active_from, active_until, is_preset, profile:profiles(full_name)`,
       ),
     admin
       .from("solo_session_overrides")
@@ -462,8 +462,10 @@ export async function getAdminWeekSchedule(
     });
 
     // ---------- PT instances ----------
+    // Presets are reusable models, not real sessions — they never render.
     const daySoloTemplates = soloTemplates.filter(
       (t) =>
+        !t.is_preset &&
         t.day_of_week === dow &&
         t.active_from <= date &&
         (t.active_until === null || t.active_until >= date),
