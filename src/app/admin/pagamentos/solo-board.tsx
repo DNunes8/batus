@@ -19,6 +19,9 @@ import { StatusPill } from "./status-pill";
 
 export type SoloBoardRow = DrawerStudent & {
   effectiveStatus: PaymentStatus;
+  // Account-level pause (profiles.is_blocked) — distinct from the monthly
+  // payment status. A paused account can't book; it still shows here.
+  is_paused: boolean;
 };
 
 type BulkAction = { status: PaymentStatus; ids: string[] } | null;
@@ -245,6 +248,11 @@ export function SoloBoard({
                         ) : (
                           <span className="inline-flex items-center rounded-full border border-muted-foreground/30 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
                             Pago à sessão
+                          </span>
+                        )}
+                        {r.is_paused && (
+                          <span className="inline-flex shrink-0 items-center rounded-full border border-muted-foreground/40 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                            Conta em pausa
                           </span>
                         )}
                         <span className="text-xs text-muted-foreground tabular-nums">

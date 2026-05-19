@@ -67,6 +67,8 @@ export default async function PerfilPage({
 
   // Admins are always treated as approved; everyone else needs the flag.
   const isApproved = !!profile?.approved || !!profile?.is_admin;
+  // A paused account stays approved but is blocked from booking new classes.
+  const isPaused = !!profile?.is_blocked && !profile?.is_admin;
 
   const since = profile
     ? new Date(profile.joined_at).toLocaleDateString("pt-PT", {
@@ -129,6 +131,42 @@ export default async function PerfilPage({
               aulas no horário — sem precisares de voltar a entrar.
             </p>
           </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {studio.social.instagram && (
+              <a
+                href={`https://instagram.com/${studio.social.instagram}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-11 items-center rounded-md border border-border/60 px-4 text-sm font-medium hover:bg-muted"
+              >
+                Instagram @{studio.social.instagram}
+              </a>
+            )}
+            <Link
+              href="/contacto"
+              className="inline-flex h-11 items-center rounded-md bg-foreground px-4 text-sm font-medium text-background hover:opacity-90"
+            >
+              Contactar
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Paused account — still approved, so stats/bookings stay visible below
+          (existing bookings remain cancellable), but no new bookings. */}
+      {isApproved && isPaused && (
+        <div className="mt-8 rounded-md border border-foreground/25 bg-muted/40 p-5 sm:p-6">
+          <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            Estado da conta
+          </p>
+          <h2 className="mt-2 font-display text-2xl tracking-[0.04em] sm:text-3xl">
+            CONTA EM PAUSA
+          </h2>
+          <p className="mt-3 max-w-prose text-sm leading-relaxed text-foreground/80">
+            A tua conta está em pausa, por isso não podes marcar novas aulas. As
+            marcações que já tens mantêm-se — fala com o{" "}
+            {studio.coach.split(" ")[0]} para reativares a conta.
+          </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {studio.social.instagram && (
               <a

@@ -147,6 +147,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
     waitlist_position: number | null;
   } | null = null;
   let isApproved = false;
+  let isPaused = false;
   if (user) {
     const [bookingRes, profileRes] = await Promise.all([
       supabase
@@ -159,7 +160,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
         .maybeSingle(),
       supabase
         .from("profiles")
-        .select("approved, is_admin")
+        .select("approved, is_admin, is_blocked")
         .eq("id", user.id)
         .maybeSingle(),
     ]);
@@ -173,6 +174,8 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
     }
     isApproved =
       !!profileRes.data?.approved || !!profileRes.data?.is_admin;
+    isPaused =
+      !!profileRes.data?.is_blocked && !profileRes.data?.is_admin;
   }
 
   const backHref = `/aulas?week=${mondayOf(date)}`;
@@ -279,6 +282,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
           isFull={isFull}
           isLoggedIn={!!user}
           isApproved={isApproved}
+          isPaused={isPaused}
           userBooking={userBooking}
         />
       </div>
@@ -332,6 +336,7 @@ function BookingAction({
   isFull,
   isLoggedIn,
   isApproved,
+  isPaused,
   userBooking,
 }: {
   template_id: string;
@@ -341,6 +346,7 @@ function BookingAction({
   isFull: boolean;
   isLoggedIn: boolean;
   isApproved: boolean;
+  isPaused: boolean;
   userBooking: {
     id: string;
     status: "booked" | "waitlisted";
@@ -435,6 +441,30 @@ function BookingAction({
           className="mt-4 inline-flex h-10 items-center justify-center rounded-md border border-border/60 px-4 text-xs uppercase tracking-widest hover:bg-muted"
         >
           Sair em Perfil →
+        </Link>
+      </div>
+    );
+  }
+
+  // Paused account — keeps any existing booking above, but can't make a new
+  // one. Explain instead of offering the button.
+  if (isPaused) {
+    return (
+      <div className="rounded-md border border-foreground/25 bg-muted/30 p-6 text-center">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+          Conta
+        </p>
+        <p className="mt-2 font-display text-2xl tracking-wide">
+          CONTA EM PAUSA
+        </p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Não podes marcar novas aulas enquanto a conta estiver em pausa.
+        </p>
+        <Link
+          href="/perfil"
+          className="mt-4 inline-flex h-10 items-center justify-center rounded-md border border-border/60 px-4 text-xs uppercase tracking-widest hover:bg-muted"
+        >
+          Saber mais →
         </Link>
       </div>
     );

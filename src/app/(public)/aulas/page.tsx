@@ -37,13 +37,15 @@ export default async function AulasPage({
   // Approval status — a logged-in but unapproved student can browse the
   // schedule but not book. Admins are always treated as approved.
   let isApproved = false;
+  let isPaused = false;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("approved, is_admin")
+      .select("approved, is_admin, is_blocked")
       .eq("id", user.id)
       .maybeSingle();
     isApproved = !!profile?.approved || !!profile?.is_admin;
+    isPaused = !!profile?.is_blocked && !profile?.is_admin;
   }
   const isPending = !!user && !isApproved;
 
@@ -110,6 +112,20 @@ export default async function AulasPage({
               className="font-medium text-foreground underline-offset-4 hover:underline"
             >
               O que falta?
+            </Link>
+          </p>
+        </div>
+      ) : isPaused ? (
+        <div className="mt-6 rounded-md border border-foreground/25 bg-muted/40 p-4 sm:p-5">
+          <p className="text-sm font-medium">A tua conta está em pausa</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Podes ver o horário, mas não podes marcar novas aulas enquanto a
+            conta estiver em pausa.{" "}
+            <Link
+              href="/perfil"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Saber mais
             </Link>
           </p>
         </div>
@@ -192,6 +208,7 @@ export default async function AulasPage({
                           cls={c}
                           isLoggedIn={!!user}
                           isApproved={isApproved}
+                          isPaused={isPaused}
                           isPast={isClassInPast(c.date, c.start_time)}
                         />
                       </li>
@@ -211,11 +228,13 @@ function BookingControl({
   cls,
   isLoggedIn,
   isApproved,
+  isPaused,
   isPast,
 }: {
   cls: ScheduleClass;
   isLoggedIn: boolean;
   isApproved: boolean;
+  isPaused: boolean;
   isPast: boolean;
 }) {
   if (cls.cancelled) {
@@ -279,6 +298,15 @@ function BookingControl({
         {cls.user_waitlist_position
           ? ` · #${cls.user_waitlist_position}`
           : ""}
+      </span>
+    );
+  }
+
+  // Paused account — keeps existing bookings above, but no new ones.
+  if (isPaused) {
+    return (
+      <span className="inline-flex h-10 items-center rounded-md border border-border/60 px-3 text-xs uppercase tracking-widest text-muted-foreground">
+        Conta em pausa
       </span>
     );
   }

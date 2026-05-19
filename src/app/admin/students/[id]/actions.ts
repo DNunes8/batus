@@ -50,6 +50,30 @@ export async function updateStudentNotesAndGoals(formData: FormData) {
   redirect(`/admin/students/${id}?saved=1`);
 }
 
+// Pause or reactivate a student's account. A paused account can't book new
+// classes — both the bookClass server action and the booking UI check
+// is_blocked. Existing bookings are untouched: the student can still cancel
+// those from /perfil. The protect_profile_columns trigger (migration 0003)
+// lets admins write is_blocked, same as approveStudent writes `approved`.
+export async function setStudentPaused(formData: FormData) {
+  await assertAdmin();
+  const id = formData.get("id") as string | null;
+  const paused = formData.get("paused") === "true";
+  if (!id) throw new Error("ID em falta.");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ is_blocked: paused })
+    .eq("id", id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/admin/students/${id}`);
+  revalidatePath("/admin/students");
+  revalidatePath("/admin/pagamentos");
+}
+
 export async function upsertPaymentRecord(formData: FormData) {
   await assertAdmin();
   const user_id = formData.get("user_id") as string | null;

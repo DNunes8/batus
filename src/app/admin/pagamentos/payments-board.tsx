@@ -19,6 +19,9 @@ import { StatusPill } from "./status-pill";
 
 export type BoardRow = DrawerStudent & {
   effectiveStatus: PaymentStatus;
+  // Account-level pause (profiles.is_blocked) — distinct from the monthly
+  // payment status. A paused account can't book; it still shows here.
+  is_paused: boolean;
 };
 
 type BulkAction = { status: PaymentStatus; ids: string[] } | null;
@@ -212,6 +215,11 @@ export function PaymentsBoard({
                       </p>
                       <div className="mt-1 flex items-center gap-2">
                         <StatusPill status={r.effectiveStatus} />
+                        {r.is_paused && (
+                          <span className="inline-flex shrink-0 items-center rounded-full border border-muted-foreground/40 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                            Conta em pausa
+                          </span>
+                        )}
                         {r.record?.notes && (
                           <span className="truncate text-xs text-muted-foreground">
                             · {r.record.notes}

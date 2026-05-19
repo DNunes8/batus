@@ -32,8 +32,10 @@ export async function bookClass(formData: FormData) {
     redirect("/perfil");
   }
 
+  // A paused account can't book new classes. Bounce to /perfil, which shows
+  // the "conta em pausa" panel — same graceful handling as the gate above.
   if (gateProfile?.is_blocked) {
-    throw new Error("A tua conta está bloqueada. Fala com o treinador.");
+    redirect("/perfil");
   }
 
   const template_id = formData.get("template_id") as string | null;

@@ -11,6 +11,7 @@ import { StatusPill } from "@/app/admin/pagamentos/status-pill";
 import type { PaymentStatus } from "@/app/admin/pagamentos/actions";
 import { approveStudent } from "../actions";
 import {
+  setStudentPaused,
   togglePaymentStatus,
   updateStudentNotesAndGoals,
   upsertPaymentRecord,
@@ -92,6 +93,62 @@ export default async function StudentDetailPage({
           </ConfirmForm>
         </div>
       )}
+
+      {/* Pause control — a paused account stays registered but can't book new
+          classes. Shown for approved, non-admin students; a pending student
+          is gated by the approval panel above instead. */}
+      {profile.approved &&
+        !profile.is_admin &&
+        (profile.is_blocked ? (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-foreground/30 bg-muted/40 p-4">
+            <div>
+              <p className="text-sm font-medium">Conta em pausa</p>
+              <p className="text-xs text-muted-foreground">
+                Este aluno não pode marcar aulas. As marcações que já tem
+                mantêm-se.
+              </p>
+            </div>
+            <ConfirmForm
+              message={`Reativar ${
+                profile.full_name || profile.email
+              }? Vai poder voltar a marcar aulas.`}
+              action={setStudentPaused}
+            >
+              <input type="hidden" name="id" value={profile.id} />
+              <input type="hidden" name="paused" value="false" />
+              <button
+                type="submit"
+                className="h-11 rounded-md bg-foreground px-5 text-sm font-medium uppercase tracking-wider text-background transition-opacity hover:opacity-90"
+              >
+                Reativar conta
+              </button>
+            </ConfirmForm>
+          </div>
+        ) : (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border/60 p-4">
+            <div>
+              <p className="text-sm font-medium">Conta ativa</p>
+              <p className="text-xs text-muted-foreground">
+                Este aluno pode marcar aulas normalmente.
+              </p>
+            </div>
+            <ConfirmForm
+              message={`Pôr ${
+                profile.full_name || profile.email
+              } em pausa? Não vai poder marcar aulas.`}
+              action={setStudentPaused}
+            >
+              <input type="hidden" name="id" value={profile.id} />
+              <input type="hidden" name="paused" value="true" />
+              <button
+                type="submit"
+                className="h-11 rounded-md border border-foreground/30 px-5 text-sm font-medium uppercase tracking-wider transition-colors hover:bg-muted"
+              >
+                Pôr em pausa
+              </button>
+            </ConfirmForm>
+          </div>
+        ))}
 
       <section className="mt-12">
         <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">

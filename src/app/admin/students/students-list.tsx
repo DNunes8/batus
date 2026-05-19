@@ -132,8 +132,8 @@ export function StudentsList({ profiles }: { profiles: StudentProfile[] }) {
                           </span>
                         )}
                         {p.is_blocked && (
-                          <span className="ml-2 inline-block rounded-sm bg-destructive/20 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-destructive">
-                            Bloqueado
+                          <span className="ml-2 inline-block rounded-sm border border-muted-foreground/40 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+                            Em pausa
                           </span>
                         )}
                       </td>
@@ -224,8 +224,8 @@ export function StudentsList({ profiles }: { profiles: StudentProfile[] }) {
                           </span>
                         )}
                         {p.is_blocked && (
-                          <span className="rounded-sm bg-destructive/20 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-destructive">
-                            Bloqueado
+                          <span className="rounded-sm border border-muted-foreground/40 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+                            Em pausa
                           </span>
                         )}
                       </div>
