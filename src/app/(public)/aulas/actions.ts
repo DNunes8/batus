@@ -24,9 +24,18 @@ export async function bookClass(formData: FormData) {
   // check, so the action has to enforce it itself.
   const { data: gateProfile } = await supabase
     .from("profiles")
-    .select("approved, is_admin, is_blocked")
+    .select("approved, is_admin, is_blocked, full_name, phone")
     .eq("id", user.id)
     .maybeSingle();
+
+  // Missing name or phone — finish /bem-vindo first so the coach never has
+  // nameless rows in the Alunos list. Admins are exempt.
+  if (
+    !gateProfile?.is_admin &&
+    (!gateProfile?.full_name || !gateProfile?.phone)
+  ) {
+    redirect("/bem-vindo");
+  }
 
   if (!gateProfile?.approved && !gateProfile?.is_admin) {
     redirect("/perfil");

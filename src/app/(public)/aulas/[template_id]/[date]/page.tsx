@@ -148,6 +148,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
   } | null = null;
   let isApproved = false;
   let isPaused = false;
+  let isIncomplete = false;
   if (user) {
     const [bookingRes, profileRes] = await Promise.all([
       supabase
@@ -160,7 +161,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
         .maybeSingle(),
       supabase
         .from("profiles")
-        .select("approved, is_admin, is_blocked")
+        .select("approved, is_admin, is_blocked, full_name, phone")
         .eq("id", user.id)
         .maybeSingle(),
     ]);
@@ -176,6 +177,9 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       !!profileRes.data?.approved || !!profileRes.data?.is_admin;
     isPaused =
       !!profileRes.data?.is_blocked && !profileRes.data?.is_admin;
+    isIncomplete =
+      !profileRes.data?.is_admin &&
+      (!profileRes.data?.full_name || !profileRes.data?.phone);
   }
 
   const backHref = `/aulas?week=${mondayOf(date)}`;
@@ -283,6 +287,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
           isLoggedIn={!!user}
           isApproved={isApproved}
           isPaused={isPaused}
+          isIncomplete={isIncomplete}
           userBooking={userBooking}
         />
       </div>
@@ -337,6 +342,7 @@ function BookingAction({
   isLoggedIn,
   isApproved,
   isPaused,
+  isIncomplete,
   userBooking,
 }: {
   template_id: string;
@@ -347,6 +353,7 @@ function BookingAction({
   isLoggedIn: boolean;
   isApproved: boolean;
   isPaused: boolean;
+  isIncomplete: boolean;
   userBooking: {
     id: string;
     status: "booked" | "waitlisted";
@@ -441,6 +448,30 @@ function BookingAction({
           className="mt-4 inline-flex h-10 items-center justify-center rounded-md border border-border/60 px-4 text-xs uppercase tracking-widest hover:bg-muted"
         >
           Sair em Perfil →
+        </Link>
+      </div>
+    );
+  }
+
+  // Incomplete profile — name or phone missing. The bookClass action would
+  // bounce them; explain instead of offering the button.
+  if (isIncomplete) {
+    return (
+      <div className="rounded-md border border-foreground/25 bg-muted/30 p-6 text-center">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+          Conta
+        </p>
+        <p className="mt-2 font-display text-2xl tracking-wide">
+          PERFIL INCOMPLETO
+        </p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Precisamos do teu nome e telefone antes de marcares aulas.
+        </p>
+        <Link
+          href="/bem-vindo"
+          className="mt-4 inline-flex h-10 items-center justify-center rounded-md border border-border/60 px-4 text-xs uppercase tracking-widest hover:bg-muted"
+        >
+          Completar agora →
         </Link>
       </div>
     );

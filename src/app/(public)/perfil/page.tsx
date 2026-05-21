@@ -69,6 +69,10 @@ export default async function PerfilPage({
   const isApproved = !!profile?.approved || !!profile?.is_admin;
   // A paused account stays approved but is blocked from booking new classes.
   const isPaused = !!profile?.is_blocked && !profile?.is_admin;
+  // Missing name or phone — must be filled before anything else (the coach
+  // can't have nameless rows in the Alunos list). Admins are exempt.
+  const isIncomplete =
+    !profile?.is_admin && (!profile?.full_name || !profile?.phone);
 
   const since = profile
     ? new Date(profile.joined_at).toLocaleDateString("pt-PT", {
@@ -107,9 +111,34 @@ export default async function PerfilPage({
         </div>
       )}
 
+      {/* Incomplete profile — must come before the pending/paused panels so
+          the student fills the form first; the coach can't have nameless
+          rows in the Alunos list. */}
+      {isIncomplete && (
+        <div className="mt-8 rounded-md border border-foreground/25 bg-muted/40 p-5 sm:p-6">
+          <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            Estado da conta
+          </p>
+          <h2 className="mt-2 font-display text-2xl tracking-[0.04em] sm:text-3xl">
+            FALTA COMPLETAR O PERFIL
+          </h2>
+          <p className="mt-3 max-w-prose text-sm leading-relaxed text-foreground/80">
+            Precisamos do teu nome e telefone para o treinador saber quem és
+            e como te contactar. Preenche em baixo na secção{" "}
+            <strong>Os teus dados</strong>.
+          </p>
+          <a
+            href="#os-teus-dados"
+            className="mt-4 inline-flex h-11 items-center rounded-md bg-foreground px-4 text-sm font-medium text-background hover:opacity-90"
+          >
+            Ir para Os teus dados ↓
+          </a>
+        </div>
+      )}
+
       {/* Pending account — leads the page with a clear "what's next" panel
           instead of stats/bookings the student can't have yet. */}
-      {!isApproved && (
+      {!isApproved && !isIncomplete && (
         <div className="mt-8 rounded-md border border-foreground/25 bg-muted/40 p-5 sm:p-6">
           <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
             Estado da conta
@@ -154,7 +183,7 @@ export default async function PerfilPage({
 
       {/* Paused account — still approved, so stats/bookings stay visible below
           (existing bookings remain cancellable), but no new bookings. */}
-      {isApproved && isPaused && (
+      {isApproved && isPaused && !isIncomplete && (
         <div className="mt-8 rounded-md border border-foreground/25 bg-muted/40 p-5 sm:p-6">
           <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
             Estado da conta
@@ -189,7 +218,7 @@ export default async function PerfilPage({
       )}
 
       {/* Stats + bookings only make sense once the student can actually book. */}
-      {isApproved && (
+      {isApproved && !isIncomplete && (
         <>
           <div className="mt-12 grid gap-4 sm:grid-cols-3">
             <StatCard
@@ -256,7 +285,7 @@ export default async function PerfilPage({
         </>
       )}
 
-      <section className="mt-16">
+      <section id="os-teus-dados" className="mt-16 scroll-mt-8">
         <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           Os teus dados
         </h2>
@@ -270,6 +299,7 @@ export default async function PerfilPage({
               <Input
                 id="full_name"
                 name="full_name"
+                required
                 defaultValue={profile?.full_name ?? ""}
                 placeholder="O teu nome"
               />
@@ -280,6 +310,7 @@ export default async function PerfilPage({
                 id="phone"
                 name="phone"
                 type="tel"
+                required
                 defaultValue={profile?.phone ?? ""}
                 placeholder="9XX XXX XXX"
               />

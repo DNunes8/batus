@@ -62,6 +62,13 @@ export async function updateOwnProfile(formData: FormData) {
   const phone = ((formData.get("phone") as string | null) ?? "").trim() || null;
   const goals = ((formData.get("goals") as string | null) ?? "").trim() || null;
 
+  // Nome + telefone are required so the coach never has nameless rows in the
+  // Alunos list. HTML `required` blocks most users client-side; this is the
+  // server-side backstop.
+  if (!full_name || !phone) {
+    throw new Error("Nome e telefone são obrigatórios.");
+  }
+
   const { error } = await supabase
     .from("profiles")
     .update({ full_name, phone, goals })

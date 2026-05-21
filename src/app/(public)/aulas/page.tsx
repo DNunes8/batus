@@ -38,14 +38,17 @@ export default async function AulasPage({
   // schedule but not book. Admins are always treated as approved.
   let isApproved = false;
   let isPaused = false;
+  let isIncomplete = false;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("approved, is_admin, is_blocked")
+      .select("approved, is_admin, is_blocked, full_name, phone")
       .eq("id", user.id)
       .maybeSingle();
     isApproved = !!profile?.approved || !!profile?.is_admin;
     isPaused = !!profile?.is_blocked && !profile?.is_admin;
+    isIncomplete =
+      !profile?.is_admin && (!profile?.full_name || !profile?.phone);
   }
   const isPending = !!user && !isApproved;
 
@@ -99,7 +102,22 @@ export default async function AulasPage({
         </div>
       </header>
 
-      {isPending ? (
+      {isIncomplete ? (
+        <div className="mt-6 rounded-md border border-foreground/25 bg-muted/40 p-4 sm:p-5">
+          <p className="text-sm font-medium">
+            Falta completar o teu perfil
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Precisamos do teu nome e telefone antes de marcares aulas.{" "}
+            <Link
+              href="/bem-vindo"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Completar agora →
+            </Link>
+          </p>
+        </div>
+      ) : isPending ? (
         <div className="mt-6 rounded-md border border-foreground/25 bg-muted/40 p-4 sm:p-5">
           <p className="text-sm font-medium">
             A tua conta está a aguardar aprovação
@@ -209,6 +227,7 @@ export default async function AulasPage({
                           isLoggedIn={!!user}
                           isApproved={isApproved}
                           isPaused={isPaused}
+                          isIncomplete={isIncomplete}
                           isPast={isClassInPast(c.date, c.start_time)}
                         />
                       </li>
@@ -229,12 +248,14 @@ function BookingControl({
   isLoggedIn,
   isApproved,
   isPaused,
+  isIncomplete,
   isPast,
 }: {
   cls: ScheduleClass;
   isLoggedIn: boolean;
   isApproved: boolean;
   isPaused: boolean;
+  isIncomplete: boolean;
   isPast: boolean;
 }) {
   if (cls.cancelled) {
@@ -298,6 +319,16 @@ function BookingControl({
         {cls.user_waitlist_position
           ? ` · #${cls.user_waitlist_position}`
           : ""}
+      </span>
+    );
+  }
+
+  // Incomplete profile — name or phone still missing. The bookClass action
+  // would bounce them anyway; reflect that in the button.
+  if (isIncomplete) {
+    return (
+      <span className="inline-flex h-10 items-center rounded-md border border-border/60 px-3 text-xs uppercase tracking-widest text-muted-foreground">
+        Completar perfil
       </span>
     );
   }

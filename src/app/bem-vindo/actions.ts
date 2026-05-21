@@ -32,6 +32,9 @@ export async function completeProfile(
   if (!full_name) {
     return { error: "Diz-nos o teu nome." };
   }
+  if (!phone) {
+    return { error: "Diz-nos o teu telefone." };
+  }
 
   const { error } = await supabase
     .from("profiles")

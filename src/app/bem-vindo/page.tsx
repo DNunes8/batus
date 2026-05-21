@@ -53,8 +53,8 @@ function BemVindoContent() {
             AO BATUS
           </h1>
           <p className="mt-4 text-sm text-foreground/80">
-            Só falta o teu nome — para o treinador saber quem és quando
-            apareces.
+            Só falta o teu nome e telefone — para o treinador saber quem és
+            e como te contactar.
           </p>
         </div>
 
@@ -78,22 +78,20 @@ function BemVindoContent() {
 
           <div className="space-y-2">
             <Label htmlFor="phone" className="text-base">
-              Telefone{" "}
-              <span className="text-xs font-normal text-muted-foreground">
-                · opcional
-              </span>
+              Telefone
             </Label>
             <Input
               id="phone"
               name="phone"
               type="tel"
+              required
               autoComplete="tel"
               inputMode="tel"
               placeholder="9XX XXX XXX"
               className="h-12 text-base"
             />
             <p className="text-xs text-muted-foreground">
-              Caso o treinador precise de te contactar.
+              Para o treinador te contactar quando precisar.
             </p>
           </div>
 

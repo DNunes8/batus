@@ -22,10 +22,14 @@ async function destinationForUser(userId: string): Promise<string> {
   const supabase = await createClient();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_admin")
+    .select("is_admin, full_name, phone")
     .eq("id", userId)
     .maybeSingle();
-  return profile?.is_admin ? "/admin" : "/aulas";
+  if (profile?.is_admin) return "/admin";
+  // Non-admin with a missing name or phone — finish /bem-vindo first so the
+  // coach never sees nameless rows in the Alunos list.
+  if (!profile?.full_name || !profile?.phone) return "/bem-vindo";
+  return "/aulas";
 }
 
 // Primary login flow: email + password. Browsers offer to save the
