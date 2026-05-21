@@ -16,6 +16,7 @@ import { formatEuro, formatMonthYear } from "@/lib/money";
 import {
   setPaymentStatus,
   setStudentHasMonthlyFee,
+  setStudentMonthlyFee,
   setStudentServiceType,
   type PaymentStatus,
 } from "./actions";
@@ -38,7 +39,9 @@ export type DrawerStudent = {
     amount_cents: number;
     notes: string | null;
   } | null;
-  resolvedFee: number;
+  // null = coach hasn't set this student's monthly fee yet — drawer shows
+  // the field empty so they can set it inline.
+  resolvedFee: number | null;
   history: HistoryCell[];
   solo_activity?: {
     sessions_this_month: number;
@@ -105,14 +108,17 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
   const initialStatus: PaymentStatus = student?.record?.status ?? "unpaid";
   const initialAmount = student?.record
     ? eurosFromCents(student.record.amount_cents)
-    : student
+    : student?.resolvedFee != null
       ? eurosFromCents(student.resolvedFee)
       : "";
   const initialNotes = student?.record?.notes ?? "";
+  const initialStandingFee =
+    student?.resolvedFee != null ? eurosFromCents(student.resolvedFee) : "";
 
   const [status, setStatus] = useState<PaymentStatus>(initialStatus);
   const [amount, setAmount] = useState(initialAmount);
   const [notes, setNotes] = useState(initialNotes);
+  const [standingFee, setStandingFee] = useState(initialStandingFee);
 
   useEffect(() => {
     if (!student) return;
@@ -120,9 +126,14 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
     setAmount(
       student.record
         ? eurosFromCents(student.record.amount_cents)
-        : eurosFromCents(student.resolvedFee),
+        : student.resolvedFee != null
+          ? eurosFromCents(student.resolvedFee)
+          : "",
     );
     setNotes(student.record?.notes ?? "");
+    setStandingFee(
+      student.resolvedFee != null ? eurosFromCents(student.resolvedFee) : "",
+    );
   }, [student]);
 
   if (!student) return null;
@@ -134,29 +145,73 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
 
   function handleSave() {
     if (!student) return;
-    const parsed = Math.max(
-      0,
-      Math.round(parseFloat(amount.replace(",", ".")) * 100),
-    );
-    if (isNaN(parsed)) {
-      toast.error("Valor inválido.");
-      return;
+
+    // Standing fee — independent of the per-month record. Empty input means
+    // "clear it" (back to "Por definir"). Anything else must be a valid €.
+    const standingChanged = standingFee !== initialStandingFee;
+    let parsedStanding: number | null = null;
+    if (standingChanged) {
+      const trimmed = standingFee.trim();
+      if (trimmed !== "") {
+        parsedStanding = Math.max(
+          0,
+          Math.round(parseFloat(trimmed.replace(",", ".")) * 100),
+        );
+        if (!Number.isFinite(parsedStanding)) {
+          toast.error("Mensalidade inválida.");
+          return;
+        }
+      }
     }
+
+    // Per-month side — only validate if anything on that side changed.
+    const recordChanged =
+      status !== initialStatus ||
+      amount !== initialAmount ||
+      notes !== initialNotes;
+    let parsedAmount = 0;
+    if (recordChanged) {
+      parsedAmount = Math.max(
+        0,
+        Math.round(parseFloat(amount.replace(",", ".")) * 100),
+      );
+      if (!Number.isFinite(parsedAmount)) {
+        toast.error("Valor inválido.");
+        return;
+      }
+    }
+
     startTransition(async () => {
       try {
-        await setPaymentStatus({
-          user_id: student.id,
-          month,
-          status,
-          amount_cents: parsed,
-          notes,
-        });
+        const ops: Promise<unknown>[] = [];
+        if (standingChanged) {
+          ops.push(
+            setStudentMonthlyFee({
+              user_id: student.id,
+              monthly_fee_cents: parsedStanding,
+            }),
+          );
+        }
+        if (recordChanged) {
+          ops.push(
+            setPaymentStatus({
+              user_id: student.id,
+              month,
+              status,
+              amount_cents: parsedAmount,
+              notes,
+            }),
+          );
+        }
+        await Promise.all(ops);
         toast.success(
-          status === "paid"
-            ? `${name} marcado como pago em ${monthLabel}.`
-            : status === "paused"
-              ? `${name} em pausa em ${monthLabel}.`
-              : `${name} marcado por pagar em ${monthLabel}.`,
+          recordChanged
+            ? status === "paid"
+              ? `${name} marcado como pago em ${monthLabel}.`
+              : status === "paused"
+                ? `${name} em pausa em ${monthLabel}.`
+                : `${name} marcado por pagar em ${monthLabel}.`
+            : `Mensalidade de ${name} atualizada.`,
         );
         router.refresh();
         onClose();
@@ -218,7 +273,8 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
   const hasChanges =
     status !== initialStatus ||
     amount !== initialAmount ||
-    notes !== initialNotes;
+    notes !== initialNotes ||
+    standingFee !== initialStandingFee;
 
   return (
     <Dialog
@@ -286,7 +342,7 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label htmlFor="amount" className="text-xs">
-                    Valor (€)
+                    Valor este mês (€)
                   </Label>
                   <Input
                     id="amount"
@@ -298,10 +354,17 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Padrão</Label>
-                  <p className="flex h-11 items-center text-sm text-muted-foreground sm:h-10">
-                    {formatEuro(student.resolvedFee)}
-                  </p>
+                  <Label htmlFor="standing-fee" className="text-xs">
+                    Mensalidade do aluno (€)
+                  </Label>
+                  <Input
+                    id="standing-fee"
+                    value={standingFee}
+                    onChange={(e) => setStandingFee(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="ex: 25"
+                    className="h-11 text-base sm:h-10 sm:text-sm"
+                  />
                 </div>
               </div>
 

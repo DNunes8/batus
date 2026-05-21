@@ -5,7 +5,6 @@ import { formatEuro, formatMonthYear, monthKey } from "@/lib/money";
 import { addDays, dayOfWeek, todayLisbon } from "@/lib/schedule";
 import { PaymentsBoard, type BoardRow } from "./payments-board";
 import { SoloBoard, type SoloBoardRow } from "./solo-board";
-import { DefaultFeeButton } from "./default-fee-button";
 import type { PaymentStatus } from "./actions";
 import type { HistoryCell } from "./history-strip";
 
@@ -55,7 +54,6 @@ export default async function PagamentosPage({
   const [
     profilesRes,
     recordsRes,
-    settingRes,
     oneOffSolosRes,
     soloTemplatesRes,
     soloOverridesRes,
@@ -74,11 +72,6 @@ export default async function PagamentosPage({
       .gte("month", oldestMonth)
       .lte("month", selectedMonth),
     supabase
-      .from("settings")
-      .select("value")
-      .eq("key", "default_monthly_fee_cents")
-      .single(),
-    supabase
       .from("solo_sessions")
       .select("user_id, session_date, price_cents")
       .gte("session_date", `${oldestMonth}T00:00:00`),
@@ -95,7 +88,6 @@ export default async function PagamentosPage({
 
   const profiles = profilesRes.data ?? [];
   const allRecords = recordsRes.data ?? [];
-  const defaultFee = Number(settingRes.data?.value ?? 0);
   const oneOffSolos = oneOffSolosRes.data ?? [];
   const soloTemplates = soloTemplatesRes.data ?? [];
   const soloOverrides = soloOverridesRes.data ?? [];
@@ -187,7 +179,8 @@ export default async function PagamentosPage({
   ): BoardRow {
     const userRecords = recordsByUser.get(p.id);
     const currentRecord = userRecords?.get(selectedMonth) ?? null;
-    const resolvedFee = p.monthly_fee_cents ?? defaultFee;
+    // null = "Por definir" — coach hasn't set this student's monthly amount.
+    const resolvedFee: number | null = p.monthly_fee_cents ?? null;
     const effectiveStatus: PaymentStatus =
       (currentRecord?.status as PaymentStatus | undefined) ?? "unpaid";
 
@@ -264,10 +257,10 @@ export default async function PagamentosPage({
   const groupPaused = groupRows.filter((r) => r.effectiveStatus === "paused").length;
   const groupExpected = groupRows
     .filter((r) => r.effectiveStatus !== "paused")
-    .reduce((s, r) => s + (r.record?.amount_cents ?? r.resolvedFee), 0);
+    .reduce((s, r) => s + (r.record?.amount_cents ?? r.resolvedFee ?? 0), 0);
   const groupReceived = groupRows
     .filter((r) => r.effectiveStatus === "paid")
-    .reduce((s, r) => s + (r.record?.amount_cents ?? r.resolvedFee), 0);
+    .reduce((s, r) => s + (r.record?.amount_cents ?? r.resolvedFee ?? 0), 0);
 
   const soloTotalSessions = soloRows.reduce(
     (s, r) => s + (r.solo_activity?.sessions_this_month ?? 0),
@@ -373,7 +366,6 @@ export default async function PagamentosPage({
             <ChevronRight className="size-5" />
           </Link>
         </div>
-        <DefaultFeeButton currentCents={defaultFee} />
       </div>
 
       {/* Tabs */}

@@ -183,6 +183,9 @@ export function PaymentsBoard({
         <ul className="mt-2 divide-y divide-border/40 pb-32">
           {filtered.map((r) => {
             const selected = selectedIds.has(r.id);
+            // null = fee not yet defined for this student. We show
+            // "Por definir" instead of a number; coach can tap the row
+            // to set it inline in the drawer.
             const amount = r.record?.amount_cents ?? r.resolvedFee;
             const isPaid = r.effectiveStatus === "paid";
             return (
@@ -228,15 +231,21 @@ export function PaymentsBoard({
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p
-                        className={`text-sm font-medium tabular-nums ${
-                          isPaid
-                            ? "text-muted-foreground line-through"
-                            : "text-foreground"
-                        }`}
-                      >
-                        {formatEuro(amount)}
-                      </p>
+                      {amount === null ? (
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                          Por definir
+                        </p>
+                      ) : (
+                        <p
+                          className={`text-sm font-medium tabular-nums ${
+                            isPaid
+                              ? "text-muted-foreground line-through"
+                              : "text-foreground"
+                          }`}
+                        >
+                          {formatEuro(amount)}
+                        </p>
+                      )}
                     </div>
                   </button>
                 </div>

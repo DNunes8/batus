@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { assertAdmin } from "@/lib/auth-guard";
-import { parseEuroToCents } from "@/lib/money";
 
 export type PaymentStatus = "paid" | "unpaid" | "paused";
 
@@ -48,8 +47,8 @@ export async function setPaymentStatus(input: {
 // ----------------------------------------------------------------------------
 // Bulk update from the selection bar.
 // Preserves existing amount/notes for students who already have a row this
-// month — only flips the status. For new rows, uses per-student fee override
-// if set, otherwise the studio default.
+// month — only flips the status. For new rows, uses the student's standing
+// monthly fee; if not set, falls back to 0 (coach can edit per-month after).
 // ----------------------------------------------------------------------------
 export async function bulkSetPaymentStatus(input: {
   user_ids: string[];
@@ -66,13 +65,7 @@ export async function bulkSetPaymentStatus(input: {
 
   const supabase = await createClient();
 
-  // Pull default fee + per-student overrides + existing records concurrently.
-  const [settingRes, profilesRes, existingRes] = await Promise.all([
-    supabase
-      .from("settings")
-      .select("value")
-      .eq("key", "default_monthly_fee_cents")
-      .single(),
+  const [profilesRes, existingRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, monthly_fee_cents")
@@ -84,11 +77,9 @@ export async function bulkSetPaymentStatus(input: {
       .in("user_id", user_ids),
   ]);
 
-  const defaultFee = Number(settingRes.data?.value ?? 0);
-
   const feeByStudent = new Map<string, number>();
   for (const p of profilesRes.data ?? []) {
-    feeByStudent.set(p.id, p.monthly_fee_cents ?? defaultFee);
+    feeByStudent.set(p.id, p.monthly_fee_cents ?? 0);
   }
 
   const existingByStudent = new Map<
@@ -111,7 +102,7 @@ export async function bulkSetPaymentStatus(input: {
       user_id: uid,
       month,
       status,
-      amount_cents: existing?.amount_cents ?? feeByStudent.get(uid) ?? defaultFee,
+      amount_cents: existing?.amount_cents ?? feeByStudent.get(uid) ?? 0,
       paid_at: status === "paid" ? now : null,
       notes: existing?.notes ?? null,
     };
@@ -128,16 +119,22 @@ export async function bulkSetPaymentStatus(input: {
 }
 
 // ----------------------------------------------------------------------------
-// Set/clear the per-student monthly fee override (form action).
-// Empty input → clears the override and student falls back to the studio default.
+// Set/clear the per-student standing monthly fee. Called from the drawer
+// (typed args, not FormData). null → fee not yet defined, shows "Por definir".
 // ----------------------------------------------------------------------------
-export async function setStudentMonthlyFee(formData: FormData) {
+export async function setStudentMonthlyFee(input: {
+  user_id: string;
+  monthly_fee_cents: number | null;
+}) {
   await assertAdmin();
-  const user_id = formData.get("user_id") as string | null;
-  const raw = ((formData.get("amount") as string | null) ?? "").trim();
+  const { user_id, monthly_fee_cents } = input;
   if (!user_id) throw new Error("ID em falta.");
-
-  const monthly_fee_cents = raw === "" ? null : parseEuroToCents(raw);
+  if (
+    monthly_fee_cents !== null &&
+    (!Number.isFinite(monthly_fee_cents) || monthly_fee_cents < 0)
+  ) {
+    throw new Error("Valor inválido.");
+  }
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -203,20 +200,3 @@ export async function setStudentHasMonthlyFee(input: {
   revalidatePath(`/admin/students/${user_id}`);
 }
 
-// ----------------------------------------------------------------------------
-// Set the studio-wide default fee (form action). Stored in the settings table.
-// ----------------------------------------------------------------------------
-export async function setDefaultMonthlyFee(formData: FormData) {
-  await assertAdmin();
-  const raw = ((formData.get("amount") as string | null) ?? "").trim();
-  const cents = parseEuroToCents(raw);
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("settings")
-    .upsert({ key: "default_monthly_fee_cents", value: cents });
-
-  if (error) throw new Error(error.message);
-
-  revalidatePath("/admin/pagamentos");
-}

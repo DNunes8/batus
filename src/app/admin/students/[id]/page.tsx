@@ -270,10 +270,11 @@ export default async function StudentDetailPage({
                         .replace(".", ",")
                     : ""
                 }
-                placeholder="Em branco = padrão"
+                placeholder="ex: 25"
               />
               <p className="text-xs text-muted-foreground">
-                Em branco usa a mensalidade padrão definida em Pagamentos.
+                O que este aluno paga por mês. Em branco fica como{" "}
+                <em>Por definir</em> em Pagamentos.
               </p>
             </div>
           </div>
