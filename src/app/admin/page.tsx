@@ -49,6 +49,7 @@ export default async function AdminDashboardPage() {
     paymentsThisMonthRes,
     solosThisMonthRes,
     pendingApprovalsRes,
+    birthdaysRes,
   ] = await Promise.all([
     supabase.auth.getUser(),
     supabase
@@ -86,6 +87,15 @@ export default async function AdminDashboardPage() {
       .select("id", { count: "exact", head: true })
       .eq("approved", false)
       .eq("is_admin", false),
+    // All approved students with a birthday on file. We filter to "today" in
+    // JS below — PostgREST doesn't expose extract(month/day), and the studio
+    // is small enough that fetching the whole list is trivial.
+    admin
+      .from("profiles")
+      .select("id, full_name, phone, birthday")
+      .not("birthday", "is", null)
+      .eq("approved", true)
+      .eq("is_admin", false),
   ]);
 
   const todayClasses = todayClassesRes.data ?? [];
@@ -95,6 +105,19 @@ export default async function AdminDashboardPage() {
   const pendingClaims = pendingClaimsRes.count ?? 0;
   const unreadMessages = unreadMsgRes.count ?? 0;
   const pendingApprovals = pendingApprovalsRes.count ?? 0;
+
+  // Today's birthdays: same month + day as today (Lisbon). Age is current
+  // year minus birth year, clipped to 0 in case someone typed a future year.
+  const todayMMDD = today.slice(5); // "MM-DD"
+  const birthdaysToday = (birthdaysRes.data ?? [])
+    .filter((p) => p.birthday && p.birthday.slice(5) === todayMMDD)
+    .map((p) => ({
+      ...p,
+      age: Math.max(0, Number(today.slice(0, 4)) - Number(p.birthday!.slice(0, 4))),
+    }))
+    .sort((a, b) =>
+      (a.full_name ?? "").localeCompare(b.full_name ?? "", "pt"),
+    );
 
   const monthEarnings =
     (paymentsThisMonthRes.data ?? []).reduce(
@@ -140,6 +163,35 @@ export default async function AdminDashboardPage() {
           </div>
           <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
         </Link>
+      )}
+
+      {/* Today's birthdays — surfaced as a nudge so the coach can wish the
+          student in the team WhatsApp. Hidden on quiet days. */}
+      {birthdaysToday.length > 0 && (
+        <section className="mt-6 rounded-md border border-foreground/30 bg-muted/40 p-4 sm:p-5">
+          <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
+            {birthdaysToday.length === 1
+              ? "Aniversário hoje"
+              : `Aniversários hoje (${birthdaysToday.length})`}
+          </p>
+          <ul className="mt-3 space-y-1">
+            {birthdaysToday.map((p) => (
+              <li key={p.id} className="text-sm">
+                <Link
+                  href={`/admin/students/${p.id}`}
+                  className="font-medium hover:underline"
+                >
+                  {p.full_name || "—"}
+                </Link>
+                <span className="text-muted-foreground">
+                  {" · "}
+                  {p.age} {p.age === 1 ? "ano" : "anos"}
+                  {p.phone ? ` · ${p.phone}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

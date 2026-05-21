@@ -10,7 +10,16 @@ import { SubmitButton } from "@/components/submit-button";
 import { formatTime } from "@/lib/schedule";
 import { getStudentStats } from "@/lib/stats";
 import { cancelBooking } from "@/app/(public)/aulas/actions";
+import {
+  BIRTHDAY_DAYS,
+  MONTHS_PT,
+  birthYearOptions,
+  splitBirthday,
+} from "@/lib/birthday";
 import { updateOwnProfile } from "./actions";
+
+const SELECT_CLASSES =
+  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 import { ChangePasswordForm } from "./change-password-form";
 import { AutoScrollTo } from "./auto-scroll";
 
@@ -69,10 +78,12 @@ export default async function PerfilPage({
   const isApproved = !!profile?.approved || !!profile?.is_admin;
   // A paused account stays approved but is blocked from booking new classes.
   const isPaused = !!profile?.is_blocked && !profile?.is_admin;
-  // Missing name or phone — must be filled before anything else (the coach
-  // can't have nameless rows in the Alunos list). Admins are exempt.
+  // Missing name, phone, or birthday — must be filled before anything else
+  // (the coach can't have nameless rows in the Alunos list, and the dashboard
+  // birthday banner needs every student dated). Admins are exempt.
   const isIncomplete =
-    !profile?.is_admin && (!profile?.full_name || !profile?.phone);
+    !profile?.is_admin &&
+    (!profile?.full_name || !profile?.phone || !profile?.birthday);
 
   const since = profile
     ? new Date(profile.joined_at).toLocaleDateString("pt-PT", {
@@ -123,9 +134,9 @@ export default async function PerfilPage({
             FALTA COMPLETAR O PERFIL
           </h2>
           <p className="mt-3 max-w-prose text-sm leading-relaxed text-foreground/80">
-            Precisamos do teu nome e telefone para o treinador saber quem és
-            e como te contactar. Preenche em baixo na secção{" "}
-            <strong>Os teus dados</strong>.
+            Precisamos do teu nome, telefone e data de nascimento — para o
+            treinador saber quem és, te contactar, e desejar parabéns no
+            dia. Preenche em baixo na secção <strong>Os teus dados</strong>.
           </p>
           <a
             href="#os-teus-dados"
@@ -314,6 +325,62 @@ export default async function PerfilPage({
                 defaultValue={profile?.phone ?? ""}
                 placeholder="9XX XXX XXX"
               />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Data de nascimento</Label>
+            <div className="grid grid-cols-3 gap-2">
+              <select
+                name="birthday_day"
+                required
+                defaultValue={splitBirthday(profile?.birthday).day}
+                aria-label="Dia"
+                autoComplete="bday-day"
+                className={SELECT_CLASSES}
+              >
+                <option value="" disabled>
+                  Dia
+                </option>
+                {BIRTHDAY_DAYS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              <select
+                name="birthday_month"
+                required
+                defaultValue={splitBirthday(profile?.birthday).month}
+                aria-label="Mês"
+                autoComplete="bday-month"
+                className={SELECT_CLASSES}
+              >
+                <option value="" disabled>
+                  Mês
+                </option>
+                {MONTHS_PT.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                name="birthday_year"
+                required
+                defaultValue={splitBirthday(profile?.birthday).year}
+                aria-label="Ano"
+                autoComplete="bday-year"
+                className={SELECT_CLASSES}
+              >
+                <option value="" disabled>
+                  Ano
+                </option>
+                {birthYearOptions().map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           <div className="space-y-2">

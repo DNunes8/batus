@@ -24,15 +24,18 @@ export async function bookClass(formData: FormData) {
   // check, so the action has to enforce it itself.
   const { data: gateProfile } = await supabase
     .from("profiles")
-    .select("approved, is_admin, is_blocked, full_name, phone")
+    .select("approved, is_admin, is_blocked, full_name, phone, birthday")
     .eq("id", user.id)
     .maybeSingle();
 
-  // Missing name or phone — finish /bem-vindo first so the coach never has
-  // nameless rows in the Alunos list. Admins are exempt.
+  // Missing name, phone, or birthday — finish /bem-vindo first so the coach
+  // never has nameless rows and the dashboard birthday banner works. Admins
+  // are exempt.
   if (
     !gateProfile?.is_admin &&
-    (!gateProfile?.full_name || !gateProfile?.phone)
+    (!gateProfile?.full_name ||
+      !gateProfile?.phone ||
+      !gateProfile?.birthday)
   ) {
     redirect("/bem-vindo");
   }

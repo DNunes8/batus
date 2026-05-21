@@ -7,6 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatEuro, formatMonthYear } from "@/lib/money";
 import { ConfirmForm } from "@/components/confirm-form";
+import {
+  BIRTHDAY_DAYS,
+  MONTHS_PT,
+  birthYearOptions,
+  splitBirthday,
+} from "@/lib/birthday";
 import { StatusPill } from "@/app/admin/pagamentos/status-pill";
 import type { PaymentStatus } from "@/app/admin/pagamentos/actions";
 import { approveStudent } from "../actions";
@@ -178,6 +184,62 @@ export default async function StudentDetailPage({
                 placeholder="9XX XXX XXX"
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Data de nascimento</Label>
+            <div className="grid grid-cols-3 gap-2">
+              <select
+                name="birthday_day"
+                defaultValue={splitBirthday(profile.birthday).day}
+                aria-label="Dia"
+                autoComplete="bday-day"
+                className={SELECT_CLASSES}
+              >
+                <option value="" disabled>
+                  Dia
+                </option>
+                {BIRTHDAY_DAYS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              <select
+                name="birthday_month"
+                defaultValue={splitBirthday(profile.birthday).month}
+                aria-label="Mês"
+                autoComplete="bday-month"
+                className={SELECT_CLASSES}
+              >
+                <option value="" disabled>
+                  Mês
+                </option>
+                {MONTHS_PT.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                name="birthday_year"
+                defaultValue={splitBirthday(profile.birthday).year}
+                aria-label="Ano"
+                autoComplete="bday-year"
+                className={SELECT_CLASSES}
+              >
+                <option value="" disabled>
+                  Ano
+                </option>
+                {birthYearOptions().map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Aparece no dashboard quando for o dia certo.
+            </p>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">

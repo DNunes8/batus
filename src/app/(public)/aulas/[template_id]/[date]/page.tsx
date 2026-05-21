@@ -161,7 +161,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
         .maybeSingle(),
       supabase
         .from("profiles")
-        .select("approved, is_admin, is_blocked, full_name, phone")
+        .select("approved, is_admin, is_blocked, full_name, phone, birthday")
         .eq("id", user.id)
         .maybeSingle(),
     ]);
@@ -179,7 +179,9 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       !!profileRes.data?.is_blocked && !profileRes.data?.is_admin;
     isIncomplete =
       !profileRes.data?.is_admin &&
-      (!profileRes.data?.full_name || !profileRes.data?.phone);
+      (!profileRes.data?.full_name ||
+        !profileRes.data?.phone ||
+        !profileRes.data?.birthday);
   }
 
   const backHref = `/aulas?week=${mondayOf(date)}`;
@@ -465,7 +467,8 @@ function BookingAction({
           PERFIL INCOMPLETO
         </p>
         <p className="mt-3 text-sm text-muted-foreground">
-          Precisamos do teu nome e telefone antes de marcares aulas.
+          Precisamos do teu nome, telefone e data de nascimento antes de
+          marcares aulas.
         </p>
         <Link
           href="/bem-vindo"

@@ -22,13 +22,16 @@ async function destinationForUser(userId: string): Promise<string> {
   const supabase = await createClient();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_admin, full_name, phone")
+    .select("is_admin, full_name, phone, birthday")
     .eq("id", userId)
     .maybeSingle();
   if (profile?.is_admin) return "/admin";
-  // Non-admin with a missing name or phone — finish /bem-vindo first so the
-  // coach never sees nameless rows in the Alunos list.
-  if (!profile?.full_name || !profile?.phone) return "/bem-vindo";
+  // Non-admin with a missing name/phone/birthday — finish /bem-vindo first so
+  // the coach never sees nameless rows in the Alunos list and the dashboard
+  // birthday banner has every student dated.
+  if (!profile?.full_name || !profile?.phone || !profile?.birthday) {
+    return "/bem-vindo";
+  }
   return "/aulas";
 }
 

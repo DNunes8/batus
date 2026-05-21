@@ -8,9 +8,19 @@ import { studio } from "@/lib/studio.config";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/submit-button";
+import {
+  BIRTHDAY_DAYS,
+  MONTHS_PT,
+  birthYearOptions,
+} from "@/lib/birthday";
 import { completeProfile, type CompleteProfileState } from "./actions";
 
 const initialState: CompleteProfileState = null;
+
+// Matches the h-12 text-base look of the page's <Input>s so the three
+// birthday selects sit flush with the name + phone fields above.
+const BIG_SELECT_CLASSES =
+  "flex h-12 w-full rounded-md border border-input bg-transparent px-3 text-base transition-colors focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 
 function BemVindoContent() {
   const params = useSearchParams();
@@ -53,8 +63,8 @@ function BemVindoContent() {
             AO BATUS
           </h1>
           <p className="mt-4 text-sm text-foreground/80">
-            Só falta o teu nome e telefone — para o treinador saber quem és
-            e como te contactar.
+            Só faltam uns dados — o treinador precisa de saber quem és, te
+            contactar, e desejar parabéns no dia.
           </p>
         </div>
 
@@ -92,6 +102,66 @@ function BemVindoContent() {
             />
             <p className="text-xs text-muted-foreground">
               Para o treinador te contactar quando precisar.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-base">Data de nascimento</Label>
+            <div className="grid grid-cols-3 gap-2">
+              <select
+                name="birthday_day"
+                required
+                defaultValue=""
+                aria-label="Dia"
+                autoComplete="bday-day"
+                className={BIG_SELECT_CLASSES}
+              >
+                <option value="" disabled>
+                  Dia
+                </option>
+                {BIRTHDAY_DAYS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              <select
+                name="birthday_month"
+                required
+                defaultValue=""
+                aria-label="Mês"
+                autoComplete="bday-month"
+                className={BIG_SELECT_CLASSES}
+              >
+                <option value="" disabled>
+                  Mês
+                </option>
+                {MONTHS_PT.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                name="birthday_year"
+                required
+                defaultValue=""
+                aria-label="Ano"
+                autoComplete="bday-year"
+                className={BIG_SELECT_CLASSES}
+              >
+                <option value="" disabled>
+                  Ano
+                </option>
+                {birthYearOptions().map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Para o treinador te desejar parabéns no dia certo.
             </p>
           </div>
 

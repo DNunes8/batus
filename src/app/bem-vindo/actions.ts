@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { safeRelativePath } from "@/lib/safe-redirect";
+import { parseBirthdayFromForm } from "@/lib/birthday";
 
 export type CompleteProfileState = {
   error?: string;
@@ -25,6 +26,10 @@ export async function completeProfile(
   const full_name =
     ((formData.get("full_name") as string | null) ?? "").trim() || null;
   const phone = ((formData.get("phone") as string | null) ?? "").trim() || null;
+  // Three form fields (birthday_day, birthday_month, birthday_year) combined
+  // into a YYYY-MM-DD string; null when any field is missing or the date
+  // isn't real (Feb 30 etc.).
+  const birthday = parseBirthdayFromForm(formData);
   // Sanitised so a crafted ?next=https://evil.com can't redirect off-site.
   const next =
     safeRelativePath(formData.get("next") as string | null) ?? "/aulas";
@@ -35,10 +40,13 @@ export async function completeProfile(
   if (!phone) {
     return { error: "Diz-nos o teu telefone." };
   }
+  if (!birthday) {
+    return { error: "Diz-nos a tua data de nascimento." };
+  }
 
   const { error } = await supabase
     .from("profiles")
-    .update({ full_name, phone })
+    .update({ full_name, phone, birthday })
     .eq("id", user.id);
 
   if (error) {

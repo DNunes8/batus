@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { assertAdmin } from "@/lib/auth-guard";
 import { parseEuroToCents } from "@/lib/money";
+import { parseBirthdayFromForm } from "@/lib/birthday";
 
 export async function updateStudentNotesAndGoals(formData: FormData) {
   await assertAdmin();
@@ -14,6 +15,7 @@ export async function updateStudentNotesAndGoals(formData: FormData) {
   const full_name = ((formData.get("full_name") as string | null) ?? "").trim() ||
     null;
   const phone = ((formData.get("phone") as string | null) ?? "").trim() || null;
+  const birthday = parseBirthdayFromForm(formData);
 
   // Per-student monthly fee override. Empty input → fall back to studio default.
   const feeRaw = ((formData.get("monthly_fee") as string | null) ?? "").trim();
@@ -37,6 +39,7 @@ export async function updateStudentNotesAndGoals(formData: FormData) {
       goals,
       full_name,
       phone,
+      birthday,
       monthly_fee_cents,
       service_type,
       has_monthly_fee,

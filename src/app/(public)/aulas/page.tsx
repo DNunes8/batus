@@ -42,13 +42,14 @@ export default async function AulasPage({
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("approved, is_admin, is_blocked, full_name, phone")
+      .select("approved, is_admin, is_blocked, full_name, phone, birthday")
       .eq("id", user.id)
       .maybeSingle();
     isApproved = !!profile?.approved || !!profile?.is_admin;
     isPaused = !!profile?.is_blocked && !profile?.is_admin;
     isIncomplete =
-      !profile?.is_admin && (!profile?.full_name || !profile?.phone);
+      !profile?.is_admin &&
+      (!profile?.full_name || !profile?.phone || !profile?.birthday);
   }
   const isPending = !!user && !isApproved;
 
@@ -108,7 +109,8 @@ export default async function AulasPage({
             Falta completar o teu perfil
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Precisamos do teu nome e telefone antes de marcares aulas.{" "}
+            Precisamos do teu nome, telefone e data de nascimento antes de
+            marcares aulas.{" "}
             <Link
               href="/bem-vindo"
               className="font-medium text-foreground underline-offset-4 hover:underline"
