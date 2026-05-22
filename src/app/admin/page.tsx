@@ -1,11 +1,5 @@
 import Link from "next/link";
-import {
-  TrendingUp,
-  Calendar,
-  Package,
-  Mail,
-  ArrowRight,
-} from "lucide-react";
+import { TrendingUp, Package, ArrowRight } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { formatEuro, monthKey } from "@/lib/money";
@@ -32,6 +26,30 @@ function dowOf(s: string): number {
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
 
+// "há 2h" / "ontem" / "há 3 dias" / fallback to a short date for older items.
+function relativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "agora";
+  if (diffMin < 60) return `há ${diffMin}min`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `há ${diffHr}h`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay === 1) return "ontem";
+  if (diffDay < 7) return `há ${diffDay} dias`;
+  return new Date(iso).toLocaleDateString("pt-PT", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+// Single-line message preview: collapse whitespace + clip with ellipsis.
+function previewText(text: string, maxLen = 80): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (flat.length <= maxLen) return flat;
+  return `${flat.slice(0, maxLen).trimEnd()}…`;
+}
+
 export default async function AdminDashboardPage() {
   const supabase = await createClient();
   const admin = createAdminClient();
@@ -46,6 +64,7 @@ export default async function AdminDashboardPage() {
     todayOverrideRes,
     pendingClaimsRes,
     unreadMsgRes,
+    latestMessagesRes,
     paymentsThisMonthRes,
     solosThisMonthRes,
     pendingApprovalsRes,
@@ -60,7 +79,9 @@ export default async function AdminDashboardPage() {
       .or(`active_until.is.null,active_until.gte.${today}`),
     admin
       .from("bookings")
-      .select("template_id, status")
+      .select(
+        "template_id, status, profile:profiles(full_name, email)",
+      )
       .eq("instance_date", today)
       .in("status", ["booked", "waitlisted"]),
     supabase.from("closed_days").select("reason").eq("date", today).maybeSingle(),
@@ -73,6 +94,14 @@ export default async function AdminDashboardPage() {
       .from("contact_messages")
       .select("id", { count: "exact", head: true })
       .is("read_at", null),
+    // Preview of the 3 most-recent unread messages so the coach can triage
+    // straight from the dashboard without opening /admin/messages.
+    admin
+      .from("contact_messages")
+      .select("id, name, message, created_at")
+      .is("read_at", null)
+      .order("created_at", { ascending: false })
+      .limit(3),
     admin
       .from("payment_records")
       .select("amount_cents")
@@ -104,7 +133,83 @@ export default async function AdminDashboardPage() {
   const todayOverrides = todayOverrideRes.data ?? [];
   const pendingClaims = pendingClaimsRes.count ?? 0;
   const unreadMessages = unreadMsgRes.count ?? 0;
+  const latestMessages = latestMessagesRes.data ?? [];
   const pendingApprovals = pendingApprovalsRes.count ?? 0;
+
+  // Current Lisbon clock time in "minutes since midnight" — used to tag the
+  // today list with "Em curso" / "Próxima" / past styling.
+  const nowLisbonHM = new Date().toLocaleTimeString("en-GB", {
+    timeZone: "Europe/Lisbon",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  const [nowH, nowM] = nowLisbonHM.split(":").map(Number);
+  const nowTimeMin = nowH * 60 + nowM;
+
+  // Enrich today's classes with roster names + time-status, pre-sorted by
+  // start time. The first non-cancelled upcoming class gets the "Próxima" tag.
+  type EnrichedClass = {
+    id: string;
+    name: string;
+    start: string;
+    duration_minutes: number;
+    capacity: number;
+    cancelled: boolean;
+    booked: number;
+    waitlist: number;
+    rosterNames: string[];
+    timeStatus: "past" | "current" | "upcoming";
+    isNext: boolean;
+  };
+  const enrichedTodayClasses: EnrichedClass[] = todayClasses
+    .map((t): EnrichedClass => {
+      const override = todayOverrides.find((o) => o.template_id === t.id);
+      const cancelled = override?.cancelled ?? false;
+      const start = override?.override_start_time ?? t.start_time;
+      const capacity = override?.override_capacity ?? t.capacity;
+      const matching = todayBookings.filter((b) => b.template_id === t.id);
+      const booked = matching.filter((b) => b.status === "booked").length;
+      const waitlist = matching.filter((b) => b.status === "waitlisted").length;
+      const rosterNames = matching
+        .filter((b) => b.status === "booked")
+        .map((b) => {
+          const p = b.profile as unknown as {
+            full_name: string | null;
+            email: string;
+          } | null;
+          return p?.full_name?.trim() || p?.email?.split("@")[0] || "—";
+        });
+      const [sH, sM] = start.split(":").map(Number);
+      const startMin = sH * 60 + sM;
+      const endMin = startMin + t.duration_minutes;
+      const timeStatus: "past" | "current" | "upcoming" = cancelled
+        ? "past"
+        : nowTimeMin < startMin
+          ? "upcoming"
+          : nowTimeMin <= endMin
+            ? "current"
+            : "past";
+      return {
+        id: t.id,
+        name: t.name,
+        start,
+        duration_minutes: t.duration_minutes,
+        capacity,
+        cancelled,
+        booked,
+        waitlist,
+        rosterNames,
+        timeStatus,
+        isNext: false,
+      };
+    })
+    .sort((a, b) => a.start.localeCompare(b.start));
+
+  const nextIdx = enrichedTodayClasses.findIndex(
+    (c) => c.timeStatus === "upcoming" && !c.cancelled,
+  );
+  if (nextIdx >= 0) enrichedTodayClasses[nextIdx].isNext = true;
 
   // Today's birthdays: same month + day as today (Lisbon). Age is current
   // year minus birth year, clipped to 0 in case someone typed a future year.
@@ -194,36 +299,10 @@ export default async function AdminDashboardPage() {
         </section>
       )}
 
-      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <DashboardCard
-          icon={TrendingUp}
-          label="Receitas este mês"
-          value={formatEuro(monthEarnings)}
-          href="/admin/pagamentos"
-        />
-        <DashboardCard
-          icon={Calendar}
-          label="Aulas hoje"
-          value={String(todayClasses.length)}
-          href="/admin/calendar"
-        />
-        <DashboardCard
-          icon={Package}
-          label="Pedidos pendentes"
-          value={String(pendingClaims)}
-          href="/admin/claims"
-          highlight={pendingClaims > 0}
-        />
-        <DashboardCard
-          icon={Mail}
-          label="Mensagens por ler"
-          value={String(unreadMessages)}
-          href="/admin/messages"
-          highlight={unreadMessages > 0}
-        />
-      </div>
-
-      <section className="mt-12">
+      {/* Hoje — first thing on opening the app. Bigger time, status chips
+          ("Em curso" / "Próxima" / "Cheia") and a short roster preview so
+          the coach knows who's coming without leaving the dashboard. */}
+      <section className="mt-10">
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
             Hoje
@@ -243,52 +322,133 @@ export default async function AdminDashboardPage() {
               Razão: {todayClosed.reason}
             </span>
           </p>
-        ) : todayClasses.length === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">
-            Sem aulas hoje.
-          </p>
+        ) : enrichedTodayClasses.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">Sem aulas hoje.</p>
         ) : (
           <ul className="mt-4 divide-y divide-border/60 rounded-md border border-border/60">
-            {todayClasses
-              .map((t) => {
-                const override = todayOverrides.find(
-                  (o) => o.template_id === t.id,
-                );
-                const cancelled = override?.cancelled ?? false;
-                const start = override?.override_start_time ?? t.start_time;
-                const capacity = override?.override_capacity ?? t.capacity;
-                const booked = todayBookings.filter(
-                  (b) => b.template_id === t.id && b.status === "booked",
-                ).length;
-                const waitlist = todayBookings.filter(
-                  (b) => b.template_id === t.id && b.status === "waitlisted",
-                ).length;
-                return { ...t, start, capacity, cancelled, booked, waitlist };
-              })
-              .sort((a, b) => a.start.localeCompare(b.start))
-              .map((c) => (
-                <li
-                  key={c.id}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-                >
-                  <div className="flex items-baseline gap-3">
-                    <span className="font-display text-lg tracking-wider tabular-nums">
+            {enrichedTodayClasses.map((c) => {
+              const past = c.timeStatus === "past";
+              const isFull = !c.cancelled && c.booked >= c.capacity;
+              const rosterPreview = c.rosterNames.slice(0, 3).join(", ");
+              const rosterRemainder = c.rosterNames.length - 3;
+              return (
+                <li key={c.id} className="px-4 py-4">
+                  <div className="flex items-baseline gap-4">
+                    <span
+                      className={`font-display text-2xl tabular-nums ${
+                        past ? "text-muted-foreground line-through" : ""
+                      }`}
+                    >
                       {formatTime(c.start)}
                     </span>
-                    <p className="font-medium">{c.name}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <p
+                          className={`font-medium ${
+                            past ? "text-muted-foreground" : ""
+                          }`}
+                        >
+                          {c.name}
+                        </p>
+                        {c.cancelled ? (
+                          <span className="inline-flex items-center rounded-sm border border-destructive/40 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-destructive">
+                            Cancelada
+                          </span>
+                        ) : c.timeStatus === "current" ? (
+                          <span className="inline-flex items-center gap-1 rounded-sm border border-gold/40 bg-gold/10 px-1.5 py-0.5 text-[10px] uppercase tracking-widest">
+                            <span className="size-1.5 rounded-full bg-gold" />
+                            Em curso
+                          </span>
+                        ) : c.isNext ? (
+                          <span className="inline-flex items-center rounded-sm bg-foreground px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-background">
+                            Próxima
+                          </span>
+                        ) : null}
+                        {isFull && (
+                          <span className="inline-flex items-center rounded-sm border border-gold/40 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-foreground">
+                            Cheia
+                            {c.waitlist > 0 && ` · espera ${c.waitlist}`}
+                          </span>
+                        )}
+                      </div>
+                      {!c.cancelled && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          <span className="tabular-nums">
+                            {c.booked}/{c.capacity}
+                          </span>
+                          {c.rosterNames.length > 0 && (
+                            <>
+                              {" · "}
+                              {rosterPreview}
+                              {rosterRemainder > 0 && ` +${rosterRemainder}`}
+                            </>
+                          )}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    {c.cancelled
-                      ? "Cancelada"
-                      : `${c.booked}/${c.capacity}${
-                          c.waitlist > 0 ? ` · espera ${c.waitlist}` : ""
-                        }`}
-                  </span>
                 </li>
-              ))}
+              );
+            })}
           </ul>
         )}
       </section>
+
+      {/* Mensagens por ler — latest unread previews so the coach can triage
+          straight from the dashboard. Hidden on quiet days. */}
+      {latestMessages.length > 0 && (
+        <section className="mt-12">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Mensagens por ler ({unreadMessages})
+            </h2>
+            <Link
+              href="/admin/messages"
+              className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground"
+            >
+              Ver todas →
+            </Link>
+          </div>
+          <ul className="mt-4 divide-y divide-border/60 rounded-md border border-border/60">
+            {latestMessages.map((m) => (
+              <li key={m.id}>
+                <Link
+                  href="/admin/messages"
+                  className="block px-4 py-3 transition-colors hover:bg-muted/30"
+                >
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="truncate font-medium">{m.name}</p>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {relativeTime(m.created_at)}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {previewText(m.message)}
+                  </p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Quick-glance overview stats below the day-of focus. Dropped the
+          Aulas/Mensagens counts — the sections above already convey them. */}
+      <div className="mt-12 grid gap-4 sm:grid-cols-2">
+        <DashboardCard
+          icon={TrendingUp}
+          label="Receitas este mês"
+          value={formatEuro(monthEarnings)}
+          href="/admin/pagamentos"
+        />
+        <DashboardCard
+          icon={Package}
+          label="Pedidos pendentes"
+          value={String(pendingClaims)}
+          href="/admin/claims"
+          highlight={pendingClaims > 0}
+        />
+      </div>
 
       <section className="mt-12">
         <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
