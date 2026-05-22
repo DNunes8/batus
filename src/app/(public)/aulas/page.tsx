@@ -56,6 +56,10 @@ export default async function AulasPage({
   const todayStr = todayLisbon();
   const prevWeek = addDays(weekStart, -7);
   const nextWeek = addDays(weekStart, 7);
+  // On the current week, hide days that have already passed — the focus is
+  // today onwards. Past + future weeks show in full (history vs. planning).
+  const isCurrentWeek =
+    todayStr >= weekStart && todayStr < addDays(weekStart, 7);
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-16">
@@ -166,9 +170,12 @@ export default async function AulasPage({
       )}
 
       {(() => {
-        const visibleDays = days.filter(
-          (d) => d.closed || d.classes.length > 0,
-        );
+        const visibleDays = days.filter((d) => {
+          // Trim past days on the current week — no value in showing
+          // yesterday's classes a student can't book anyway.
+          if (isCurrentWeek && d.date < todayStr) return false;
+          return d.closed || d.classes.length > 0;
+        });
 
         if (visibleDays.length === 0) {
           return (

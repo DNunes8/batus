@@ -134,6 +134,22 @@ export default async function AdminCalendarPage({
     : (todayInWeek?.date ?? weekStart);
   const selectedDay = days.find((d) => d.date === selectedDate) ?? days[0];
 
+  // Trim past days when viewing the current week — the focus is today
+  // onwards, no point staring at Monday's classes on a Wednesday. Past
+  // and future weeks always show the full 7 days (whole point of going
+  // back is history; whole point of going forward is planning).
+  //
+  // Escape hatch: if a shared URL points at a past day in this week,
+  // expand to the full week so that day is visible.
+  const weekEnd = addDays(weekStart, 7);
+  const isCurrentWeek = todayStr >= weekStart && todayStr < weekEnd;
+  const explicitPastDayRequested =
+    isCurrentWeek && !!dayInWeek && dayInWeek.date < todayStr;
+  const visibleDays =
+    isCurrentWeek && !explicitPastDayRequested
+      ? days.filter((d) => d.date >= todayStr)
+      : days;
+
   return (
     <div className="p-4 sm:p-6 lg:p-10">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border/60 pb-6">
@@ -177,11 +193,11 @@ export default async function AdminCalendarPage({
         </div>
       </header>
 
-      {/* Week strip (mobile + tablet). The whole week visible on one row;
-          tap a day to switch the expanded view below. */}
+      {/* Week strip (mobile + tablet). One row of day chips; tap to switch
+          the expanded view below. Current-week strip trims past days too. */}
       <div className="mt-6 xl:hidden">
         <WeekStrip
-          days={days}
+          days={visibleDays}
           weekStart={weekStart}
           selectedDate={selectedDate}
           todayStr={todayStr}
@@ -198,17 +214,20 @@ export default async function AdminCalendarPage({
         />
       </div>
 
-      {/* Seven-column grid (desktop only). At xl+ the screen is wide enough
-          to scan the whole week at a glance — the strip becomes redundant. */}
-      <div className="mt-8 hidden grid-cols-7 gap-3 xl:grid">
-        {days.map((day) => (
-          <DayCard
-            key={day.date}
-            day={day}
-            todayStr={todayStr}
-            groupTemplates={groupTemplates}
-            soloTemplates={soloTemplates}
-          />
+      {/* Desktop row of day cards. Flex with items-start so a dense day
+          (think 10+ classes) grows vertically on its own without dragging
+          the other columns to match. flex-1 on each card means fewer
+          visible days = wider columns, automatically. */}
+      <div className="mt-8 hidden gap-3 xl:flex xl:items-start">
+        {visibleDays.map((day) => (
+          <div key={day.date} className="min-w-0 flex-1">
+            <DayCard
+              day={day}
+              todayStr={todayStr}
+              groupTemplates={groupTemplates}
+              soloTemplates={soloTemplates}
+            />
+          </div>
         ))}
       </div>
     </div>
@@ -227,7 +246,7 @@ function WeekStrip({
   todayStr: string;
 }) {
   return (
-    <div className="grid grid-cols-7 gap-1 sm:gap-2">
+    <div className="flex gap-1 sm:gap-2">
       {days.map((day) => {
         const isSelected = day.date === selectedDate;
         const isToday = day.date === todayStr;
@@ -241,7 +260,7 @@ function WeekStrip({
             aria-label={`${DAY_LONG[day.day_of_week]} ${dayNumber(day.date)}${
               day.closed ? " (fechado)" : ""
             }${count ? ` (${count} ${count === 1 ? "aula" : "aulas"})` : ""}`}
-            className={`flex flex-col items-center gap-0.5 rounded-md border px-1 py-2 transition-colors ${
+            className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-md border px-1 py-2 transition-colors ${
               isSelected
                 ? "border-foreground bg-foreground text-background"
                 : isToday
@@ -404,7 +423,7 @@ function DayCard({
 
   return (
     <div
-      className={`flex min-h-[280px] flex-col overflow-hidden rounded-lg border bg-background ${
+      className={`flex min-h-[320px] flex-col overflow-hidden rounded-lg border bg-background ${
         isToday ? "border-foreground" : "border-border/60"
       }`}
     >
