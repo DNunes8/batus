@@ -210,7 +210,7 @@ export async function cancelBooking(formData: FormData) {
           className: tpl.name,
           dateLabel: formatDayHeader(booking.instance_date),
           timeLabel: formatTime(tpl.start_time),
-          perfilUrl: `${proto}://${host}/perfil`,
+          siteUrl: `${proto}://${host}`,
         });
       }
     }

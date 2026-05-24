@@ -1,21 +1,27 @@
 import { studio } from "@/lib/studio.config";
 
-// Thin Resend wrapper. We POST to the Resend HTTP API directly — no SDK
-// dependency to carry through the hand-off. Every send is best-effort:
-// if the keys aren't configured yet (pre-Resend-setup) or the call fails,
-// we log and return. Sending email must NEVER break the booking/auth flow
-// that triggered it.
+// Thin Resend wrapper + the app's transactional emails. We POST to the
+// Resend HTTP API directly — no SDK dependency to carry through the hand-off.
+// Every send is best-effort: if the keys aren't set (pre-Resend-setup) or the
+// call fails, we log and return. Sending email must NEVER break the flow that
+// triggered it.
 //
-// Config (Vercel env): RESEND_API_KEY + RESEND_FROM (e.g.
-// "Batus <noreply@batusboxe.com>" — must be on a domain verified in Resend).
+// Look matches supabase/email-templates/recovery.html (the password email) so
+// every email the studio sends is visually consistent: logo, serif headline,
+// warm off-white palette, table-based for Outlook safety.
+//
+// NOTE: these are the emails OUR code sends (waitlist, welcome). The auth
+// emails (password reset, etc.) are written by Supabase's template editor and
+// merely delivered through Resend's SMTP — they don't live here.
+//
+// Config (Vercel env): RESEND_API_KEY + RESEND_FROM
+// (e.g. "Batus <noreply@batusboxe.com>" — domain must be verified in Resend).
 
 type SendArgs = {
   to: string;
   subject: string;
   html: string;
-  // Plain-text alternative. Always pass it: multipart text+html mail is
-  // less likely to be flagged as spam than html-only.
-  text?: string;
+  text?: string; // plain-text alt — multipart mail is less spam-prone.
 };
 
 export async function sendEmail({
@@ -58,73 +64,140 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;");
 }
 
-// Sent when a waitlisted student is auto-promoted into a class (a booked
-// spot freed up). They won't be refreshing the app, so this is how they
-// find out they're in.
+const SANS =
+  "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+// Shared branded shell — single source of truth for the look. Mirrors the
+// recovery.html template so app + auth emails are indistinguishable in style.
+function emailShell(opts: {
+  siteUrl: string;
+  heading: string;
+  bodyHtml: string;
+  cta?: { label: string; url: string };
+}): string {
+  const cta = opts.cta
+    ? `
+        <tr><td align="center" style="padding:4px 8px 28px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+            <td bgcolor="#0A0A0A" style="border-radius:6px;">
+              <a href="${opts.cta.url}" style="display:inline-block;padding:16px 32px;font-family:${SANS};font-size:14px;font-weight:600;letter-spacing:0.08em;color:#FAFAF7;text-decoration:none;text-transform:uppercase;border-radius:6px;">${escapeHtml(opts.cta.label)} &rarr;</a>
+            </td>
+          </tr></table>
+        </td></tr>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="pt-PT"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"></head>
+<body style="margin:0;padding:0;background:#FAFAF7;font-family:${SANS};color:#0A0A0A;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FAFAF7;"><tr>
+    <td align="center" style="padding:32px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;">
+        <tr><td align="center" style="padding:8px 0 28px;">
+          <img src="${opts.siteUrl}/logo-stacked.png" alt="${escapeHtml(studio.name)}" width="72" height="72" style="display:block;border:0;outline:none;text-decoration:none;height:72px;width:auto;">
+        </td></tr>
+        <tr><td align="center" style="padding:0 8px 18px;">
+          <h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:700;letter-spacing:0.04em;line-height:1.2;color:#0A0A0A;text-transform:uppercase;">${escapeHtml(opts.heading)}</h1>
+        </td></tr>
+        <tr><td style="padding:0 8px 24px;font-size:16px;line-height:1.6;color:#0A0A0A;">
+          ${opts.bodyHtml}
+        </td></tr>
+        ${cta}
+        <tr><td align="center" style="padding:28px 8px 8px;border-top:1px solid #E5E5E0;font-size:11px;letter-spacing:0.2em;line-height:1.7;text-transform:uppercase;color:#999;">
+          ${escapeHtml(studio.fullName)}<br><span style="color:#bbb;">${escapeHtml(studio.coach)} · ${escapeHtml(studio.city)}</span>
+        </td></tr>
+      </table>
+    </td>
+  </tr></table>
+</body></html>`;
+}
+
+// ---------------------------------------------------------------------------
+// Waitlist promotion — a booked spot freed up and this student moved in.
+// ---------------------------------------------------------------------------
 export async function sendWaitlistPromotionEmail(args: {
   to: string;
   studentName: string | null;
   className: string;
   dateLabel: string;
   timeLabel: string;
-  perfilUrl: string;
+  siteUrl: string;
 }): Promise<void> {
-  const { to, studentName, className, dateLabel, timeLabel, perfilUrl } = args;
+  const { to, studentName, className, dateLabel, timeLabel, siteUrl } = args;
   const firstName = studentName?.trim().split(" ")[0] || "Olá";
 
   const subject = `Tens vaga na aula de ${className}`;
+
+  const bodyHtml = `
+          <p style="margin:0 0 14px;">${escapeHtml(firstName)}, abriu uma vaga e <strong>entraste</strong> nesta aula:</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;border:1px solid #E5E5E0;border-radius:8px;"><tr><td style="padding:14px 16px;">
+            <p style="margin:0 0 4px;font-size:17px;font-weight:700;">${escapeHtml(className)}</p>
+            <p style="margin:0;font-size:14px;color:#777;">${escapeHtml(dateLabel)} · ${escapeHtml(timeLabel)}</p>
+          </td></tr></table>
+          <p style="margin:0;">Já estás confirmado. Se não puderes ir, cancela a marcação para libertar o lugar para o próximo da lista.</p>`;
+
+  const html = emailShell({
+    siteUrl,
+    heading: "Tens vaga",
+    bodyHtml,
+    cta: { label: "Ver a minha marcação", url: `${siteUrl}/perfil` },
+  });
 
   const text = [
     "Tens vaga!",
     "",
     `${firstName}, abriu uma vaga e entraste nesta aula:`,
     "",
-    `${className}`,
+    className,
     `${dateLabel} · ${timeLabel}`,
     "",
-    "Já estás confirmado. Se não puderes ir, cancela a marcação para libertar o lugar para o próximo da lista.",
+    "Já estás confirmado. Se não puderes ir, cancela a marcação para libertar o lugar.",
     "",
-    `Ver a tua marcação: ${perfilUrl}`,
+    `Ver a tua marcação: ${siteUrl}/perfil`,
     "",
     `${studio.fullName} · ${studio.city}`,
   ].join("\n");
 
-  const html = `
-  <div style="background:#f4f4f5;padding:24px 0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
-    <div style="max-width:480px;margin:0 auto;background:#ffffff;border:1px solid #e5e5e5;border-radius:12px;overflow:hidden">
-      <div style="background:#111111;padding:18px 24px">
-        <p style="margin:0;color:#ffffff;font-size:15px;font-weight:700;letter-spacing:3px">
-          ${escapeHtml(studio.name.toUpperCase())}
-        </p>
-      </div>
-      <div style="padding:24px">
-        <h1 style="font-size:20px;margin:0 0 16px;color:#111111">Tens vaga!</h1>
-        <p style="font-size:15px;line-height:1.5;margin:0 0 16px;color:#333333">
-          ${escapeHtml(firstName)}, abriu uma vaga e <strong>entraste</strong> nesta aula:
-        </p>
-        <div style="border:1px solid #e5e5e5;border-radius:8px;padding:16px;margin:0 0 16px">
-          <p style="font-size:16px;font-weight:600;margin:0 0 4px;color:#111111">
-            ${escapeHtml(className)}
-          </p>
-          <p style="font-size:14px;color:#666666;margin:0">
-            ${escapeHtml(dateLabel)} · ${escapeHtml(timeLabel)}
-          </p>
-        </div>
-        <p style="font-size:15px;line-height:1.5;margin:0 0 20px;color:#333333">
-          Já estás confirmado. Se não puderes ir, cancela a marcação para
-          libertar o lugar para o próximo da lista.
-        </p>
-        <a href="${perfilUrl}" style="display:inline-block;background:#111111;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600">
-          Ver a minha marcação
-        </a>
-      </div>
-      <div style="border-top:1px solid #eeeeee;padding:16px 24px">
-        <p style="font-size:12px;color:#999999;margin:0">
-          ${escapeHtml(studio.fullName)} · ${escapeHtml(studio.city)}
-        </p>
-      </div>
-    </div>
-  </div>`;
+  await sendEmail({ to, subject, html, text });
+}
+
+// ---------------------------------------------------------------------------
+// Welcome — fired on signup. New students land pending, so this nudges them
+// to reach the coach for approval before they can book.
+// ---------------------------------------------------------------------------
+export async function sendWelcomeEmail(args: {
+  to: string;
+  siteUrl: string;
+}): Promise<void> {
+  const { to, siteUrl } = args;
+  const ig = studio.social.instagram;
+  const cta = ig
+    ? { label: "Falar no Instagram", url: `https://instagram.com/${ig}` }
+    : { label: "Falar com o treinador", url: `${siteUrl}/contacto` };
+
+  const subject = `Bem-vindo ao ${studio.name}`;
+
+  const bodyHtml = `
+          <p style="margin:0 0 14px;">Recebemos o teu registo. Bem-vindo!</p>
+          <p style="margin:0;">Antes da primeira aula, o ${escapeHtml(studio.coach)} aprova cada novo aluno. Fala com ele para combinarem a tua entrada e ficas logo a poder marcar aulas no horário.</p>`;
+
+  const html = emailShell({
+    siteUrl,
+    heading: `Bem-vindo ao ${studio.name}`,
+    bodyHtml,
+    cta,
+  });
+
+  const text = [
+    `Bem-vindo ao ${studio.name}!`,
+    "",
+    "Recebemos o teu registo.",
+    "",
+    `Antes da primeira aula, o ${studio.coach} aprova cada novo aluno. Fala com ele para combinarem a tua entrada.`,
+    "",
+    `${cta.label}: ${cta.url}`,
+    "",
+    `${studio.fullName} · ${studio.city}`,
+  ].join("\n");
 
   await sendEmail({ to, subject, html, text });
 }
