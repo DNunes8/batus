@@ -1,9 +1,10 @@
-// Six-month strip used in the drawer + the student detail page.
-// Monochrome by design: shape encodes state, not colour.
-//   ▣ filled  = pago
-//   ▢ outline = por pagar (had a row, but didn't pay)
-//   ◌ dashed  = em pausa
-//   · light   = sem registo (no row at all that month)
+// Six-month payment history — "action-first". Visual weight tracks how much
+// attention a month needs, so the coach's eye lands on what matters:
+//   • por pagar → LOUD: solid fill, "Falta". These need chasing.
+//   • paid      → quiet: faint check. Done, ignore.
+//   • em pausa  → muted dashed, "Pausa".
+//   • sem registo → faintest dot.
+// The current month is tagged "este mês" so "this vs last month" is obvious.
 
 import { formatMonthYear } from "@/lib/money";
 import type { PaymentStatus } from "./actions";
@@ -11,6 +12,7 @@ import type { PaymentStatus } from "./actions";
 export type HistoryCell = {
   month: string; // YYYY-MM-01
   status: PaymentStatus | null; // null = no record at all
+  isCurrent?: boolean;
 };
 
 const SHORT_PT_MONTHS = [
@@ -35,40 +37,29 @@ function shortMonth(month: string): string {
 
 function cellClasses(status: PaymentStatus | null): string {
   switch (status) {
-    case "paid":
-      return "bg-foreground border-foreground";
     case "unpaid":
-      return "border-foreground/60";
+      // Loudest — it's the action item.
+      return "border-foreground bg-foreground text-background";
     case "paused":
-      return "border-muted-foreground/40 border-dashed";
+      return "border-dashed border-muted-foreground/40 text-muted-foreground";
+    case "paid":
+      // Receded — done, no attention needed.
+      return "border-border/50 text-muted-foreground/60";
     default:
-      return "border-muted-foreground/15";
+      return "border-transparent text-muted-foreground/25";
   }
 }
 
-function glyph(status: PaymentStatus | null): string {
+function cellText(status: PaymentStatus | null): string {
   switch (status) {
+    case "unpaid":
+      return "Falta";
+    case "paused":
+      return "Pausa";
     case "paid":
       return "✓";
-    case "unpaid":
-      return "!";
-    case "paused":
-      return "II";
     default:
       return "·";
-  }
-}
-
-function glyphColor(status: PaymentStatus | null): string {
-  switch (status) {
-    case "paid":
-      return "text-background";
-    case "unpaid":
-      return "text-foreground";
-    case "paused":
-      return "text-muted-foreground";
-    default:
-      return "text-muted-foreground/40";
   }
 }
 
@@ -95,14 +86,25 @@ export function HistoryStrip({ cells }: { cells: HistoryCell[] }) {
           className="flex flex-col items-center gap-1"
         >
           <div
-            className={`flex h-10 w-full items-center justify-center rounded-sm border text-[10px] font-medium ${cellClasses(
+            className={`flex h-10 w-full items-center justify-center rounded-sm border text-[10px] font-semibold ${cellClasses(
               c.status,
-            )} ${glyphColor(c.status)}`}
+            )}`}
           >
-            {glyph(c.status)}
+            {cellText(c.status)}
           </div>
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span
+            className={`text-[10px] uppercase tracking-wider ${
+              c.isCurrent
+                ? "font-bold text-foreground"
+                : "text-muted-foreground"
+            }`}
+          >
             {shortMonth(c.month)}
+          </span>
+          {/* Reserve the line on every column so the row stays aligned;
+              only the current month fills it. */}
+          <span className="h-3 text-[9px] uppercase tracking-wide text-muted-foreground">
+            {c.isCurrent ? "este mês" : ""}
           </span>
         </div>
       ))}

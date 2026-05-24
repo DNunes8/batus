@@ -111,6 +111,8 @@ export default async function PagamentosPage({
   // (generating instances inside the month, skipping cancelled overrides).
   const today = todayLisbon();
   const activityCutoff = monthEnd < today ? monthEnd : today;
+  // Used to tag the "este mês" cell in the history strip.
+  const currentMonthIso = `${today.slice(0, 7)}-01`;
 
   type ActivityAcc = {
     sessions_this_month: number;
@@ -189,6 +191,7 @@ export default async function PagamentosPage({
       return {
         month: m,
         status: rec ? (rec.status as PaymentStatus) : null,
+        isCurrent: m === currentMonthIso,
       };
     });
 
