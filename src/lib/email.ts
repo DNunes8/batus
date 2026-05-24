@@ -87,7 +87,7 @@ function emailShell(opts: {
     : "";
 
   return `<!DOCTYPE html>
-<html lang="pt-PT"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"></head>
+<html lang="pt-PT"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet"></head>
 <body style="margin:0;padding:0;background:#FAFAF7;font-family:${SANS};color:#0A0A0A;-webkit-font-smoothing:antialiased;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FAFAF7;"><tr>
     <td align="center" style="padding:32px 16px;">
@@ -96,7 +96,7 @@ function emailShell(opts: {
           <img src="${opts.siteUrl}/logo-stacked.png" alt="${escapeHtml(studio.name)}" width="72" height="72" style="display:block;border:0;outline:none;text-decoration:none;height:72px;width:auto;">
         </td></tr>
         <tr><td align="center" style="padding:0 8px 18px;">
-          <h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:700;letter-spacing:0.04em;line-height:1.2;color:#0A0A0A;text-transform:uppercase;">${escapeHtml(opts.heading)}</h1>
+          <h1 style="margin:0;font-family:'Bebas Neue','Arial Narrow',Arial,sans-serif;font-size:34px;font-weight:700;letter-spacing:0.06em;line-height:1.1;color:#0A0A0A;text-transform:uppercase;">${escapeHtml(opts.heading)}</h1>
         </td></tr>
         <tr><td style="padding:0 8px 24px;font-size:16px;line-height:1.6;color:#0A0A0A;">
           ${opts.bodyHtml}
