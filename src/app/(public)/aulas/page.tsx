@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
@@ -10,7 +10,6 @@ import {
   formatWeekRange,
   getWeekSchedule,
   isClassInPast,
-  mondayOf,
   safeReferenceDate,
   todayLisbon,
   type ScheduleClass,
@@ -25,9 +24,14 @@ export default async function AulasPage({
   searchParams: Promise<{ week?: string }>;
 }) {
   const params = await searchParams;
-  const referenceDate = safeReferenceDate(params.week);
-  const weekStart = mondayOf(referenceDate);
-  const days = await getWeekSchedule(weekStart);
+  const todayStr = todayLisbon();
+  // Students get a rolling 7-day window starting today (or the requested
+  // start, clamped so it never goes before today — they only book forward).
+  // No Monday anchoring, so the schedule never looks empty just because it's
+  // late in the calendar week. Baltaru's admin calendar keeps its own view.
+  const requested = safeReferenceDate(params.week);
+  const start = requested < todayStr ? todayStr : requested;
+  const days = await getWeekSchedule(start);
 
   const supabase = await createClient();
   const {
@@ -53,13 +57,7 @@ export default async function AulasPage({
   }
   const isPending = !!user && !isApproved;
 
-  const todayStr = todayLisbon();
-  const prevWeek = addDays(weekStart, -7);
-  const nextWeek = addDays(weekStart, 7);
-  // On the current week, hide days that have already passed — the focus is
-  // today onwards. Past + future weeks show in full (history vs. planning).
-  const isCurrentWeek =
-    todayStr >= weekStart && todayStr < addDays(weekStart, 7);
+  const nextStart = addDays(start, 7);
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-16">
@@ -72,22 +70,12 @@ export default async function AulasPage({
             HORÁRIO
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Boxe e kickboxing · Semana de {formatWeekRange(weekStart)}
+            Boxe e kickboxing · {formatWeekRange(start)}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
-            render={<Link href={`/aulas?week=${prevWeek}`} />}
-            nativeButton={false}
-            variant="outline"
-            aria-label="Semana anterior"
-            className="h-10 w-10 p-0 sm:h-9 sm:w-auto sm:px-3"
-          >
-            <ChevronLeft className="size-4" />
-            <span className="hidden sm:inline">Anterior</span>
-          </Button>
-          <Button
-            render={<Link href={`/aulas?week=${todayStr}`} />}
+            render={<Link href="/aulas" />}
             nativeButton={false}
             variant="outline"
             className="h-10 px-4 sm:h-9 sm:px-3"
@@ -95,13 +83,13 @@ export default async function AulasPage({
             Hoje
           </Button>
           <Button
-            render={<Link href={`/aulas?week=${nextWeek}`} />}
+            render={<Link href={`/aulas?week=${nextStart}`} />}
             nativeButton={false}
             variant="outline"
-            aria-label="Próxima semana"
-            className="h-10 w-10 p-0 sm:h-9 sm:w-auto sm:px-3"
+            aria-label="Próximos dias"
+            className="h-10 px-4 sm:h-9 sm:px-3"
           >
-            <span className="hidden sm:inline">Próxima</span>
+            Próxima
             <ChevronRight className="size-4" />
           </Button>
         </div>
@@ -170,18 +158,20 @@ export default async function AulasPage({
       )}
 
       {(() => {
-        const visibleDays = days.filter((d) => {
-          // Trim past days on the current week — no value in showing
-          // yesterday's classes a student can't book anyway.
-          if (isCurrentWeek && d.date < todayStr) return false;
-          return d.closed || d.classes.length > 0;
-        });
+        // The window already starts today, so every day here is upcoming —
+        // just drop the empty, non-closed days.
+        const visibleDays = days.filter(
+          (d) => d.closed || d.classes.length > 0,
+        );
 
         if (visibleDays.length === 0) {
           return (
             <p className="mt-12 text-sm text-muted-foreground">
-              Sem aulas marcadas nesta semana. Tenta a próxima semana ou
-              contacta o estúdio.
+              Sem aulas marcadas para os próximos dias. Vê mais à frente com{" "}
+              <Link href={`/aulas?week=${nextStart}`} className="underline">
+                Próxima
+              </Link>{" "}
+              ou contacta o estúdio.
             </p>
           );
         }
@@ -201,7 +191,7 @@ export default async function AulasPage({
 
                 {day.closed ? (
                   <p className="mt-3 text-sm text-muted-foreground">
-                    Fechado — {day.closed_reason}
+                    Fechado · {day.closed_reason}
                   </p>
                 ) : (
                   <ul className="mt-3 divide-y divide-border/60 rounded-md border border-border/60">
