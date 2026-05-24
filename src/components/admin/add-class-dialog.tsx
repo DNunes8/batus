@@ -408,7 +408,7 @@ function GroupForm({
               type="number"
               min={1}
               max={100}
-              defaultValue={12}
+              defaultValue={8}
               required
             />
           </div>

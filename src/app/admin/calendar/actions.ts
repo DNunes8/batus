@@ -105,7 +105,7 @@ export async function createClassFromCalendar(
   const name = ((formData.get("name") as string | null) ?? "").trim();
   const start_time = formData.get("start_time") as string | null;
   const duration_minutes = Number(formData.get("duration_minutes") ?? 60);
-  const capacity = Number(formData.get("capacity") ?? 12);
+  const capacity = Number(formData.get("capacity") ?? 8);
   const is_public = formData.get("is_public") !== "false";
   const repeat_weekly = formData.get("repeat_weekly") === "on";
 
