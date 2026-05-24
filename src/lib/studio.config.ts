@@ -5,7 +5,7 @@ export const studio = {
   name: "Batus",
   fullName: "Batus Boxing & Training",
   tagline: "Boxe e kickboxing em Braga",
-  coach: "Robert Baltaru",
+  coach: "Baltaru",
   city: "Braga",
   country: "Portugal",
 

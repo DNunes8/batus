@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { studio } from "@/lib/studio.config";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,13 +16,13 @@ import {
   splitBirthday,
 } from "@/lib/birthday";
 import { updateOwnProfile } from "./actions";
-
-const SELECT_CLASSES =
-  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 import { ChangePasswordForm } from "./change-password-form";
 import { AutoScrollTo } from "./auto-scroll";
 
 export const dynamic = "force-dynamic";
+
+const SELECT_CLASSES =
+  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 
 const PT_DAYS_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const PT_MONTHS_SHORT = [
@@ -49,10 +48,18 @@ function formatBookingDate(s: string): string {
   }`;
 }
 
+// "1997-02-11" -> "11 Fevereiro 1997"
+function formatBirthdayLong(iso: string | null | undefined): string {
+  const { day, month, year } = splitBirthday(iso);
+  if (!day || !month || !year) return "";
+  const m = MONTHS_PT.find((mm) => String(mm.value) === month);
+  return `${day} ${m ? m.label : month} ${year}`;
+}
+
 export default async function PerfilPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ reset?: string }>;
+  searchParams?: Promise<{ reset?: string; edit?: string; pw?: string }>;
 }) {
   const params = (await searchParams) ?? {};
   const isReset = params.reset === "1";
@@ -84,6 +91,13 @@ export default async function PerfilPage({
   const isIncomplete =
     !profile?.is_admin &&
     (!profile?.full_name || !profile?.phone || !profile?.birthday);
+
+  // The "Os teus dados" section shows a read-only summary by default and only
+  // becomes a form on ?edit=1 — or automatically when the profile is still
+  // incomplete (nothing to display yet). Password works the same: collapsed
+  // until ?pw=1, and auto-open during the reset flow.
+  const isEditing = params.edit === "1" || isIncomplete;
+  const showPassword = params.pw === "1" || isReset;
 
   const since = profile
     ? new Date(profile.joined_at).toLocaleDateString("pt-PT", {
@@ -134,9 +148,10 @@ export default async function PerfilPage({
             FALTA COMPLETAR O PERFIL
           </h2>
           <p className="mt-3 max-w-prose text-sm leading-relaxed text-foreground/80">
-            Precisamos do teu nome, telefone e data de nascimento — para o
-            treinador saber quem és, te contactar, e desejar parabéns no
-            dia. Preenche em baixo na secção <strong>Os teus dados</strong>.
+            Precisamos do teu nome, telefone e data de nascimento, para o
+            treinador saber quem és, conseguir contactar-te e desejar os
+            parabéns no dia. Preenche em baixo na secção{" "}
+            <strong>Os teus dados</strong>.
           </p>
           <a
             href="#os-teus-dados"
@@ -159,8 +174,8 @@ export default async function PerfilPage({
           </h2>
           <p className="mt-3 max-w-prose text-sm leading-relaxed text-foreground/80">
             O {studio.name} aprova cada novo aluno antes da primeira aula. Já
-            temos o teu registo — falta só falares com o{" "}
-            {studio.coach.split(" ")[0]} para combinarem a tua entrada.
+            temos o teu registo. Falta só falares com o {studio.coach} para
+            combinarem a tua entrada.
           </p>
           <div className="mt-4 rounded-md border border-border/60 bg-background p-4">
             <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
@@ -168,7 +183,7 @@ export default async function PerfilPage({
             </p>
             <p className="mt-1 text-sm text-foreground/80">
               Contacta o treinador. Assim que aprovar a tua conta, podes marcar
-              aulas no horário — sem precisares de voltar a entrar.
+              aulas no horário, sem precisares de voltar a entrar.
             </p>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -204,8 +219,8 @@ export default async function PerfilPage({
           </h2>
           <p className="mt-3 max-w-prose text-sm leading-relaxed text-foreground/80">
             A tua conta está em pausa, por isso não podes marcar novas aulas. As
-            marcações que já tens mantêm-se — fala com o{" "}
-            {studio.coach.split(" ")[0]} para reativares a conta.
+            marcações que já tens mantêm-se. Fala com o {studio.coach} para
+            reativares a conta.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {studio.social.instagram && (
@@ -296,126 +311,198 @@ export default async function PerfilPage({
         </>
       )}
 
+      {/* Os teus dados — read-only summary with an Editar toggle, so an
+          already-filled profile doesn't look like a form asking again. */}
       <section id="os-teus-dados" className="mt-16 scroll-mt-8">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-          Os teus dados
-        </h2>
-        <form
-          action={updateOwnProfile}
-          className="mt-4 space-y-4 rounded-md border border-border/60 p-4"
-        >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="full_name">Nome</Label>
-              <Input
-                id="full_name"
-                name="full_name"
-                required
-                defaultValue={profile?.full_name ?? ""}
-                placeholder="O teu nome"
-              />
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            Os teus dados
+          </h2>
+          {!isEditing && (
+            <Link
+              href="/perfil?edit=1#os-teus-dados"
+              className="text-xs uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground"
+            >
+              Editar
+            </Link>
+          )}
+        </div>
+
+        {isEditing ? (
+          <form
+            action={updateOwnProfile}
+            className="mt-4 space-y-4 rounded-md border border-border/60 p-4"
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="full_name">Nome</Label>
+                <Input
+                  id="full_name"
+                  name="full_name"
+                  required
+                  defaultValue={profile?.full_name ?? ""}
+                  placeholder="O teu nome"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefone</Label>
+                <Input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  required
+                  defaultValue={profile?.phone ?? ""}
+                  placeholder="9XX XXX XXX"
+                />
+              </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Telefone</Label>
-              <Input
-                id="phone"
-                name="phone"
-                type="tel"
-                required
-                defaultValue={profile?.phone ?? ""}
-                placeholder="9XX XXX XXX"
+              <Label>Data de nascimento</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <select
+                  name="birthday_day"
+                  required
+                  defaultValue={splitBirthday(profile?.birthday).day}
+                  aria-label="Dia"
+                  autoComplete="bday-day"
+                  className={SELECT_CLASSES}
+                >
+                  <option value="" disabled>
+                    Dia
+                  </option>
+                  {BIRTHDAY_DAYS.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  name="birthday_month"
+                  required
+                  defaultValue={splitBirthday(profile?.birthday).month}
+                  aria-label="Mês"
+                  autoComplete="bday-month"
+                  className={SELECT_CLASSES}
+                >
+                  <option value="" disabled>
+                    Mês
+                  </option>
+                  {MONTHS_PT.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  name="birthday_year"
+                  required
+                  defaultValue={splitBirthday(profile?.birthday).year}
+                  aria-label="Ano"
+                  autoComplete="bday-year"
+                  className={SELECT_CLASSES}
+                >
+                  <option value="" disabled>
+                    Ano
+                  </option>
+                  {birthYearOptions().map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="goals">Objetivos (opcional)</Label>
+              <Textarea
+                id="goals"
+                name="goals"
+                rows={2}
+                defaultValue={profile?.goals ?? ""}
+                placeholder="ex: melhorar técnica, perder peso"
               />
+              <p className="text-xs text-muted-foreground">
+                Partilhar isto com o treinador ajuda a personalizar o teu
+                treino.
+              </p>
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Data de nascimento</Label>
-            <div className="grid grid-cols-3 gap-2">
-              <select
-                name="birthday_day"
-                required
-                defaultValue={splitBirthday(profile?.birthday).day}
-                aria-label="Dia"
-                autoComplete="bday-day"
-                className={SELECT_CLASSES}
-              >
-                <option value="" disabled>
-                  Dia
-                </option>
-                {BIRTHDAY_DAYS.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-              <select
-                name="birthday_month"
-                required
-                defaultValue={splitBirthday(profile?.birthday).month}
-                aria-label="Mês"
-                autoComplete="bday-month"
-                className={SELECT_CLASSES}
-              >
-                <option value="" disabled>
-                  Mês
-                </option>
-                {MONTHS_PT.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                name="birthday_year"
-                required
-                defaultValue={splitBirthday(profile?.birthday).year}
-                aria-label="Ano"
-                autoComplete="bday-year"
-                className={SELECT_CLASSES}
-              >
-                <option value="" disabled>
-                  Ano
-                </option>
-                {birthYearOptions().map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
+            <div className="flex flex-wrap items-center gap-3">
+              <SubmitButton className="h-11 text-base" pendingText="A guardar…">
+                Guardar
+              </SubmitButton>
+              {!isIncomplete && (
+                <Link
+                  href="/perfil#os-teus-dados"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Cancelar
+                </Link>
+              )}
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="goals">Objetivos (opcional)</Label>
-            <Textarea
-              id="goals"
-              name="goals"
-              rows={2}
-              defaultValue={profile?.goals ?? ""}
-              placeholder="ex: melhorar técnica, perder peso"
+          </form>
+        ) : (
+          <dl className="mt-4 divide-y divide-border/60 rounded-md border border-border/60">
+            <DetailRow label="Nome" value={profile?.full_name} />
+            <DetailRow label="Telefone" value={profile?.phone} />
+            <DetailRow
+              label="Data de nascimento"
+              value={formatBirthdayLong(profile?.birthday)}
             />
-            <p className="text-xs text-muted-foreground">
-              Partilhar isto com o treinador ajuda a personalizar o teu treino.
-            </p>
-          </div>
-          <SubmitButton className="h-11 text-base" pendingText="A guardar…">
-            Guardar
-          </SubmitButton>
-        </form>
+            {profile?.goals && (
+              <DetailRow label="Objetivos" value={profile.goals} />
+            )}
+          </dl>
+        )}
       </section>
 
+      {/* Palavra-passe — collapsed behind a button; opens on ?pw=1 or during
+          the reset flow. Avoids looking like we're asking them to set one. */}
       <section id="palavra-passe" className="mt-16 scroll-mt-8">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-          Palavra-passe
-        </h2>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Define uma nova palavra-passe para as próximas entradas.
-        </p>
-        <div
-          className={`mt-4 rounded-md border p-4 ${
-            isReset ? "border-foreground/30 bg-foreground/[0.03]" : "border-border/60"
-          }`}
-        >
-          <ChangePasswordForm />
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            Palavra-passe
+          </h2>
+          {!showPassword && (
+            <Link
+              href="/perfil?pw=1#palavra-passe"
+              className="text-xs uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground"
+            >
+              Alterar
+            </Link>
+          )}
         </div>
+
+        {showPassword ? (
+          <div
+            className={`mt-4 rounded-md border p-4 ${
+              isReset
+                ? "border-foreground/30 bg-foreground/[0.03]"
+                : "border-border/60"
+            }`}
+          >
+            <ChangePasswordForm />
+            {!isReset && (
+              <Link
+                href="/perfil#palavra-passe"
+                className="mt-3 inline-block text-sm text-muted-foreground hover:text-foreground"
+              >
+                Cancelar
+              </Link>
+            )}
+          </div>
+        ) : (
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-border/60 px-4 py-3">
+            <span className="text-sm tracking-[0.3em] text-muted-foreground">
+              ••••••••
+            </span>
+            <Link
+              href="/perfil?pw=1#palavra-passe"
+              className="text-sm font-medium hover:underline"
+            >
+              Alterar
+            </Link>
+          </div>
+        )}
       </section>
     </section>
   );
@@ -428,6 +515,21 @@ function StatCard({ label, value }: { label: string; value: number }) {
         {label}
       </p>
       <p className="mt-2 font-display text-4xl tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | null | undefined;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 px-4 py-3">
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="text-right text-sm font-medium">{value || ""}</dd>
     </div>
   );
 }
