@@ -102,9 +102,13 @@ export default function NewClassPage() {
               type="number"
               min={1}
               max={100}
-              defaultValue={12}
+              defaultValue={8}
               required
             />
+            <p className="text-xs text-muted-foreground">
+              Lugares na aula. Quem marcar acima disto entra na lista de
+              espera.
+            </p>
           </div>
         </div>
 

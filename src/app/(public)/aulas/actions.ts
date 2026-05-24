@@ -2,9 +2,11 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { mondayOf } from "@/lib/schedule";
+import { formatDayHeader, formatTime, mondayOf } from "@/lib/schedule";
+import { sendWaitlistPromotionEmail } from "@/lib/email";
 
 export async function bookClass(formData: FormData) {
   const supabase = await createClient();
@@ -121,7 +123,7 @@ export async function cancelBooking(formData: FormData) {
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      `id, template_id, instance_date, status, class_templates!inner(start_time)`,
+      `id, template_id, instance_date, status, class_templates!inner(start_time, name)`,
     )
     .eq("id", booking_id)
     .single();
@@ -172,7 +174,7 @@ export async function cancelBooking(formData: FormData) {
     const admin = createAdminClient();
     const { data: nextInLine } = await admin
       .from("bookings")
-      .select("id")
+      .select("id, user_id")
       .eq("template_id", booking.template_id)
       .eq("instance_date", booking.instance_date)
       .eq("status", "waitlisted")
@@ -185,7 +187,32 @@ export async function cancelBooking(formData: FormData) {
         .from("bookings")
         .update({ status: "booked", waitlist_position: null })
         .eq("id", nextInLine.id);
-      // Day 6: send notification email to the promoted student.
+
+      // Tell the promoted student — they won't be refreshing the app.
+      // Best-effort: an unconfigured/failed email never blocks the cancel.
+      const { data: promoted } = await admin
+        .from("profiles")
+        .select("email, full_name")
+        .eq("id", nextInLine.user_id)
+        .maybeSingle();
+
+      if (promoted?.email) {
+        const tpl = booking.class_templates as unknown as {
+          start_time: string;
+          name: string;
+        };
+        const h = await headers();
+        const host = h.get("host") ?? "batus-mu.vercel.app";
+        const proto = host.startsWith("localhost") ? "http" : "https";
+        await sendWaitlistPromotionEmail({
+          to: promoted.email,
+          studentName: promoted.full_name,
+          className: tpl.name,
+          dateLabel: formatDayHeader(booking.instance_date),
+          timeLabel: formatTime(tpl.start_time),
+          perfilUrl: `${proto}://${host}/perfil`,
+        });
+      }
     }
   }
 
