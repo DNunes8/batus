@@ -258,19 +258,9 @@ export default async function PagamentosPage({
   const groupPaid = groupRows.filter((r) => r.effectiveStatus === "paid").length;
   const groupUnpaid = groupRows.filter((r) => r.effectiveStatus === "unpaid").length;
   const groupPaused = groupRows.filter((r) => r.effectiveStatus === "paused").length;
-  const groupExpected = groupRows
-    .filter((r) => r.effectiveStatus !== "paused")
-    .reduce((s, r) => s + (r.record?.amount_cents ?? r.resolvedFee ?? 0), 0);
-  const groupReceived = groupRows
-    .filter((r) => r.effectiveStatus === "paid")
-    .reduce((s, r) => s + (r.record?.amount_cents ?? r.resolvedFee ?? 0), 0);
 
   const soloTotalSessions = soloRows.reduce(
     (s, r) => s + (r.solo_activity?.sessions_this_month ?? 0),
-    0,
-  );
-  const soloTotalRevenue = soloRows.reduce(
-    (s, r) => s + (r.solo_activity?.revenue_this_month ?? 0),
     0,
   );
   const soloMonthlyTracked = soloRows.filter((r) => r.has_monthly_fee).length;
