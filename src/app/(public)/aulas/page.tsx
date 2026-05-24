@@ -15,6 +15,8 @@ import {
   type ScheduleClass,
 } from "@/lib/schedule";
 import { bookClass } from "./actions";
+import { studio } from "@/lib/studio.config";
+import { currentMonthLabel, isUnpaidAndBlocked } from "@/lib/payment";
 
 export const dynamic = "force-dynamic";
 
@@ -43,10 +45,13 @@ export default async function AulasPage({
   let isApproved = false;
   let isPaused = false;
   let isIncomplete = false;
+  let isUnpaid = false;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("approved, is_admin, is_blocked, full_name, phone, birthday")
+      .select(
+        "approved, is_admin, is_blocked, full_name, phone, birthday, has_monthly_fee, joined_at",
+      )
       .eq("id", user.id)
       .maybeSingle();
     isApproved = !!profile?.approved || !!profile?.is_admin;
@@ -54,10 +59,15 @@ export default async function AulasPage({
     isIncomplete =
       !profile?.is_admin &&
       (!profile?.full_name || !profile?.phone || !profile?.birthday);
+    // Payment gate only matters once they're otherwise bookable.
+    if (profile && isApproved && !isPaused && !isIncomplete) {
+      isUnpaid = await isUnpaidAndBlocked(user.id, profile);
+    }
   }
   const isPending = !!user && !isApproved;
 
   const nextStart = addDays(start, 7);
+  const monthLabel = currentMonthLabel();
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-16">
@@ -133,6 +143,22 @@ export default async function AulasPage({
           <p className="mt-1 text-sm text-muted-foreground">
             Podes ver o horário, mas não podes marcar novas aulas enquanto a
             conta estiver em pausa.{" "}
+            <Link
+              href="/perfil"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Saber mais
+            </Link>
+          </p>
+        </div>
+      ) : isUnpaid ? (
+        <div className="mt-6 rounded-md border border-foreground/25 bg-muted/40 p-4 sm:p-5">
+          <p className="text-sm font-medium">
+            Mensalidade de {monthLabel} em falta
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            As marcações ficam em pausa até acertares a mensalidade. Fala com o{" "}
+            {studio.coach} e ficas logo a marcar outra vez.{" "}
             <Link
               href="/perfil"
               className="font-medium text-foreground underline-offset-4 hover:underline"
@@ -227,6 +253,7 @@ export default async function AulasPage({
                           isApproved={isApproved}
                           isPaused={isPaused}
                           isIncomplete={isIncomplete}
+                          isUnpaid={isUnpaid}
                           isPast={isClassInPast(c.date, c.start_time)}
                         />
                       </li>
@@ -248,6 +275,7 @@ function BookingControl({
   isApproved,
   isPaused,
   isIncomplete,
+  isUnpaid,
   isPast,
 }: {
   cls: ScheduleClass;
@@ -255,6 +283,7 @@ function BookingControl({
   isApproved: boolean;
   isPaused: boolean;
   isIncomplete: boolean;
+  isUnpaid: boolean;
   isPast: boolean;
 }) {
   if (cls.cancelled) {
@@ -337,6 +366,15 @@ function BookingControl({
     return (
       <span className="inline-flex h-10 items-center rounded-md border border-border/60 px-3 text-xs uppercase tracking-widest text-muted-foreground">
         Conta em pausa
+      </span>
+    );
+  }
+
+  // Unpaid past the monthly cutoff — locked until they settle up.
+  if (isUnpaid) {
+    return (
+      <span className="inline-flex h-10 items-center rounded-md border border-border/60 px-3 text-xs uppercase tracking-widest text-muted-foreground">
+        Pagamento em falta
       </span>
     );
   }

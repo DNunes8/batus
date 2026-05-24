@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDayHeader, formatTime, mondayOf } from "@/lib/schedule";
 import { sendWaitlistPromotionEmail } from "@/lib/email";
+import { isUnpaidAndBlocked } from "@/lib/payment";
 
 export async function bookClass(formData: FormData) {
   const supabase = await createClient();
@@ -26,7 +27,9 @@ export async function bookClass(formData: FormData) {
   // check, so the action has to enforce it itself.
   const { data: gateProfile } = await supabase
     .from("profiles")
-    .select("approved, is_admin, is_blocked, full_name, phone, birthday")
+    .select(
+      "approved, is_admin, is_blocked, full_name, phone, birthday, has_monthly_fee, joined_at",
+    )
     .eq("id", user.id)
     .maybeSingle();
 
@@ -49,6 +52,12 @@ export async function bookClass(formData: FormData) {
   // A paused account can't book new classes. Bounce to /perfil, which shows
   // the "conta em pausa" panel — same graceful handling as the gate above.
   if (gateProfile?.is_blocked) {
+    redirect("/perfil");
+  }
+
+  // Unpaid past the monthly cutoff — bounce to /perfil, which shows the
+  // payment reminder. Grace period + exemptions live in isUnpaidAndBlocked.
+  if (gateProfile && (await isUnpaidAndBlocked(user.id, gateProfile))) {
     redirect("/perfil");
   }
 

@@ -201,3 +201,48 @@ export async function sendWelcomeEmail(args: {
 
   await sendEmail({ to, subject, html, text });
 }
+
+// ---------------------------------------------------------------------------
+// Payment reminder — sent on the cutoff day to students who haven't paid this
+// month. Friendly, not a dunning notice: the coach never has to bring it up.
+// ---------------------------------------------------------------------------
+export async function sendPaymentReminderEmail(args: {
+  to: string;
+  studentName: string | null;
+  monthLabel: string;
+  siteUrl: string;
+}): Promise<void> {
+  const { to, studentName, monthLabel, siteUrl } = args;
+  const firstName = studentName?.trim().split(" ")[0] || "Olá";
+  const ig = studio.social.instagram;
+  const cta = ig
+    ? { label: "Falar no Instagram", url: `https://instagram.com/${ig}` }
+    : { label: "Falar com o treinador", url: `${siteUrl}/contacto` };
+
+  const subject = `Lembrete: mensalidade de ${monthLabel}`;
+
+  const bodyHtml = `
+          <p style="margin:0 0 14px;">${escapeHtml(firstName)}, passámos só para lembrar que ainda não registámos a tua mensalidade de <strong>${escapeHtml(monthLabel)}</strong>.</p>
+          <p style="margin:0;">Para continuares a marcar aulas, é só acertares com o ${escapeHtml(studio.coach)}. Qualquer dúvida, fala connosco.</p>`;
+
+  const html = emailShell({
+    siteUrl,
+    heading: "Lembrete de pagamento",
+    bodyHtml,
+    cta,
+  });
+
+  const text = [
+    `Lembrete: mensalidade de ${monthLabel}`,
+    "",
+    `${firstName}, ainda não registámos a tua mensalidade de ${monthLabel}.`,
+    "",
+    `Para continuares a marcar aulas, acerta com o ${studio.coach}.`,
+    "",
+    `${cta.label}: ${cta.url}`,
+    "",
+    `${studio.fullName} · ${studio.city}`,
+  ].join("\n");
+
+  await sendEmail({ to, subject, html, text });
+}

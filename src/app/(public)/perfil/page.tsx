@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { studio } from "@/lib/studio.config";
+import { currentMonthLabel, isUnpaidAndBlocked } from "@/lib/payment";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -91,6 +92,12 @@ export default async function PerfilPage({
   const isIncomplete =
     !profile?.is_admin &&
     (!profile?.full_name || !profile?.phone || !profile?.birthday);
+  // Unpaid past the monthly cutoff — shown as its own panel; stats/bookings
+  // stay visible so existing marcações remain cancellable.
+  const isUnpaid =
+    isApproved && !isPaused && !isIncomplete && profile
+      ? await isUnpaidAndBlocked(user.id, profile)
+      : false;
 
   // The "Os teus dados" section shows a read-only summary by default and only
   // becomes a form on ?edit=1 — or automatically when the profile is still
@@ -221,6 +228,42 @@ export default async function PerfilPage({
             A tua conta está em pausa, por isso não podes marcar novas aulas. As
             marcações que já tens mantêm-se. Fala com o {studio.coach} para
             reativares a conta.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {studio.social.instagram && (
+              <a
+                href={`https://instagram.com/${studio.social.instagram}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-11 items-center rounded-md border border-border/60 px-4 text-sm font-medium hover:bg-muted"
+              >
+                Instagram @{studio.social.instagram}
+              </a>
+            )}
+            <Link
+              href="/contacto"
+              className="inline-flex h-11 items-center rounded-md bg-foreground px-4 text-sm font-medium text-background hover:opacity-90"
+            >
+              Contactar
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Unpaid past the monthly cutoff — friendly reminder; existing bookings
+          below stay cancellable, but no new ones until they settle up. */}
+      {isApproved && isUnpaid && !isPaused && !isIncomplete && (
+        <div className="mt-8 rounded-md border border-foreground/25 bg-muted/40 p-5 sm:p-6">
+          <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            Estado da conta
+          </p>
+          <h2 className="mt-2 font-display text-2xl tracking-[0.04em] sm:text-3xl">
+            MENSALIDADE EM FALTA
+          </h2>
+          <p className="mt-3 max-w-prose text-sm leading-relaxed text-foreground/80">
+            Ainda não registámos a tua mensalidade de {currentMonthLabel()}. As
+            marcações ficam em pausa até acertares. Fala com o {studio.coach} e
+            ficas logo a marcar outra vez.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {studio.social.instagram && (

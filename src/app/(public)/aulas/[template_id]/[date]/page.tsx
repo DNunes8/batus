@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
 import { WhatsAppShareButton } from "@/components/whatsapp-share-button";
 import { studio } from "@/lib/studio.config";
+import { currentMonthLabel, isUnpaidAndBlocked } from "@/lib/payment";
 import {
   dayOfWeek,
   formatDayHeader,
@@ -149,6 +150,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
   let isApproved = false;
   let isPaused = false;
   let isIncomplete = false;
+  let isUnpaid = false;
   if (user) {
     const [bookingRes, profileRes] = await Promise.all([
       supabase
@@ -161,7 +163,9 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
         .maybeSingle(),
       supabase
         .from("profiles")
-        .select("approved, is_admin, is_blocked, full_name, phone, birthday")
+        .select(
+          "approved, is_admin, is_blocked, full_name, phone, birthday, has_monthly_fee, joined_at",
+        )
         .eq("id", user.id)
         .maybeSingle(),
     ]);
@@ -182,6 +186,10 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       (!profileRes.data?.full_name ||
         !profileRes.data?.phone ||
         !profileRes.data?.birthday);
+    isUnpaid =
+      isApproved && !isPaused && !isIncomplete && profileRes.data
+        ? await isUnpaidAndBlocked(user.id, profileRes.data)
+        : false;
   }
 
   const backHref = `/aulas?week=${mondayOf(date)}`;
@@ -290,6 +298,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
           isApproved={isApproved}
           isPaused={isPaused}
           isIncomplete={isIncomplete}
+          isUnpaid={isUnpaid}
           userBooking={userBooking}
         />
       </div>
@@ -345,6 +354,7 @@ function BookingAction({
   isApproved,
   isPaused,
   isIncomplete,
+  isUnpaid,
   userBooking,
 }: {
   template_id: string;
@@ -356,6 +366,7 @@ function BookingAction({
   isApproved: boolean;
   isPaused: boolean;
   isIncomplete: boolean;
+  isUnpaid: boolean;
   userBooking: {
     id: string;
     status: "booked" | "waitlisted";
@@ -493,6 +504,30 @@ function BookingAction({
         </p>
         <p className="mt-3 text-sm text-muted-foreground">
           Não podes marcar novas aulas enquanto a conta estiver em pausa.
+        </p>
+        <Link
+          href="/perfil"
+          className="mt-4 inline-flex h-10 items-center justify-center rounded-md border border-border/60 px-4 text-xs uppercase tracking-widest hover:bg-muted"
+        >
+          Saber mais →
+        </Link>
+      </div>
+    );
+  }
+
+  // Unpaid past the monthly cutoff — locked until they settle up.
+  if (isUnpaid) {
+    return (
+      <div className="rounded-md border border-foreground/25 bg-muted/30 p-6 text-center">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+          Mensalidade
+        </p>
+        <p className="mt-2 font-display text-2xl tracking-wide">
+          MENSALIDADE EM FALTA
+        </p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Acerta a mensalidade de {currentMonthLabel()} com o {studio.coach}{" "}
+          para voltares a marcar.
         </p>
         <Link
           href="/perfil"
