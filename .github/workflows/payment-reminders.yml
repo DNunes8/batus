@@ -1,0 +1,25 @@
+name: Lembrete de pagamento (dia 8)
+
+# Sends the friendly "ainda não pagaste" email on the 8th of each month to
+# students who are blocked for non-payment. The endpoint applies all the
+# exemptions (paid / em pausa / per-session / admin / first month), so this
+# job just has to fire it.
+#
+# Setup (one-time): add a CRON_SECRET to BOTH
+#   • Vercel → Project → Settings → Environment Variables
+#   • GitHub → repo → Settings → Secrets and variables → Actions
+# with the same random value.
+
+on:
+  schedule:
+    - cron: "0 9 8 * *" # 09:00 UTC on the 8th (~10:00 Lisbon)
+  workflow_dispatch: {}
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger payment reminders endpoint
+        run: |
+          curl -fsS -X GET "https://batusboxe.com/api/cron/payment-reminders" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
