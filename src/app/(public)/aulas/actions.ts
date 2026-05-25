@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDayHeader, formatTime, mondayOf } from "@/lib/schedule";
 import { sendWaitlistPromotionEmail } from "@/lib/email";
 import { isUnpaidAndBlocked } from "@/lib/payment";
+import { getBookableUntil } from "@/lib/booking-window";
 
 export async function bookClass(formData: FormData) {
   const supabase = await createClient();
@@ -66,6 +67,13 @@ export async function bookClass(formData: FormData) {
 
   if (!template_id || !instance_date) {
     throw new Error("Pedido inválido.");
+  }
+
+  // Booking window — students can only book up to the date the coach has
+  // opened with "Abrir próximas 2 semanas". The UI normally prevents this;
+  // this is the server-side backstop.
+  if (instance_date > (await getBookableUntil())) {
+    redirect("/aulas");
   }
 
   const { data: template } = await supabase

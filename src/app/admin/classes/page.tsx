@@ -3,7 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { ConfirmForm } from "@/components/confirm-form";
 import { formatEuro } from "@/lib/money";
-import { deleteClassTemplate, deleteSoloTemplate } from "./actions";
+import { formatDayHeader, todayLisbon } from "@/lib/schedule";
+import { getBookableUntil } from "@/lib/booking-window";
+import {
+  deleteClassTemplate,
+  deleteSoloTemplate,
+  openNextTwoWeeks,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +57,8 @@ export default async function ClassesListPage() {
 
   const templates = classRes.data ?? [];
   const ptTemplates = (ptRes.data ?? []) as unknown as PtTemplate[];
+  const bookableUntil = await getBookableUntil();
+  const windowOpen = bookableUntil > todayLisbon();
 
   return (
     <div className="p-6 sm:p-10">
@@ -72,8 +80,8 @@ export default async function ClassesListPage() {
             </h2>
             <p className="mt-2 max-w-xl text-sm text-muted-foreground">
               Cada modelo é uma aula recorrente (ex: Boxe Iniciados, Segundas
-              18:00). O calendário gera as aulas automaticamente a partir
-              destes modelos.
+              18:00). Os alunos só marcam dentro do período aberto — usa
+              &quot;Abrir próximas 2 semanas&quot; para abrir o próximo bloco.
             </p>
           </div>
           <Button
@@ -82,6 +90,31 @@ export default async function ClassesListPage() {
           >
             Nova aula
           </Button>
+        </div>
+
+        {/* Booking window — the wife's fortnightly "open the next 2 weeks". */}
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-md border border-foreground/20 bg-muted/30 p-4">
+          <p className="text-sm">
+            {windowOpen ? (
+              <>
+                Marcações abertas até{" "}
+                <strong>{formatDayHeader(bookableUntil)}</strong>.
+              </>
+            ) : (
+              <>Marcações fechadas. Abre o próximo bloco de 2 semanas.</>
+            )}
+          </p>
+          <ConfirmForm
+            message="Abrir marcações para as próximas 2 semanas?"
+            action={openNextTwoWeeks}
+          >
+            <button
+              type="submit"
+              className="h-11 rounded-md bg-foreground px-5 text-sm font-medium uppercase tracking-wider text-background transition-opacity hover:opacity-90"
+            >
+              Abrir próximas 2 semanas
+            </button>
+          </ConfirmForm>
         </div>
 
         {templates.length === 0 ? (

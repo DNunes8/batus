@@ -11,6 +11,24 @@ import {
   mondayOf,
   todayLisbon,
 } from "@/lib/schedule";
+import { nextWindowEnd } from "@/lib/booking-window";
+
+// Open booking for the next two weeks — the wife's fortnightly "set up the
+// next 2 weeks" button. Stores the cutoff date in settings.bookable_until;
+// bookClass + the schedule UI gate on it.
+export async function openNextTwoWeeks() {
+  await assertAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("settings")
+    .upsert({ key: "bookable_until", value: nextWindowEnd() });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/aulas");
+  revalidatePath("/admin/classes");
+  revalidatePath("/admin/calendar");
+  redirect("/admin/classes?opened=1");
+}
 
 export async function createClassTemplate(formData: FormData) {
   await assertAdmin();

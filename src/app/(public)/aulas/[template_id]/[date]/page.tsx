@@ -9,6 +9,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { WhatsAppShareButton } from "@/components/whatsapp-share-button";
 import { studio } from "@/lib/studio.config";
 import { currentMonthLabel, isUnpaidAndBlocked } from "@/lib/payment";
+import { getBookableUntil } from "@/lib/booking-window";
 import {
   dayOfWeek,
   formatDayHeader,
@@ -192,6 +193,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
         : false;
   }
 
+  const bookableUntil = await getBookableUntil();
   const backHref = `/aulas?week=${mondayOf(date)}`;
 
   // Build the absolute URL once on the server so the share text has the right
@@ -299,6 +301,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
           isPaused={isPaused}
           isIncomplete={isIncomplete}
           isUnpaid={isUnpaid}
+          notYetOpen={date > bookableUntil}
           userBooking={userBooking}
         />
       </div>
@@ -355,6 +358,7 @@ function BookingAction({
   isPaused,
   isIncomplete,
   isUnpaid,
+  notYetOpen,
   userBooking,
 }: {
   template_id: string;
@@ -367,6 +371,7 @@ function BookingAction({
   isPaused: boolean;
   isIncomplete: boolean;
   isUnpaid: boolean;
+  notYetOpen: boolean;
   userBooking: {
     id: string;
     status: "booked" | "waitlisted";
@@ -382,6 +387,20 @@ function BookingAction({
       <div className="rounded-md border border-border/60 bg-muted/20 p-6 text-center">
         <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
           Esta aula já passou
+        </p>
+      </div>
+    );
+  }
+
+  // Beyond the window the coach has opened — visible but not bookable yet.
+  if (notYetOpen) {
+    return (
+      <div className="rounded-md border border-border/60 bg-muted/20 p-6 text-center">
+        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+          Abre em breve
+        </p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          As marcações para esta data ainda não abriram.
         </p>
       </div>
     );

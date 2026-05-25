@@ -17,6 +17,7 @@ import {
 import { bookClass } from "./actions";
 import { studio } from "@/lib/studio.config";
 import { currentMonthLabel, isUnpaidAndBlocked } from "@/lib/payment";
+import { getBookableUntil } from "@/lib/booking-window";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,9 @@ export default async function AulasPage({
 
   const nextStart = addDays(start, 7);
   const monthLabel = currentMonthLabel();
+  // Latest date the coach has opened for booking; classes beyond it show
+  // "Abre em breve" instead of a book button.
+  const bookableUntil = await getBookableUntil();
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-16">
@@ -254,6 +258,7 @@ export default async function AulasPage({
                           isPaused={isPaused}
                           isIncomplete={isIncomplete}
                           isUnpaid={isUnpaid}
+                          notYetOpen={c.date > bookableUntil}
                           isPast={isClassInPast(c.date, c.start_time)}
                         />
                       </li>
@@ -276,6 +281,7 @@ function BookingControl({
   isPaused,
   isIncomplete,
   isUnpaid,
+  notYetOpen,
   isPast,
 }: {
   cls: ScheduleClass;
@@ -284,6 +290,7 @@ function BookingControl({
   isPaused: boolean;
   isIncomplete: boolean;
   isUnpaid: boolean;
+  notYetOpen: boolean;
   isPast: boolean;
 }) {
   if (cls.cancelled) {
@@ -305,6 +312,15 @@ function BookingControl({
     return (
       <span className="text-xs uppercase tracking-widest text-muted-foreground">
         Passou
+      </span>
+    );
+  }
+
+  // Beyond the window the coach has opened — visible but not bookable yet.
+  if (notYetOpen) {
+    return (
+      <span className="inline-flex h-10 items-center rounded-md border border-border/60 px-3 text-xs uppercase tracking-widest text-muted-foreground">
+        Abre em breve
       </span>
     );
   }
