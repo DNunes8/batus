@@ -547,7 +547,7 @@ function GroupBlock({ entry }: { entry: AdminGroupEntry }) {
 
   return (
     <div
-      className={`rounded-md border bg-background p-2.5 transition-colors ${
+      className={`group rounded-md border bg-background p-2.5 transition-colors ${
         isFull
           ? "border-gold/40 bg-gold/5 hover:border-gold"
           : "border-border/40 hover:border-border"
@@ -566,7 +566,9 @@ function GroupBlock({ entry }: { entry: AdminGroupEntry }) {
           {entry.waitlist_count > 0 && ` · +${entry.waitlist_count}`}
         </span>
       </div>
-      <p className="mt-1 text-sm font-medium leading-tight">{entry.name}</p>
+      <p className="mt-1 text-sm font-medium leading-tight xl:line-clamp-2 xl:min-h-[2.25rem]">
+        {entry.name}
+      </p>
 
       {entry.roster.length > 0 && (
         <ul className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
@@ -594,7 +596,7 @@ function GroupBlock({ entry }: { entry: AdminGroupEntry }) {
         </ul>
       )}
 
-      <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/30 pt-1.5">
+      <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/30 pt-1.5 transition-opacity duration-150 xl:opacity-0 xl:group-hover:opacity-100 xl:group-focus-within:opacity-100">
         <RescheduleDialog
           kind="group"
           template_id={entry.template_id}
@@ -655,7 +657,7 @@ function SoloBlock({ entry }: { entry: AdminSoloEntry }) {
   }
 
   return (
-    <div className="rounded-md border border-gold/30 bg-gold/5 p-2.5 transition-colors hover:border-gold/60">
+    <div className="group rounded-md border border-gold/30 bg-gold/5 p-2.5 transition-colors hover:border-gold/60">
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-display text-base tabular-nums">
           {formatTime(entry.start_time)}
@@ -664,7 +666,7 @@ function SoloBlock({ entry }: { entry: AdminSoloEntry }) {
           PT
         </span>
       </div>
-      <p className="mt-1 text-sm font-medium leading-tight">
+      <p className="mt-1 text-sm font-medium leading-tight xl:line-clamp-2 xl:min-h-[2.25rem]">
         {entry.student_name}
       </p>
       <p className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">
@@ -676,7 +678,7 @@ function SoloBlock({ entry }: { entry: AdminSoloEntry }) {
         </p>
       )}
 
-      <div className="mt-2 flex items-center justify-between gap-2 border-t border-gold/20 pt-1.5">
+      <div className="mt-2 flex items-center justify-between gap-2 border-t border-gold/20 pt-1.5 transition-opacity duration-150 xl:opacity-0 xl:group-hover:opacity-100 xl:group-focus-within:opacity-100">
         <RescheduleDialog
           kind="solo"
           template_id={entry.template_id}
