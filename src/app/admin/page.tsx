@@ -456,7 +456,7 @@ export default async function AdminDashboardPage() {
         </h2>
         <div className="mt-4 flex flex-wrap gap-2">
           <ShortcutLink href="/admin/classes/new">Nova aula</ShortcutLink>
-          <ShortcutLink href="/admin/sessions/new">Nova sessão PT</ShortcutLink>
+          <ShortcutLink href="/admin/classes/pts/new">Novo PT</ShortcutLink>
           <ShortcutLink href="/admin/students">Ver alunos</ShortcutLink>
           <ShortcutLink href="/admin/merch/new">Novo artigo</ShortcutLink>
         </div>
