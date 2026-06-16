@@ -17,6 +17,18 @@ import { studio } from "@/lib/studio.config";
 // Config (Vercel env): RESEND_API_KEY + RESEND_FROM
 // (e.g. "Batus <noreply@batusboxe.com>" — domain must be verified in Resend).
 
+// Canonical, absolute site origin for links + the logo inside emails. Pinned
+// so outbound mail never points at the wrong host: previously the origin was
+// read from the request Host header (fallback "batus-mu.vercel.app"), which
+// could differ from the batusboxe.com address we send FROM. Override with
+// NEXT_PUBLIC_SITE_URL if the domain ever changes. No trailing slash.
+export function getSiteUrl(): string {
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://batusboxe.com").replace(
+    /\/$/,
+    "",
+  );
+}
+
 type SendArgs = {
   to: string;
   subject: string;

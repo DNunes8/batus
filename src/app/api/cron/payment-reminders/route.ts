@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendPaymentReminderEmail } from "@/lib/email";
+import { sendPaymentReminderEmail, getSiteUrl } from "@/lib/email";
 import { currentMonthLabel, PAYMENT_CUTOFF_DAY } from "@/lib/payment";
 import { todayLisbon } from "@/lib/schedule";
 
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     return status !== "paid" && status !== "paused";
   });
 
-  const siteUrl = new URL(request.url).origin;
+  const siteUrl = getSiteUrl();
   const monthLabel = currentMonthLabel(today);
 
   let sent = 0;

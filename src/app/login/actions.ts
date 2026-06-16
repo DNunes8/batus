@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { sendWelcomeEmail } from "@/lib/email";
+import { sendWelcomeEmail, getSiteUrl } from "@/lib/email";
 
 export type AuthState = {
   error?: string;
@@ -123,7 +123,7 @@ export async function signUpWithPassword(
 
   // Best-effort welcome email — nudges the new (pending) student to reach the
   // coach for approval. Never blocks signup (sendEmail swallows failures).
-  await sendWelcomeEmail({ to: email, siteUrl: await originFromRequest() });
+  await sendWelcomeEmail({ to: email, siteUrl: getSiteUrl() });
 
   // With "Confirm email" off, signUp returns a session and the cookie is set
   // — the user is logged in. If confirmation is on, there's no session.

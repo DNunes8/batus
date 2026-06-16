@@ -2,11 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDayHeader, formatTime, mondayOf } from "@/lib/schedule";
-import { sendWaitlistPromotionEmail } from "@/lib/email";
+import { sendWaitlistPromotionEmail, getSiteUrl } from "@/lib/email";
 import { isUnpaidAndBlocked } from "@/lib/payment";
 import { getBookableUntil } from "@/lib/booking-window";
 
@@ -218,16 +217,13 @@ export async function cancelBooking(formData: FormData) {
           start_time: string;
           name: string;
         };
-        const h = await headers();
-        const host = h.get("host") ?? "batus-mu.vercel.app";
-        const proto = host.startsWith("localhost") ? "http" : "https";
         await sendWaitlistPromotionEmail({
           to: promoted.email,
           studentName: promoted.full_name,
           className: tpl.name,
           dateLabel: formatDayHeader(booking.instance_date),
           timeLabel: formatTime(tpl.start_time),
-          siteUrl: `${proto}://${host}`,
+          siteUrl: getSiteUrl(),
         });
       }
     }
