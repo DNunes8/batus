@@ -1,32 +1,19 @@
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { createClient } from "@/lib/supabase/server";
 
-export default async function PublicLayout({
+// No session read here on purpose. The header now resolves auth on the client,
+// so this layout stays static — which lets the marketing pages it wraps be
+// cached instead of rendered per request (the fix for the Vercel usage that
+// paused us). Per-user pages (/aulas, /perfil, /admin) read the session
+// themselves and remain dynamic.
+export default function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let isAdmin = false;
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("is_admin")
-      .eq("id", user.id)
-      .single();
-    isAdmin = profile?.is_admin ?? false;
-  }
-
   return (
     <>
-      <SiteHeader
-        user={user ? { email: user.email!, is_admin: isAdmin } : null}
-      />
+      <SiteHeader />
       <main className="flex-1">{children}</main>
       <SiteFooter />
     </>

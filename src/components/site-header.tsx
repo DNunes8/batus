@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Menu } from "lucide-react";
 import { studio } from "@/lib/studio.config";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -24,6 +26,53 @@ export type HeaderUser = {
   email: string;
   is_admin: boolean;
 } | null;
+
+// Auth state is read on the CLIENT so the public layout/pages no longer touch
+// the session server-side — that's what lets them be statically cached (and
+// keeps crawler traffic off our function budget). A brief logged-out flash on
+// first paint is expected; it resolves once the check returns and updates live
+// on login/logout. The real access gates live server-side, so this is display
+// only — never a security boundary.
+function useCurrentUser(): HeaderUser {
+  const [user, setUser] = useState<HeaderUser>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    let active = true;
+
+    async function load() {
+      const {
+        data: { user: u },
+      } = await supabase.auth.getUser();
+      if (!u) {
+        if (active) setUser(null);
+        return;
+      }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", u.id)
+        .single();
+      if (active) {
+        setUser({
+          email: u.email ?? "",
+          is_admin: profile?.is_admin ?? false,
+        });
+      }
+    }
+
+    load();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => load());
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  return user;
+}
 
 function Wordmark() {
   const horizontal = studio.brand.logo?.horizontal;
@@ -73,7 +122,8 @@ function Wordmark() {
   );
 }
 
-export function SiteHeader({ user }: { user: HeaderUser }) {
+export function SiteHeader() {
+  const user = useCurrentUser();
   // Logged-in users are already inside the app — hide the marketing
   // "Sobre" page from the nav so it doesn't feel out of place.
   const navItems = user ? NAV.filter((item) => item.href !== "/sobre") : NAV;

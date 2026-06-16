@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import { Button } from "@/components/ui/button";
 import { studio } from "@/lib/studio.config";
 import { formatTime } from "@/lib/schedule";
@@ -35,10 +35,14 @@ const MODALITIES = [
   },
 ] as const;
 
-export const dynamic = "force-dynamic";
+// Cached, not dynamic. The landing page is the #1 crawler target; rendering it
+// per-request was the main driver of our serverless usage. It reads only the
+// public class schedule (cookie-free client), so it can be statically generated
+// and revalidated hourly — bots get cached HTML for ~free.
+export const revalidate = 3600;
 
 export default async function Home() {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data: templates } = await supabase
     .from("class_templates")
     .select("name, day_of_week, start_time, duration_minutes")
