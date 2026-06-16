@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { createPublicClient } from "@/lib/supabase/public";
 import { Button } from "@/components/ui/button";
 import { studio } from "@/lib/studio.config";
-import { formatTime } from "@/lib/schedule";
+import { formatTime, todayLisbon } from "@/lib/schedule";
 
 const DAY_LABEL: Record<number, string> = {
   0: "Domingo",
@@ -43,9 +43,15 @@ export const revalidate = 3600;
 
 export default async function Home() {
   const supabase = createPublicClient();
+  // Only currently-active recurring classes — same window /aulas uses — so the
+  // (up-to-1h cached) preview never shows expired or not-yet-started templates.
+  // RLS already limits the anon client to is_public rows.
+  const today = todayLisbon();
   const { data: templates } = await supabase
     .from("class_templates")
     .select("name, day_of_week, start_time, duration_minutes")
+    .lte("active_from", today)
+    .or(`active_until.is.null,active_until.gte.${today}`)
     .order("day_of_week")
     .order("start_time")
     .limit(8);
