@@ -10,7 +10,16 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: "*",
-      disallow: ["/admin", "/perfil", "/aulas", "/api", "/auth", "/bem-vindo"],
+      disallow: [
+      "/admin",
+      "/perfil",
+      "/aulas",
+      "/loja",
+      "/contacto",
+      "/api",
+      "/auth",
+      "/bem-vindo",
+    ],
     },
     host: getSiteUrl(),
   };
