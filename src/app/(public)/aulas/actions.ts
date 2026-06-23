@@ -75,6 +75,23 @@ export async function bookClass(formData: FormData) {
     redirect("/aulas");
   }
 
+  // One class per day (coach's rule): a student can't book a second class on a
+  // day they already have an active booking. The UI hides the button, and
+  // book_class enforces it atomically (migration 0018) — this pre-check just
+  // gives a clean message before we hit the DB.
+  const { data: sameDayBooking } = await supabase
+    .from("bookings")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("instance_date", instance_date)
+    .neq("template_id", template_id)
+    .in("status", ["booked", "waitlisted"])
+    .limit(1)
+    .maybeSingle();
+  if (sameDayBooking) {
+    throw new Error("Só podes marcar uma aula por dia.");
+  }
+
   const { data: template } = await supabase
     .from("class_templates")
     .select("capacity")
@@ -100,6 +117,9 @@ export async function bookClass(formData: FormData) {
   if (error) {
     if (error.message.includes("BATUS_ALREADY_BOOKED")) {
       throw new Error("Já tens marcação para esta aula.");
+    }
+    if (error.message.includes("BATUS_ONE_PER_DAY")) {
+      throw new Error("Só podes marcar uma aula por dia.");
     }
     throw new Error(error.message);
   }

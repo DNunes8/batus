@@ -208,7 +208,15 @@ export default async function AulasPage({
 
         return (
           <div className="mt-10 space-y-10">
-            {visibleDays.map((day) => (
+            {visibleDays.map((day) => {
+              // One class per day: does the student already hold an active
+              // booking (booked or waitlisted) somewhere on this day?
+              const userBookedThisDay = day.classes.some(
+                (c) =>
+                  c.user_booking_status === "booked" ||
+                  c.user_booking_status === "waitlisted",
+              );
+              return (
               <div key={day.date}>
                 <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">
                   {formatDayHeader(day.date)}
@@ -259,6 +267,11 @@ export default async function AulasPage({
                           isIncomplete={isIncomplete}
                           isUnpaid={isUnpaid}
                           notYetOpen={c.date > bookableUntil}
+                          dayHasOtherBooking={
+                            userBookedThisDay &&
+                            c.user_booking_status !== "booked" &&
+                            c.user_booking_status !== "waitlisted"
+                          }
                           isPast={isClassInPast(c.date, c.start_time)}
                         />
                       </li>
@@ -266,7 +279,8 @@ export default async function AulasPage({
                   </ul>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         );
       })()}
@@ -282,6 +296,7 @@ function BookingControl({
   isIncomplete,
   isUnpaid,
   notYetOpen,
+  dayHasOtherBooking,
   isPast,
 }: {
   cls: ScheduleClass;
@@ -291,6 +306,7 @@ function BookingControl({
   isIncomplete: boolean;
   isUnpaid: boolean;
   notYetOpen: boolean;
+  dayHasOtherBooking: boolean;
   isPast: boolean;
 }) {
   if (cls.cancelled) {
@@ -391,6 +407,16 @@ function BookingControl({
     return (
       <span className="inline-flex h-10 items-center rounded-md border border-border/60 px-3 text-xs uppercase tracking-widest text-muted-foreground">
         Pagamento em falta
+      </span>
+    );
+  }
+
+  // One class per day — they already booked a different class this day, so this
+  // one is locked. book_class enforces it server-side too (migration 0018).
+  if (dayHasOtherBooking) {
+    return (
+      <span className="inline-flex h-10 items-center rounded-md border border-border/60 px-3 text-xs uppercase tracking-widest text-muted-foreground">
+        Já tens aula neste dia
       </span>
     );
   }
