@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { formatEuro, monthKey } from "@/lib/money";
 import {
+  addDays,
   formatDayHeader,
   formatTime,
   todayLisbon,
@@ -55,6 +56,13 @@ export default async function AdminDashboardPage() {
   const admin = createAdminClient();
   const today = todayLisbon();
   const monthStart = monthKey(new Date());
+  // Month end + cutoff (min of month-end and today), used to walk recurring PT
+  // revenue the same way the Pagamentos page does.
+  const [myYear, myMonth] = monthStart.split("-").map(Number);
+  const monthEnd = new Date(Date.UTC(myYear, myMonth, 0))
+    .toISOString()
+    .slice(0, 10);
+  const activityCutoff = monthEnd < today ? monthEnd : today;
 
   const [
     { data: { user } },
@@ -69,6 +77,8 @@ export default async function AdminDashboardPage() {
     solosThisMonthRes,
     pendingApprovalsRes,
     birthdaysRes,
+    soloTemplatesRes,
+    soloOverridesRes,
   ] = await Promise.all([
     supabase.auth.getUser(),
     supabase
@@ -125,6 +135,15 @@ export default async function AdminDashboardPage() {
       .not("birthday", "is", null)
       .eq("approved", true)
       .eq("is_admin", false),
+    admin
+      .from("solo_session_templates")
+      .select(
+        "id, user_id, day_of_week, price_cents, active_from, active_until, is_preset",
+      ),
+    admin
+      .from("solo_session_overrides")
+      .select("template_id, instance_date, cancelled")
+      .gte("instance_date", monthStart),
   ]);
 
   const todayClasses = todayClassesRes.data ?? [];
@@ -224,6 +243,36 @@ export default async function AdminDashboardPage() {
       (a.full_name ?? "").localeCompare(b.full_name ?? "", "pt"),
     );
 
+  // Recurring PT revenue this month — mirrors the Pagamentos page so the
+  // dashboard total isn't undercounted. Walk each active recurring template
+  // weekly from month start to today, skipping presets + cancelled overrides.
+  const soloTemplates = soloTemplatesRes.data ?? [];
+  const soloOverrides = soloOverridesRes.data ?? [];
+  let recurringPtCents = 0;
+  for (const tpl of soloTemplates) {
+    if (tpl.is_preset || !tpl.user_id) continue;
+    if (tpl.active_from > monthEnd) continue;
+    if (tpl.active_until && tpl.active_until < monthStart) continue;
+    const start = tpl.active_from > monthStart ? tpl.active_from : monthStart;
+    const end =
+      tpl.active_until && tpl.active_until < activityCutoff
+        ? tpl.active_until
+        : activityCutoff;
+    let cursor = start;
+    while (cursor <= end && dowOf(cursor) !== tpl.day_of_week) {
+      cursor = addDays(cursor, 1);
+    }
+    while (cursor <= end) {
+      const ov = soloOverrides.find(
+        (o) => o.template_id === tpl.id && o.instance_date === cursor,
+      );
+      if (!ov?.cancelled) {
+        recurringPtCents += tpl.price_cents ?? 0;
+      }
+      cursor = addDays(cursor, 7);
+    }
+  }
+
   const monthEarnings =
     (paymentsThisMonthRes.data ?? []).reduce(
       (sum, p) => sum + (p.amount_cents ?? 0),
@@ -232,7 +281,8 @@ export default async function AdminDashboardPage() {
     (solosThisMonthRes.data ?? []).reduce(
       (sum, s) => sum + (s.price_cents ?? 0),
       0,
-    );
+    ) +
+    recurringPtCents;
 
   const dayName = PT_DAYS[dowOf(today)];
 
