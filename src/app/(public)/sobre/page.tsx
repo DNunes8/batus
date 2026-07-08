@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 
 export const metadata = {
   title: `Sobre — ${studio.fullName}`,
-  description: `Conhece o ${studio.fullName}: estúdio de boxe, kickboxing e muay thai do treinador ${studio.coach}, em ${studio.city}.`,
+  description: `Conhece o ${studio.fullName}: estúdio de boxe e kickboxing do treinador ${studio.coach}, em ${studio.city}.`,
 };
 
 const MODALIDADES = [
@@ -18,11 +18,6 @@ const MODALIDADES = [
     name: "Kickboxing",
     description:
       "Mãos e pernas. Combinações, percussão e muito condicionamento em grupo.",
-  },
-  {
-    name: "Muay Thai",
-    description:
-      "A arte das oito armas — punhos, cotovelos, joelhos e canelas. Técnica e clinch.",
   },
   {
     name: "PT",
@@ -102,7 +97,7 @@ export default function SobrePage() {
           </h2>
           <div className="mt-10 grid max-w-4xl gap-6 text-base leading-relaxed text-foreground/80 sm:mt-12 sm:grid-cols-2 sm:gap-10 sm:text-lg">
             <p>
-              O {studio.fullName} é o estúdio de boxe, kickboxing e muay thai
+              O {studio.fullName} é o estúdio de boxe e kickboxing
               do treinador {studio.coach}, em {studio.city}. A ideia é simples:
               ensinar desportos de combate com método e rigor — turmas
               pequenas, atenção a cada aluno e nenhum atalho.

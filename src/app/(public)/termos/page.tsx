@@ -56,7 +56,7 @@ export default function TermosPage() {
             1. Quem somos
           </h2>
           <p className="mt-2">
-            O {studio.fullName} é um estúdio de boxe, kickboxing e muay thai em{" "}
+            O {studio.fullName} é um estúdio de boxe e kickboxing em{" "}
             {studio.city}, {studio.country}, do treinador {studio.coach}. Este
             site permite-te conhecer o estúdio, criar conta, marcar e gerir
             aulas e reservar artigos da loja. A identificação legal do estúdio
@@ -171,7 +171,7 @@ export default function TermosPage() {
             7. Riscos da prática e condição física
           </h2>
           <p className="mt-2">
-            O boxe, o kickboxing, o muay thai e outras modalidades de combate são
+            O boxe, o kickboxing e outras modalidades de combate são
             desportos de contacto e de esforço físico intenso, com risco inerente
             de lesão (contusões e lesões musculares ou articulares, entre
             outras). Ao participares:
