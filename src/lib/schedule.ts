@@ -35,9 +35,17 @@ export type RosterEntry = {
   waitlist_position: number | null;
 };
 
+export type ClassGuest = {
+  id: string;
+  name: string;
+};
+
 export type AdminGroupEntry = ScheduleClass & {
   kind: "group";
   roster: RosterEntry[];
+  // Coach-added people (aula experimental / manual placement). They occupy
+  // seats — booked_count already includes them.
+  guests: ClassGuest[];
 };
 
 export type AdminSoloEntry = {
@@ -180,6 +188,7 @@ export async function getWeekSchedule(
     overridesRes,
     closedDaysRes,
     bookingCountsRes,
+    guestCountsRes,
   ] = await Promise.all([
     supabase.from("class_templates").select("*"),
     supabase
@@ -198,12 +207,19 @@ export async function getWeekSchedule(
       .gte("instance_date", weekStart)
       .lt("instance_date", weekEnd)
       .in("status", ["booked", "waitlisted"]),
+    // Coach-added guests occupy seats too (admin client: table is coach-only).
+    admin
+      .from("class_guests")
+      .select("template_id, instance_date")
+      .gte("instance_date", weekStart)
+      .lt("instance_date", weekEnd),
   ]);
 
   const templates = templatesRes.data ?? [];
   const overrides = overridesRes.data ?? [];
   const closedDays = closedDaysRes.data ?? [];
   const bookingCounts = bookingCountsRes.data ?? [];
+  const guestCounts = guestCountsRes.data ?? [];
 
   const userBookings = user
     ? (
@@ -269,7 +285,11 @@ export async function getWeekSchedule(
       const matching = bookingCounts.filter(
         (b) => b.template_id === t.id && b.instance_date === date,
       );
-      const booked_count = matching.filter((b) => b.status === "booked").length;
+      const guestSeats = guestCounts.filter(
+        (g) => g.template_id === t.id && g.instance_date === date,
+      ).length;
+      const booked_count =
+        matching.filter((b) => b.status === "booked").length + guestSeats;
       const waitlist_count = matching.filter(
         (b) => b.status === "waitlisted",
       ).length;
@@ -326,6 +346,7 @@ export async function getAdminWeekSchedule(
     bookingsRes,
     soloTemplatesRes,
     soloOverridesRes,
+    guestsRes,
   ] = await Promise.all([
     admin.from("class_templates").select("*"),
     admin
@@ -356,6 +377,12 @@ export async function getAdminWeekSchedule(
       .select("*")
       .gte("instance_date", weekStart)
       .lt("instance_date", weekEnd),
+    admin
+      .from("class_guests")
+      .select("id, template_id, instance_date, name")
+      .gte("instance_date", weekStart)
+      .lt("instance_date", weekEnd)
+      .order("created_at", { ascending: true }),
   ]);
 
   const classTemplates = classTemplatesRes.data ?? [];
@@ -364,6 +391,7 @@ export async function getAdminWeekSchedule(
   const bookings = bookingsRes.data ?? [];
   const soloTemplates = soloTemplatesRes.data ?? [];
   const soloOverrides = soloOverridesRes.data ?? [];
+  const allGuests = guestsRes.data ?? [];
 
   const days: AdminScheduleDay[] = [];
   for (let i = 0; i < 7; i++) {
@@ -398,6 +426,10 @@ export async function getAdminWeekSchedule(
       const matching = bookings.filter(
         (b) => b.template_id === t.id && b.instance_date === date,
       );
+
+      const guests: ClassGuest[] = allGuests
+        .filter((g) => g.template_id === t.id && g.instance_date === date)
+        .map((g) => ({ id: g.id, name: g.name }));
 
       const roster: RosterEntry[] = matching.map((b) => {
         const profile = b.profile as unknown as {
@@ -436,10 +468,12 @@ export async function getAdminWeekSchedule(
           cancelled: true,
           cancellation_reason: override.reason ?? undefined,
           roster,
+          guests,
         };
       }
 
-      const booked_count = roster.filter((r) => r.status === "booked").length;
+      const booked_count =
+        roster.filter((r) => r.status === "booked").length + guests.length;
       const waitlist_count = roster.filter(
         (r) => r.status === "waitlisted",
       ).length;
@@ -458,6 +492,7 @@ export async function getAdminWeekSchedule(
         waitlist_count,
         cancelled: false,
         roster,
+        guests,
       };
     });
 

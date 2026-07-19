@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmForm } from "@/components/confirm-form";
+import { SubmitButton } from "@/components/submit-button";
 import {
   AddClassDialog,
   type GroupTemplateLite,
@@ -24,6 +25,8 @@ import {
   type AdminScheduleDay,
 } from "@/lib/schedule";
 import {
+  addClassGuest,
+  removeClassGuest,
   reopenDay,
   restoreClassInstance,
   cancelClassInstance,
@@ -595,6 +598,62 @@ function GroupBlock({ entry }: { entry: AdminGroupEntry }) {
           )}
         </ul>
       )}
+
+      {/* Coach-added guests (aula experimental / manual). They hold seats. */}
+      {entry.guests.length > 0 && (
+        <ul className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
+          {entry.guests.map((g) => (
+            <li
+              key={g.id}
+              className="flex items-center justify-between gap-2"
+            >
+              <span className="truncate">{g.name}</span>
+              <span className="flex shrink-0 items-center gap-1.5">
+                <span className="rounded-sm border border-gold/50 px-1 py-0.5 text-[9px] uppercase tracking-widest">
+                  Exp
+                </span>
+                <ConfirmForm
+                  message={`Tirar ${g.name} desta aula? A vaga fica livre.`}
+                  action={removeClassGuest}
+                >
+                  <input type="hidden" name="id" value={g.id} />
+                  <button
+                    type="submit"
+                    aria-label={`Remover ${g.name}`}
+                    className="px-1 text-sm leading-none text-muted-foreground hover:text-destructive"
+                  >
+                    ×
+                  </button>
+                </ConfirmForm>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Add a person by name — always allowed, even past capacity. */}
+      <details className="mt-2">
+        <summary className="cursor-pointer list-none text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground">
+          + Adicionar pessoa
+        </summary>
+        <form action={addClassGuest} className="mt-2 flex gap-1.5">
+          <input type="hidden" name="template_id" value={entry.template_id} />
+          <input type="hidden" name="instance_date" value={entry.date} />
+          <input
+            name="name"
+            required
+            maxLength={120}
+            placeholder="Nome (ex: experimental)"
+            className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+          />
+          <SubmitButton
+            className="h-9 shrink-0 px-3 text-xs uppercase tracking-wider"
+            pendingText="…"
+          >
+            Add
+          </SubmitButton>
+        </form>
+      </details>
 
       <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/30 pt-1.5 transition-opacity duration-150 xl:opacity-0 xl:group-hover:opacity-100 xl:group-focus-within:opacity-100">
         <RescheduleDialog

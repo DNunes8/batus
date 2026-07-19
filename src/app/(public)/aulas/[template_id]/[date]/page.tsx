@@ -74,6 +74,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
     overrideRes,
     closedDayRes,
     instanceBookingsRes,
+    guestCountRes,
     userRes,
   ] = await Promise.all([
     supabase
@@ -99,6 +100,12 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       .eq("template_id", template_id)
       .eq("instance_date", date)
       .in("status", ["booked", "waitlisted"]),
+    // Coach-added guests occupy seats too (count only, names stay admin-side).
+    admin
+      .from("class_guests")
+      .select("id", { count: "exact", head: true })
+      .eq("template_id", template_id)
+      .eq("instance_date", date),
     supabase.auth.getUser(),
   ]);
 
@@ -125,9 +132,9 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
   const override = overrideRes.data;
   const closedDay = closedDayRes.data;
   const instanceBookings = instanceBookingsRes.data ?? [];
-  const bookedCount = instanceBookings.filter(
-    (b) => b.status === "booked",
-  ).length;
+  const bookedCount =
+    instanceBookings.filter((b) => b.status === "booked").length +
+    (guestCountRes.count ?? 0);
 
   // The effective values: override beats template.
   const startTime = override?.override_start_time ?? template.start_time;

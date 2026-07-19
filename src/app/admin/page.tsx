@@ -79,6 +79,7 @@ export default async function AdminDashboardPage() {
     birthdaysRes,
     soloTemplatesRes,
     soloOverridesRes,
+    todayGuestsRes,
   ] = await Promise.all([
     supabase.auth.getUser(),
     supabase
@@ -144,6 +145,12 @@ export default async function AdminDashboardPage() {
       .from("solo_session_overrides")
       .select("template_id, instance_date, cancelled")
       .gte("instance_date", monthStart),
+    // Coach-added guests today — they occupy seats, so the Hoje card must
+    // count them like every other surface does.
+    admin
+      .from("class_guests")
+      .select("template_id, name")
+      .eq("instance_date", today),
   ]);
 
   const todayClasses = todayClassesRes.data ?? [];
@@ -188,17 +195,25 @@ export default async function AdminDashboardPage() {
       const start = override?.override_start_time ?? t.start_time;
       const capacity = override?.override_capacity ?? t.capacity;
       const matching = todayBookings.filter((b) => b.template_id === t.id);
-      const booked = matching.filter((b) => b.status === "booked").length;
+      const guestRows = (todayGuestsRes.data ?? []).filter(
+        (g) => g.template_id === t.id,
+      );
+      const booked =
+        matching.filter((b) => b.status === "booked").length +
+        guestRows.length;
       const waitlist = matching.filter((b) => b.status === "waitlisted").length;
-      const rosterNames = matching
-        .filter((b) => b.status === "booked")
-        .map((b) => {
-          const p = b.profile as unknown as {
-            full_name: string | null;
-            email: string;
-          } | null;
-          return p?.full_name?.trim() || p?.email?.split("@")[0] || "—";
-        });
+      const rosterNames = [
+        ...matching
+          .filter((b) => b.status === "booked")
+          .map((b) => {
+            const p = b.profile as unknown as {
+              full_name: string | null;
+              email: string;
+            } | null;
+            return p?.full_name?.trim() || p?.email?.split("@")[0] || "—";
+          }),
+        ...guestRows.map((g) => `${g.name} (exp)`),
+      ];
       const [sH, sM] = start.split(":").map(Number);
       const startMin = sH * 60 + sM;
       const endMin = startMin + t.duration_minutes;

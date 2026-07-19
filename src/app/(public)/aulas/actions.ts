@@ -4,16 +4,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  addDays,
-  formatDayHeader,
-  formatTime,
-  mondayOf,
-  todayLisbon,
-} from "@/lib/schedule";
-import { sendWaitlistPromotionEmail, getSiteUrl } from "@/lib/email";
+import { addDays, mondayOf, todayLisbon } from "@/lib/schedule";
 import { isUnpaidAndBlocked } from "@/lib/payment";
 import { getBookableUntil } from "@/lib/booking-window";
+import { promoteFirstWaitlistedIfSeatFree } from "@/lib/waitlist";
 
 export async function bookClass(formData: FormData) {
   const supabase = await createClient();
@@ -245,49 +239,14 @@ export async function cancelBooking(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
-  // If a confirmed slot opened up, promote the first waitlisted person.
-  // Use the admin client because the user can't see other students' bookings.
+  // A confirmed seat may have opened up — promote the first waitlisted
+  // student IF a seat is genuinely free (the shared helper re-counts booked
+  // + guests vs capacity, so a coach-overfilled class doesn't re-inflate).
   if (wasBooked) {
-    const admin = createAdminClient();
-    const { data: nextInLine } = await admin
-      .from("bookings")
-      .select("id, user_id")
-      .eq("template_id", booking.template_id)
-      .eq("instance_date", booking.instance_date)
-      .eq("status", "waitlisted")
-      .order("waitlist_position", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (nextInLine) {
-      await admin
-        .from("bookings")
-        .update({ status: "booked", waitlist_position: null })
-        .eq("id", nextInLine.id);
-
-      // Tell the promoted student — they won't be refreshing the app.
-      // Best-effort: an unconfigured/failed email never blocks the cancel.
-      const { data: promoted } = await admin
-        .from("profiles")
-        .select("email, full_name")
-        .eq("id", nextInLine.user_id)
-        .maybeSingle();
-
-      if (promoted?.email) {
-        const tpl = booking.class_templates as unknown as {
-          start_time: string;
-          name: string;
-        };
-        await sendWaitlistPromotionEmail({
-          to: promoted.email,
-          studentName: promoted.full_name,
-          className: tpl.name,
-          dateLabel: formatDayHeader(booking.instance_date),
-          timeLabel: formatTime(tpl.start_time),
-          siteUrl: getSiteUrl(),
-        });
-      }
-    }
+    await promoteFirstWaitlistedIfSeatFree(
+      booking.template_id,
+      booking.instance_date,
+    );
   }
 
   revalidatePath("/aulas");

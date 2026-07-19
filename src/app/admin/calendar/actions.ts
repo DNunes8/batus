@@ -11,6 +11,7 @@ import {
   todayLisbon,
 } from "@/lib/schedule";
 import { parseEuroToCents } from "@/lib/money";
+import { promoteFirstWaitlistedIfSeatFree } from "@/lib/waitlist";
 
 export type CalendarActionState = {
   error?: string;
@@ -544,4 +545,65 @@ export async function rescheduleSoloInstance(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/admin/calendar");
+}
+
+// ============================================================================
+// Guests ("aula experimental" / manual placement) — the coach adds a person by
+// name to a class instance. The guest takes a real seat (schedule + book_class
+// count them); adding is ALWAYS allowed, even past capacity — coach's call.
+// ============================================================================
+
+export async function addClassGuest(formData: FormData) {
+  await assertAdmin();
+  const template_id = formData.get("template_id") as string | null;
+  const instance_date = formData.get("instance_date") as string | null;
+  const name = ((formData.get("name") as string | null) ?? "")
+    .trim()
+    .slice(0, 120);
+
+  if (!template_id || !instance_date || !name) {
+    throw new Error("Preenche o nome.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("class_guests").insert({
+    template_id,
+    instance_date,
+    name,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin/calendar");
+  revalidatePath("/admin/students");
+  revalidatePath("/aulas");
+}
+
+export async function removeClassGuest(formData: FormData) {
+  await assertAdmin();
+  const id = formData.get("id") as string | null;
+  if (!id) throw new Error("ID em falta.");
+
+  const supabase = await createClient();
+  // Grab the instance BEFORE deleting so we can promote into the freed seat.
+  const { data: guest } = await supabase
+    .from("class_guests")
+    .select("template_id, instance_date")
+    .eq("id", id)
+    .maybeSingle();
+
+  const { error } = await supabase.from("class_guests").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+
+  // The guest's seat is free — promote the first waitlisted student if the
+  // class genuinely has room now (helper re-counts booked + guests).
+  if (guest) {
+    await promoteFirstWaitlistedIfSeatFree(
+      guest.template_id,
+      guest.instance_date,
+    );
+  }
+
+  revalidatePath("/admin/calendar");
+  revalidatePath("/admin/students");
+  revalidatePath("/aulas");
 }

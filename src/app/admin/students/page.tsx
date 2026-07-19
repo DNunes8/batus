@@ -4,14 +4,50 @@ import { StudentsList, type StudentProfile } from "./students-list";
 
 export const dynamic = "force-dynamic";
 
+// "19/07/2026" from "2026-07-19" — compact PT date for the guests list.
+function ptDate(iso: string): string {
+  return iso.split("-").reverse().join("/");
+}
+
 export default async function StudentsPage() {
   const supabase = await createClient();
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select(
-      "id, email, full_name, phone, is_admin, is_blocked, approved, joined_at",
-    )
-    .order("joined_at", { ascending: false });
+  const [{ data: profiles }, { data: guestRows }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(
+        "id, email, full_name, phone, is_admin, is_blocked, approved, joined_at",
+      )
+      .order("joined_at", { ascending: false }),
+    // Trial-class history ("aulas experimentais") — every guest the coach
+    // added to a class, grouped by name below. Admin-only RLS.
+    supabase
+      .from("class_guests")
+      .select("name, instance_date")
+      .order("instance_date", { ascending: false }),
+  ]);
+
+  // Group guests case-insensitively: same name = same person, count visits.
+  const guestGroups = new Map<
+    string,
+    { name: string; visits: number; last: string }
+  >();
+  for (const g of guestRows ?? []) {
+    const key = g.name.trim().toLowerCase();
+    const existing = guestGroups.get(key);
+    if (existing) {
+      existing.visits += 1;
+      if (g.instance_date > existing.last) existing.last = g.instance_date;
+    } else {
+      guestGroups.set(key, {
+        name: g.name.trim(),
+        visits: 1,
+        last: g.instance_date,
+      });
+    }
+  }
+  const guests = [...guestGroups.values()].sort((a, b) =>
+    b.last.localeCompare(a.last),
+  );
 
   const list = (profiles ?? []) as StudentProfile[];
 
@@ -63,6 +99,39 @@ export default async function StudentsPage() {
         </div>
       ) : (
         <StudentsList profiles={list} />
+      )}
+
+      {/* Aulas experimentais — quiet, collapsed; the coach's follow-up list.
+          People he added by name to classes: who tried, how often, when last. */}
+      {guests.length > 0 && (
+        <details className="mt-12 rounded-md border border-border/60">
+          <summary className="cursor-pointer list-none px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground">
+            Aulas experimentais ({guests.length})
+          </summary>
+          <div className="border-t border-border/60 px-4 py-3">
+            <ul className="divide-y divide-border/40">
+              {guests.map((g) => (
+                <li
+                  key={g.name.toLowerCase()}
+                  className="flex items-center justify-between gap-3 py-2 text-sm"
+                >
+                  <span className="min-w-0 truncate font-medium">
+                    {g.name}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                    {g.visits} {g.visits === 1 ? "aula" : "aulas"} · última{" "}
+                    {ptDate(g.last)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Adiciona pessoas pelo calendário (Adicionar pessoa numa aula).
+              Quem experimentou e nunca criou conta é boa pessoa para
+              contactar.
+            </p>
+          </div>
+        </details>
       )}
     </div>
   );
