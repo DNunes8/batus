@@ -4,8 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { ConfirmForm } from "@/components/confirm-form";
-import { approveStudent } from "./actions";
+import { ApproveDialog } from "./approve-dialog";
 
 export type StudentProfile = {
   id: string;
@@ -149,20 +148,14 @@ export function StudentsList({ profiles }: { profiles: StudentProfile[] }) {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-3">
                           {pending && (
-                            <ConfirmForm
-                              message={`Aprovar ${
-                                p.full_name || p.email
-                              }? Vai poder marcar aulas.`}
-                              action={approveStudent}
-                            >
-                              <input type="hidden" name="id" value={p.id} />
-                              <button
-                                type="submit"
-                                className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium uppercase tracking-wider text-background transition-opacity hover:opacity-90"
-                              >
-                                Aprovar
-                              </button>
-                            </ConfirmForm>
+                            <ApproveDialog
+                              student={{
+                                id: p.id,
+                                name: p.full_name || p.email,
+                              }}
+                              buttonLabel="Aprovar"
+                              buttonClassName="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium uppercase tracking-wider text-background transition-opacity hover:opacity-90"
+                            />
                           )}
                           <Link
                             href={`/admin/students/${p.id}`}
@@ -242,20 +235,11 @@ export function StudentsList({ profiles }: { profiles: StudentProfile[] }) {
                       button inside an anchor. */}
                   {pending && (
                     <div className="border-t border-border/40 p-3">
-                      <ConfirmForm
-                        message={`Aprovar ${
-                          p.full_name || p.email
-                        }? Vai poder marcar aulas.`}
-                        action={approveStudent}
-                      >
-                        <input type="hidden" name="id" value={p.id} />
-                        <button
-                          type="submit"
-                          className="h-11 w-full rounded-md bg-foreground text-sm font-medium uppercase tracking-wider text-background transition-opacity hover:opacity-90"
-                        >
-                          Aprovar aluno
-                        </button>
-                      </ConfirmForm>
+                      <ApproveDialog
+                        student={{ id: p.id, name: p.full_name || p.email }}
+                        buttonLabel="Aprovar aluno"
+                        buttonClassName="h-11 w-full rounded-md bg-foreground text-sm font-medium uppercase tracking-wider text-background transition-opacity hover:opacity-90"
+                      />
                     </div>
                   )}
                 </li>
