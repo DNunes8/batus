@@ -1,8 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendPaymentReminderEmail, getSiteUrl } from "@/lib/email";
+import { sendPaymentReminderBatch, getSiteUrl } from "@/lib/email";
 import { currentMonthLabel, PAYMENT_CUTOFF_DAY } from "@/lib/payment";
 import { todayLisbon } from "@/lib/schedule";
+
+// Resend free tier allows 100 emails/day — cap a single run below that so the
+// reminder burst can never exhaust the daily quota (welcome/waitlist emails
+// share it). If the unpaid list is ever longer, the rest are skipped and
+// logged; the coach chases stragglers in person anyway.
+const DAILY_EMAIL_BUDGET = 90;
 
 export const dynamic = "force-dynamic";
 
@@ -70,16 +76,22 @@ export async function GET(request: NextRequest) {
   const siteUrl = getSiteUrl();
   const monthLabel = currentMonthLabel(today);
 
-  let sent = 0;
-  for (const u of unpaid) {
-    await sendPaymentReminderEmail({
-      to: u.email as string,
-      studentName: u.full_name,
-      monthLabel,
-      siteUrl,
-    });
-    sent++;
+  // One batch request (max 100/call at Resend; we stay under the daily quota).
+  // Sequential per-student sends would also trip Netlify's ~10s function
+  // timeout once the list grows — the batch call is a single round-trip.
+  const toSend = unpaid.slice(0, DAILY_EMAIL_BUDGET);
+  const skipped = unpaid.length - toSend.length;
+  if (skipped > 0) {
+    console.warn(
+      `[cron] payment-reminders: ${unpaid.length} unpaid, sending ${toSend.length}, skipping ${skipped} (daily email budget)`,
+    );
   }
 
-  return NextResponse.json({ sent, candidates: candidates.length });
+  const sent = await sendPaymentReminderBatch(
+    toSend.map((u) => ({ to: u.email as string, studentName: u.full_name })),
+    monthLabel,
+    siteUrl,
+  );
+
+  return NextResponse.json({ sent, skipped, candidates: candidates.length });
 }

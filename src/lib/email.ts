@@ -218,12 +218,12 @@ export async function sendWelcomeEmail(args: {
 // Payment reminder — sent on the cutoff day to students who haven't paid this
 // month. Friendly, not a dunning notice: the coach never has to bring it up.
 // ---------------------------------------------------------------------------
-export async function sendPaymentReminderEmail(args: {
+function buildPaymentReminder(args: {
   to: string;
   studentName: string | null;
   monthLabel: string;
   siteUrl: string;
-}): Promise<void> {
+}): SendArgs {
   const { to, studentName, monthLabel, siteUrl } = args;
   const firstName = studentName?.trim().split(" ")[0] || "Olá";
   const ig = studio.social.instagram;
@@ -256,5 +256,65 @@ export async function sendPaymentReminderEmail(args: {
     `${studio.fullName} · ${studio.city}`,
   ].join("\n");
 
-  await sendEmail({ to, subject, html, text });
+  return { to, subject, html, text };
+}
+
+export async function sendPaymentReminderEmail(args: {
+  to: string;
+  studentName: string | null;
+  monthLabel: string;
+  siteUrl: string;
+}): Promise<void> {
+  await sendEmail(buildPaymentReminder(args));
+}
+
+// Batch variant for the monthly reminder cron: ONE request to Resend's batch
+// endpoint (max 100 emails/call) instead of N sequential sends. Avoids both
+// Resend's 2 req/s rate limit and Netlify's ~10s function timeout, and the
+// caller caps the list to stay under the 100 emails/day free quota.
+// Best-effort like sendEmail: logs and returns on any failure, never throws.
+export async function sendPaymentReminderBatch(
+  recipients: Array<{ to: string; studentName: string | null }>,
+  monthLabel: string,
+  siteUrl: string,
+): Promise<number> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM;
+
+  if (!apiKey || !from) {
+    console.warn(
+      `[email] skipped reminder batch (${recipients.length}) — RESEND_API_KEY/RESEND_FROM not set`,
+    );
+    return 0;
+  }
+  if (recipients.length === 0) return 0;
+
+  const payload = recipients.map((r) => ({
+    from,
+    ...buildPaymentReminder({
+      to: r.to,
+      studentName: r.studentName,
+      monthLabel,
+      siteUrl,
+    }),
+  }));
+
+  try {
+    const res = await fetch("https://api.resend.com/emails/batch", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      console.error(`[email] Resend batch ${res.status}: ${await res.text()}`);
+      return 0;
+    }
+    return recipients.length;
+  } catch (err) {
+    console.error("[email] reminder batch failed:", err);
+    return 0;
+  }
 }
