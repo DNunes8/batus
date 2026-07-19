@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { assertAdmin } from "@/lib/auth-guard";
 import { dayOfWeek as dowHelper } from "@/lib/schedule";
 import { parseEuroToCents } from "@/lib/money";
@@ -10,6 +11,97 @@ export type CalendarActionState = {
   error?: string;
   success?: boolean;
 } | null;
+
+// ============================================================================
+// When the coach cancels a class instance (or closes a whole day), the
+// affected ACTIVE bookings must be cancelled too — otherwise those students
+// stay "booked" on a dead class: the one-per-day rule blocks them from booking
+// a replacement, /perfil still lists the class, and stats count it as
+// attended. The marker prefix records the pre-cancel status so a restore can
+// put everyone back exactly as they were.
+// ============================================================================
+
+const COACH_CANCEL_MARKER = "BATUS_CLASS_CANCELLED:";
+
+// Cancel every active booking for a class instance (or, with template_id
+// null, for ALL classes on a date — the closed-day case). Service-role
+// client: students' rows are outside the coach's RLS reach.
+async function cancelInstanceBookings(
+  template_id: string | null,
+  instance_date: string,
+  reason: string,
+) {
+  const admin = createAdminClient();
+  for (const status of ["booked", "waitlisted"] as const) {
+    let q = admin
+      .from("bookings")
+      .update({
+        status: "cancelled",
+        cancelled_at: new Date().toISOString(),
+        // Marker + prior status (for restore) + human reason (for the coach).
+        cancelled_reason: `${COACH_CANCEL_MARKER}${status}|${reason}`,
+      })
+      .eq("instance_date", instance_date)
+      .eq("status", status);
+    if (template_id) q = q.eq("template_id", template_id);
+    const { error } = await q;
+    if (error) throw new Error(error.message);
+  }
+}
+
+// Restore bookings that were cancelled by a coach cancel/close — back to
+// their recorded status — skipping any student who has meanwhile booked a
+// different class that day (one-per-day must keep holding).
+async function restoreInstanceBookings(
+  template_id: string | null,
+  instance_date: string,
+) {
+  const admin = createAdminClient();
+
+  let markedQ = admin
+    .from("bookings")
+    .select("id, user_id, cancelled_reason")
+    .eq("instance_date", instance_date)
+    .eq("status", "cancelled")
+    .like("cancelled_reason", `${COACH_CANCEL_MARKER}%`);
+  if (template_id) markedQ = markedQ.eq("template_id", template_id);
+  const { data: marked } = await markedQ;
+  if (!marked || marked.length === 0) return;
+
+  // Same-day active bookings for the affected students → conflicts to skip.
+  const userIds = [...new Set(marked.map((m) => m.user_id))];
+  const { data: sameDay } = await admin
+    .from("bookings")
+    .select("user_id")
+    .eq("instance_date", instance_date)
+    .in("status", ["booked", "waitlisted"])
+    .in("user_id", userIds);
+  const conflicted = new Set((sameDay ?? []).map((b) => b.user_id));
+
+  for (const row of marked) {
+    const prior = (row.cancelled_reason ?? "")
+      .slice(COACH_CANCEL_MARKER.length)
+      .split("|")[0];
+    if (conflicted.has(row.user_id) || (prior !== "booked" && prior !== "waitlisted")) {
+      // Leave cancelled, but strip the marker so a later restore of another
+      // cancel/restore cycle can't resurrect a stale row.
+      await admin
+        .from("bookings")
+        .update({ cancelled_reason: "Aula cancelada pelo estúdio" })
+        .eq("id", row.id);
+      continue;
+    }
+    const { error } = await admin
+      .from("bookings")
+      .update({
+        status: prior,
+        cancelled_at: null,
+        cancelled_reason: null,
+      })
+      .eq("id", row.id);
+    if (error) throw new Error(error.message);
+  }
+}
 
 // One-tap "add this model to today". Clones an existing class_template's
 // config onto a specific date as a one-off (active_from = active_until = date)
@@ -153,8 +245,13 @@ export async function setClosedDay(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  // Free the day's students: cancel every active booking on this date so they
+  // can book elsewhere (and /perfil + stats stay truthful).
+  await cancelInstanceBookings(null, date, reason);
+
   revalidatePath("/admin/calendar");
   revalidatePath("/aulas");
+  revalidatePath("/perfil");
 }
 
 export async function reopenDay(formData: FormData) {
@@ -167,8 +264,13 @@ export async function reopenDay(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  // Put the day's coach-cancelled bookings back (skips students who booked
+  // elsewhere in the meantime).
+  await restoreInstanceBookings(null, date);
+
   revalidatePath("/admin/calendar");
   revalidatePath("/aulas");
+  revalidatePath("/perfil");
 }
 
 export async function cancelClassInstance(formData: FormData) {
@@ -192,8 +294,13 @@ export async function cancelClassInstance(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  // Free this class's students so one-per-day doesn't lock them out of a
+  // replacement class, and /perfil + stats stop showing a dead booking.
+  await cancelInstanceBookings(template_id, instance_date, reason);
+
   revalidatePath("/admin/calendar");
   revalidatePath("/aulas");
+  revalidatePath("/perfil");
 }
 
 export async function restoreClassInstance(formData: FormData) {
@@ -214,8 +321,13 @@ export async function restoreClassInstance(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  // Bring the cancelled bookings back to their pre-cancel status (skipping
+  // students who booked a different class this day in the meantime).
+  await restoreInstanceBookings(template_id, instance_date);
+
   revalidatePath("/admin/calendar");
   revalidatePath("/aulas");
+  revalidatePath("/perfil");
 }
 
 // ============================================================================
