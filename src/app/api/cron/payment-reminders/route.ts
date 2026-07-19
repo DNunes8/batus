@@ -38,11 +38,16 @@ export async function GET(request: NextRequest) {
 
   // Candidates: approved, non-admin, monthly-fee, joined before this month
   // (first-month grace). Mirrors isUnpaidAndBlocked's exemptions.
-  const { data: profiles } = await admin
+  const { data: profiles, error: profilesError } = await admin
     .from("profiles")
     .select("id, email, full_name, has_monthly_fee, joined_at")
     .eq("approved", true)
     .eq("is_admin", false);
+  if (profilesError) {
+    // Fail loudly (red run in GitHub Actions) — proceeding on a failed query
+    // would compute a wrong recipient list.
+    return NextResponse.json({ error: profilesError.message }, { status: 500 });
+  }
 
   const candidates = (profiles ?? []).filter(
     (p) =>
@@ -56,7 +61,7 @@ export async function GET(request: NextRequest) {
   }
 
   // This month's payment status for the candidates; paid/paused are exempt.
-  const { data: records } = await admin
+  const { data: records, error: recordsError } = await admin
     .from("payment_records")
     .select("user_id, status")
     .eq("month", monthStart)
@@ -64,6 +69,11 @@ export async function GET(request: NextRequest) {
       "user_id",
       candidates.map((c) => c.id),
     );
+  if (recordsError) {
+    // Without payment statuses, "unpaid" would wrongly include every PAID
+    // student — abort instead of emailing up to 90 people who already paid.
+    return NextResponse.json({ error: recordsError.message }, { status: 500 });
+  }
   const statusByUser = new Map(
     (records ?? []).map((r) => [r.user_id, r.status]),
   );
@@ -92,6 +102,16 @@ export async function GET(request: NextRequest) {
     monthLabel,
     siteUrl,
   );
+
+  // Batch send is best-effort internally, but a zero result with a non-empty
+  // list means the whole call failed (or keys are unset) — surface it as a
+  // red run instead of a silent green "sent: 0".
+  if (toSend.length > 0 && sent === 0) {
+    return NextResponse.json(
+      { error: "batch send failed or email not configured", attempted: toSend.length },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.json({ sent, skipped, candidates: candidates.length });
 }

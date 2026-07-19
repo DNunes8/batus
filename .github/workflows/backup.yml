@@ -1,9 +1,15 @@
-# Weekly encrypted backup of the Supabase database (public schema).
+# Weekly encrypted backup of the Supabase database (public + auth schemas).
 #
 # Every Monday — and on demand (Actions tab -> Run workflow) — this:
-#   1. dumps the `public` schema with pg_dump
+#   1. dumps the `public` AND `auth` schemas with pg_dump (auth carries the
+#      login accounts — without it a restore recovers profiles but no logins)
 #   2. encrypts the dump with the BACKUP_PASSPHRASE secret (gpg, AES-256)
 #   3. stores the encrypted file as a workflow artifact, kept for 90 days
+#
+# A `keepalive` job also pushes an empty commit when the repo has been quiet
+# for ~25 days: GitHub auto-disables scheduled workflows after 60 days of
+# repository inactivity, which would silently kill BOTH this backup and the
+# payment-reminder cron on a hand-off app that stops receiving commits.
 #
 # Required repo secrets (Settings -> Secrets and variables -> Actions):
 #   SUPABASE_DB_PASSWORD - the Supabase database password
@@ -52,10 +58,14 @@ jobs:
             --username=postgres.udgrwwkuvtycidxfaffx \
             --dbname=postgres \
             --schema=public \
+            --schema=auth \
             --no-owner \
             --no-privileges \
             --file=backup.sql
           echo "Dump complete - size: $(du -h backup.sql | cut -f1)"
+          # Sanity: the auth schema (logins) must actually be in the dump.
+          grep -q "CREATE TABLE auth\." backup.sql \
+            || { echo "::error::auth schema missing from dump"; exit 1; }
 
       - name: Encrypt the dump
         env:
@@ -73,3 +83,29 @@ jobs:
           name: db-backup
           path: backup.sql.gpg
           retention-days: 90
+
+  # Prevents GitHub's 60-day inactivity auto-disable of scheduled workflows.
+  # Only commits when the repo has been quiet for ~25 days, so it stays
+  # invisible while development is active (~1 empty commit/month otherwise).
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Empty commit if repo quiet for 25+ days
+        run: |
+          last_commit=$(git log -1 --format=%ct)
+          age_days=$(( ( $(date +%s) - last_commit ) / 86400 ))
+          echo "Last commit was ${age_days} days ago."
+          if [ "$age_days" -lt 25 ]; then
+            echo "Repo active — no keepalive needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: keepalive (prevents 60-day scheduled-workflow auto-disable)"
+          git push
