@@ -43,6 +43,29 @@ const TOAST_BY_PARAM: Record<string, ToastConfig> = {
     message: "Palavra-passe alterada.",
     description: "Da próxima vez, usa a nova para entrares.",
   },
+  // Expected booking/cancel failures. Server actions redirect with these
+  // instead of throwing — Next masks thrown messages in production, so a
+  // throw would show the generic error page instead of the real reason.
+  oneperday: {
+    type: "error",
+    message: "Só podes marcar uma aula por dia.",
+    description: "Cancela a outra marcação primeiro, em Perfil.",
+    action: { label: "Perfil", href: "/perfil" },
+  },
+  already: {
+    type: "info",
+    message: "Já tens marcação para esta aula.",
+  },
+  cutoff: {
+    type: "error",
+    message: "Já não dá para cancelar esta aula.",
+    description: "O limite de cancelamento passou — fala com o treinador.",
+  },
+  expired: {
+    type: "error",
+    message: "Esse link expirou ou já foi usado.",
+    description: "Pede um novo em “Esqueci-me da palavra-passe”.",
+  },
 };
 
 export function SearchParamToast() {

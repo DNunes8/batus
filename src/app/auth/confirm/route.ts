@@ -63,5 +63,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(new URL("/login?error=expired", origin));
+  // ?expired=1 fires the "link expirou" toast (see search-param-toast.tsx) —
+  // previously ?error=expired rendered nothing, so a burned reset link looked
+  // like a silent failure.
+  return NextResponse.redirect(new URL("/login?expired=1", origin));
 }

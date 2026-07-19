@@ -68,6 +68,19 @@ export async function bookClass(formData: FormData) {
     throw new Error("Pedido inválido.");
   }
 
+  // Where to land after this action — the page the form told us about (class
+  // detail) or the schedule anchored to the right week. Expected failures
+  // redirect here with a toast param instead of throwing: Next masks thrown
+  // messages in production, so a throw would show the generic error page.
+  const return_to = (formData.get("return_to") as string | null)?.trim();
+  const bounce = (param: string): never => {
+    if (return_to) {
+      const separator = return_to.includes("?") ? "&" : "?";
+      redirect(`${return_to}${separator}${param}=1`);
+    }
+    redirect(`/aulas?week=${mondayOf(instance_date)}&${param}=1`);
+  };
+
   // Booking window — students can only book up to the date the coach has
   // opened with "Abrir próximas 2 semanas". The UI normally prevents this;
   // this is the server-side backstop.
@@ -89,7 +102,7 @@ export async function bookClass(formData: FormData) {
     .limit(1)
     .maybeSingle();
   if (sameDayBooking) {
-    throw new Error("Só podes marcar uma aula por dia.");
+    bounce("oneperday");
   }
 
   const { data: template } = await supabase
@@ -116,10 +129,10 @@ export async function bookClass(formData: FormData) {
 
   if (error) {
     if (error.message.includes("BATUS_ALREADY_BOOKED")) {
-      throw new Error("Já tens marcação para esta aula.");
+      bounce("already");
     }
     if (error.message.includes("BATUS_ONE_PER_DAY")) {
-      throw new Error("Só podes marcar uma aula por dia.");
+      bounce("oneperday");
     }
     throw new Error(error.message);
   }
@@ -128,17 +141,7 @@ export async function bookClass(formData: FormData) {
   revalidatePath("/perfil");
   revalidatePath(`/aulas/${template_id}/${instance_date}`);
 
-  // If the form told us where to return to (e.g. the class detail page),
-  // bounce back there with the toast. Otherwise default to the schedule
-  // pre-anchored to the right week.
-  const status_param = resultStatus === "waitlisted" ? "waitlist" : "booked";
-  const return_to = (formData.get("return_to") as string | null)?.trim();
-  if (return_to) {
-    const separator = return_to.includes("?") ? "&" : "?";
-    redirect(`${return_to}${separator}${status_param}=1`);
-  }
-  const week = mondayOf(instance_date);
-  redirect(`/aulas?week=${week}&${status_param}=1`);
+  bounce(resultStatus === "waitlisted" ? "waitlist" : "booked");
 }
 
 export async function cancelBooking(formData: FormData) {
@@ -188,9 +191,9 @@ export async function cancelBooking(formData: FormData) {
     const cutoffMs = classDateTime.getTime() - cutoffHours * 60 * 60 * 1000;
 
     if (Date.now() > cutoffMs) {
-      throw new Error(
-        `Só podes cancelar até ${cutoffHours}h antes da aula.`,
-      );
+      // Expected case, not an exception: a thrown message would be masked in
+      // production. Redirect to /perfil with the cutoff toast instead.
+      redirect("/perfil?cutoff=1");
     }
   }
 
