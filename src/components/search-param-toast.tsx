@@ -56,6 +56,12 @@ const TOAST_BY_PARAM: Record<string, ToastConfig> = {
     type: "info",
     message: "Já tens marcação para esta aula.",
   },
+  weeklylimit: {
+    type: "error",
+    message: "Atingiste o limite de aulas desta semana.",
+    description:
+      "O teu plano renova à segunda-feira. Para mais aulas, fala com o treinador.",
+  },
   cutoff: {
     type: "error",
     message: "Já não dá para cancelar esta aula.",

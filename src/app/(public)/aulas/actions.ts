@@ -4,7 +4,13 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { formatDayHeader, formatTime, mondayOf } from "@/lib/schedule";
+import {
+  addDays,
+  formatDayHeader,
+  formatTime,
+  mondayOf,
+  todayLisbon,
+} from "@/lib/schedule";
 import { sendWaitlistPromotionEmail, getSiteUrl } from "@/lib/email";
 import { isUnpaidAndBlocked } from "@/lib/payment";
 import { getBookableUntil } from "@/lib/booking-window";
@@ -28,7 +34,7 @@ export async function bookClass(formData: FormData) {
   const { data: gateProfile } = await supabase
     .from("profiles")
     .select(
-      "approved, is_admin, is_blocked, full_name, phone, birthday, has_monthly_fee, joined_at",
+      "approved, is_admin, is_blocked, full_name, phone, birthday, has_monthly_fee, joined_at, weekly_class_limit",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -105,6 +111,35 @@ export async function bookClass(formData: FormData) {
     bounce("oneperday");
   }
 
+  // Weekly plan limit (25€→1, 35€→2, 50€→3, 60€→livre/null). Active bookings
+  // (booked + waitlisted) in the Mon-Sun week of the target date. The UI hides
+  // the button and book_class re-checks atomically (migration 0019) — this
+  // pre-check just returns the friendly toast without a DB round-trip to the RPC.
+  const weeklyLimit = gateProfile?.weekly_class_limit ?? null;
+  if (weeklyLimit !== null) {
+    const weekStart = mondayOf(instance_date);
+    // Booked always counts; waitlisted only while its class is still upcoming
+    // (a passed waitlist that never got promoted must not eat the week).
+    const { count: weekCount } = await supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("instance_date", weekStart)
+      .lte("instance_date", addDays(weekStart, 6))
+      .or(
+        `status.eq.booked,and(status.eq.waitlisted,instance_date.gte.${todayLisbon()})`,
+      )
+      // Exclude THIS class instance's own row: if the student is already
+      // booked here, the RPC's ALREADY_BOOKED should answer (correct toast),
+      // not a bogus weekly-limit bounce.
+      .or(
+        `template_id.neq.${template_id},instance_date.neq.${instance_date}`,
+      );
+    if ((weekCount ?? 0) >= weeklyLimit) {
+      bounce("weeklylimit");
+    }
+  }
+
   const { data: template } = await supabase
     .from("class_templates")
     .select("capacity")
@@ -133,6 +168,9 @@ export async function bookClass(formData: FormData) {
     }
     if (error.message.includes("BATUS_ONE_PER_DAY")) {
       bounce("oneperday");
+    }
+    if (error.message.includes("BATUS_WEEKLY_LIMIT")) {
+      bounce("weeklylimit");
     }
     throw new Error(error.message);
   }

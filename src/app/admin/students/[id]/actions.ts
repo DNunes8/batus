@@ -28,6 +28,18 @@ export async function updateStudentNotesAndGoals(formData: FormData) {
       ? "solo"
       : "group";
   const has_monthly_fee = formData.get("has_monthly_fee") === "on";
+  // Plan tier: "" → null (livre); otherwise 1-7 classes per week.
+  const weeklyLimitRaw = (formData.get("weekly_class_limit") as string | null) ?? "";
+  const weekly_class_limit =
+    weeklyLimitRaw === "" ? null : Number(weeklyLimitRaw);
+  if (
+    weekly_class_limit !== null &&
+    (!Number.isInteger(weekly_class_limit) ||
+      weekly_class_limit < 1 ||
+      weekly_class_limit > 7)
+  ) {
+    throw new Error("Limite semanal inválido.");
+  }
 
   if (!id) throw new Error("ID em falta.");
 
@@ -43,6 +55,7 @@ export async function updateStudentNotesAndGoals(formData: FormData) {
       monthly_fee_cents,
       service_type,
       has_monthly_fee,
+      weekly_class_limit,
     })
     .eq("id", id);
 

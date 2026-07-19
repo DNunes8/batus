@@ -18,6 +18,7 @@ import {
   setStudentHasMonthlyFee,
   setStudentMonthlyFee,
   setStudentServiceType,
+  setStudentWeeklyLimit,
   type PaymentStatus,
 } from "./actions";
 import { HistoryStrip, type HistoryCell } from "./history-strip";
@@ -34,6 +35,8 @@ export type DrawerStudent = {
   joined_at: string;
   service_type: ServiceType;
   has_monthly_fee: boolean;
+  // null = livre (no weekly cap). 1/2/3 = the plan tiers (25€/35€/50€).
+  weekly_class_limit: number | null;
   record: {
     status: PaymentStatus;
     amount_cents: number;
@@ -114,11 +117,14 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
   const initialNotes = student?.record?.notes ?? "";
   const initialStandingFee =
     student?.resolvedFee != null ? eurosFromCents(student.resolvedFee) : "";
+  // Select value: "" = livre, "1"/"2"/"3" = the plan tiers.
+  const initialWeeklyLimit = student?.weekly_class_limit?.toString() ?? "";
 
   const [status, setStatus] = useState<PaymentStatus>(initialStatus);
   const [amount, setAmount] = useState(initialAmount);
   const [notes, setNotes] = useState(initialNotes);
   const [standingFee, setStandingFee] = useState(initialStandingFee);
+  const [weeklyLimit, setWeeklyLimit] = useState(initialWeeklyLimit);
 
   useEffect(() => {
     if (!student) return;
@@ -134,6 +140,7 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
     setStandingFee(
       student.resolvedFee != null ? eurosFromCents(student.resolvedFee) : "",
     );
+    setWeeklyLimit(student.weekly_class_limit?.toString() ?? "");
   }, [student]);
 
   if (!student) return null;
@@ -181,6 +188,8 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
       }
     }
 
+    const limitChanged = weeklyLimit !== initialWeeklyLimit;
+
     startTransition(async () => {
       try {
         const ops: Promise<unknown>[] = [];
@@ -189,6 +198,15 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
             setStudentMonthlyFee({
               user_id: student.id,
               monthly_fee_cents: parsedStanding,
+            }),
+          );
+        }
+        if (limitChanged) {
+          ops.push(
+            setStudentWeeklyLimit({
+              user_id: student.id,
+              weekly_class_limit:
+                weeklyLimit === "" ? null : Number(weeklyLimit),
             }),
           );
         }
@@ -211,7 +229,9 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
               : status === "paused"
                 ? `${name} em pausa em ${monthLabel}.`
                 : `${name} marcado por pagar em ${monthLabel}.`
-            : `Mensalidade de ${name} atualizada.`,
+            : standingChanged
+              ? `Mensalidade de ${name} atualizada.`
+              : `Plano de ${name} atualizado.`,
         );
         router.refresh();
         onClose();
@@ -274,7 +294,8 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
     status !== initialStatus ||
     amount !== initialAmount ||
     notes !== initialNotes ||
-    standingFee !== initialStandingFee;
+    standingFee !== initialStandingFee ||
+    weeklyLimit !== initialWeeklyLimit;
 
   return (
     <Dialog
@@ -366,6 +387,28 @@ export function PaymentDrawer({ student, month, onClose }: Props) {
                     className="h-11 text-base sm:h-10 sm:text-sm"
                   />
                 </div>
+              </div>
+
+              {/* Plan tier — saved by the Guardar button like everything else. */}
+              <div className="mt-3 space-y-1">
+                <Label htmlFor="weekly-limit" className="text-xs">
+                  Aulas por semana (plano)
+                </Label>
+                <select
+                  id="weekly-limit"
+                  value={weeklyLimit}
+                  onChange={(e) => setWeeklyLimit(e.target.value)}
+                  className="h-11 w-full rounded-md border border-input bg-background px-3 text-base sm:h-10 sm:text-sm"
+                >
+                  <option value="">Livre (ex: 60€)</option>
+                  <option value="1">1 aula/semana (ex: 25€)</option>
+                  <option value="2">2 aulas/semana (ex: 35€)</option>
+                  <option value="3">3 aulas/semana (ex: 50€)</option>
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Quantas aulas de grupo o aluno pode marcar por semana
+                  (segunda a domingo).
+                </p>
               </div>
 
               <div className="mt-3 space-y-1">

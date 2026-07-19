@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertAdmin } from "@/lib/auth-guard";
-import { dayOfWeek as dowHelper } from "@/lib/schedule";
+import {
+  addDays,
+  dayOfWeek as dowHelper,
+  mondayOf,
+  todayLisbon,
+} from "@/lib/schedule";
 import { parseEuroToCents } from "@/lib/money";
 
 export type CalendarActionState = {
@@ -78,11 +83,49 @@ async function restoreInstanceBookings(
     .in("user_id", userIds);
   const conflicted = new Set((sameDay ?? []).map((b) => b.user_id));
 
+  // Weekly plan limits: a restore must not push a limited student over their
+  // cap (they may have legitimately booked a replacement class this week
+  // while the instance was cancelled). Count each limited student's active
+  // week bookings the same way book_class does — booked always, waitlisted
+  // only while still upcoming.
+  const { data: limitedProfiles } = await admin
+    .from("profiles")
+    .select("id, weekly_class_limit")
+    .in("id", userIds)
+    .not("weekly_class_limit", "is", null);
+  const limitByUser = new Map(
+    (limitedProfiles ?? []).map((p) => [p.id, p.weekly_class_limit as number]),
+  );
+  const weekStart = mondayOf(instance_date);
+  const overLimit = new Set<string>();
+  if (limitByUser.size > 0) {
+    const { data: weekRows } = await admin
+      .from("bookings")
+      .select("user_id")
+      .in("user_id", [...limitByUser.keys()])
+      .gte("instance_date", weekStart)
+      .lte("instance_date", addDays(weekStart, 6))
+      .or(
+        `status.eq.booked,and(status.eq.waitlisted,instance_date.gte.${todayLisbon()})`,
+      );
+    const weekCount = new Map<string, number>();
+    for (const b of weekRows ?? []) {
+      weekCount.set(b.user_id, (weekCount.get(b.user_id) ?? 0) + 1);
+    }
+    for (const [uid, limit] of limitByUser) {
+      if ((weekCount.get(uid) ?? 0) >= limit) overLimit.add(uid);
+    }
+  }
+
   for (const row of marked) {
     const prior = (row.cancelled_reason ?? "")
       .slice(COACH_CANCEL_MARKER.length)
       .split("|")[0];
-    if (conflicted.has(row.user_id) || (prior !== "booked" && prior !== "waitlisted")) {
+    if (
+      conflicted.has(row.user_id) ||
+      overLimit.has(row.user_id) ||
+      (prior !== "booked" && prior !== "waitlisted")
+    ) {
       // Leave cancelled, but strip the marker so a later restore of another
       // cancel/restore cycle can't resurrect a stale row.
       await admin

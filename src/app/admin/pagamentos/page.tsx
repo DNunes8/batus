@@ -61,7 +61,7 @@ export default async function PagamentosPage({
     supabase
       .from("profiles")
       .select(
-        "id, email, full_name, phone, monthly_fee_cents, goals, notes, joined_at, is_admin, is_blocked, service_type, has_monthly_fee",
+        "id, email, full_name, phone, monthly_fee_cents, goals, notes, joined_at, is_admin, is_blocked, service_type, has_monthly_fee, weekly_class_limit",
       )
       // Paused accounts (is_blocked) stay on the board on purpose — the coach
       // wants them visible, just flagged "Conta em pausa" (see buildBoardRow).
@@ -207,6 +207,7 @@ export default async function PagamentosPage({
       joined_at: p.joined_at,
       service_type: (p.service_type as "group" | "solo") ?? "group",
       has_monthly_fee: p.has_monthly_fee ?? true,
+      weekly_class_limit: p.weekly_class_limit ?? null,
       record: currentRecord
         ? {
             status: currentRecord.status as PaymentStatus,

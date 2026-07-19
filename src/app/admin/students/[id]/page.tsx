@@ -277,6 +277,24 @@ export default async function StudentDetailPage({
                 <em>Por definir</em> em Pagamentos.
               </p>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="weekly_class_limit">Aulas por semana (plano)</Label>
+              <select
+                id="weekly_class_limit"
+                name="weekly_class_limit"
+                defaultValue={profile.weekly_class_limit ?? ""}
+                className={SELECT_CLASSES}
+              >
+                <option value="">Livre (ex: 60€)</option>
+                <option value="1">1 aula/semana (ex: 25€)</option>
+                <option value="2">2 aulas/semana (ex: 35€)</option>
+                <option value="3">3 aulas/semana (ex: 50€)</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Quantas aulas de grupo pode marcar por semana (segunda a
+                domingo).
+              </p>
+            </div>
           </div>
           <label className="flex items-start gap-2 rounded-md border border-border/60 p-3 text-sm">
             <input

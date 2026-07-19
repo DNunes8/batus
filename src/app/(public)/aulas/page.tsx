@@ -10,6 +10,7 @@ import {
   formatWeekRange,
   getWeekSchedule,
   isClassInPast,
+  mondayOf,
   safeReferenceDate,
   todayLisbon,
   type ScheduleClass,
@@ -47,11 +48,12 @@ export default async function AulasPage({
   let isPaused = false;
   let isIncomplete = false;
   let isUnpaid = false;
+  let weeklyLimit: number | null = null;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
       .select(
-        "approved, is_admin, is_blocked, full_name, phone, birthday, has_monthly_fee, joined_at",
+        "approved, is_admin, is_blocked, full_name, phone, birthday, has_monthly_fee, joined_at, weekly_class_limit",
       )
       .eq("id", user.id)
       .maybeSingle();
@@ -60,12 +62,37 @@ export default async function AulasPage({
     isIncomplete =
       !profile?.is_admin &&
       (!profile?.full_name || !profile?.phone || !profile?.birthday);
+    weeklyLimit = profile?.weekly_class_limit ?? null;
     // Payment gate only matters once they're otherwise bookable.
     if (profile && isApproved && !isPaused && !isIncomplete) {
       isUnpaid = await isUnpaidAndBlocked(user.id, profile);
     }
   }
   const isPending = !!user && !isApproved;
+
+  // Weekly plan limit: count the student's active bookings per ISO week
+  // (Mon-Sun) across the weeks the rolling 7-day window touches, so the UI
+  // can lock the rest of a week once the plan is used up.
+  const weekCounts = new Map<string, number>();
+  if (user && weeklyLimit !== null) {
+    const rangeStart = mondayOf(start);
+    const rangeEnd = addDays(mondayOf(addDays(start, 6)), 6);
+    // Booked always counts; waitlisted only while its class is still upcoming
+    // (a passed waitlist that never got promoted must not eat the week).
+    const { data: myBookings } = await supabase
+      .from("bookings")
+      .select("instance_date")
+      .eq("user_id", user.id)
+      .gte("instance_date", rangeStart)
+      .lte("instance_date", rangeEnd)
+      .or(
+        `status.eq.booked,and(status.eq.waitlisted,instance_date.gte.${todayStr})`,
+      );
+    for (const b of myBookings ?? []) {
+      const week = mondayOf(b.instance_date);
+      weekCounts.set(week, (weekCounts.get(week) ?? 0) + 1);
+    }
+  }
 
   const nextStart = addDays(start, 7);
   const monthLabel = currentMonthLabel();
@@ -272,6 +299,13 @@ export default async function AulasPage({
                             c.user_booking_status !== "booked" &&
                             c.user_booking_status !== "waitlisted"
                           }
+                          weeklyLimitReached={
+                            weeklyLimit !== null &&
+                            (weekCounts.get(mondayOf(c.date)) ?? 0) >=
+                              weeklyLimit &&
+                            c.user_booking_status !== "booked" &&
+                            c.user_booking_status !== "waitlisted"
+                          }
                           isPast={isClassInPast(c.date, c.start_time)}
                         />
                       </li>
@@ -297,6 +331,7 @@ function BookingControl({
   isUnpaid,
   notYetOpen,
   dayHasOtherBooking,
+  weeklyLimitReached,
   isPast,
 }: {
   cls: ScheduleClass;
@@ -307,6 +342,7 @@ function BookingControl({
   isUnpaid: boolean;
   notYetOpen: boolean;
   dayHasOtherBooking: boolean;
+  weeklyLimitReached: boolean;
   isPast: boolean;
 }) {
   if (cls.cancelled) {
@@ -417,6 +453,16 @@ function BookingControl({
     return (
       <span className="inline-flex h-10 items-center rounded-md border border-border/60 px-3 text-xs uppercase tracking-widest text-muted-foreground">
         Já tens aula neste dia
+      </span>
+    );
+  }
+
+  // Weekly plan used up (25€→1/semana etc.) — the rest of this week locks.
+  // book_class enforces it atomically too (migration 0019).
+  if (weeklyLimitReached) {
+    return (
+      <span className="inline-flex h-10 items-center rounded-md border border-border/60 px-3 text-xs uppercase tracking-widest text-muted-foreground">
+        Limite semanal atingido
       </span>
     );
   }

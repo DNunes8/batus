@@ -246,6 +246,12 @@ export function PaymentsBoard({
                           {formatEuro(amount)}
                         </p>
                       )}
+                      {/* Plan tier under the fee: price + what it buys, one glance. */}
+                      <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                        {r.weekly_class_limit != null
+                          ? `${r.weekly_class_limit}×/semana`
+                          : "Livre"}
+                      </p>
                     </div>
                   </button>
                 </div>

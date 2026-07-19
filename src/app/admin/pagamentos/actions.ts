@@ -149,6 +149,39 @@ export async function setStudentMonthlyFee(input: {
 }
 
 // ----------------------------------------------------------------------------
+// Set the student's plan tier: how many group classes they may book per week
+// (25€→1, 35€→2, 50€→3, 60€→null/livre). Enforced by book_class (0019).
+// ----------------------------------------------------------------------------
+export async function setStudentWeeklyLimit(input: {
+  user_id: string;
+  weekly_class_limit: number | null;
+}) {
+  await assertAdmin();
+  const { user_id, weekly_class_limit } = input;
+  if (!user_id) throw new Error("ID em falta.");
+  if (
+    weekly_class_limit !== null &&
+    (!Number.isInteger(weekly_class_limit) ||
+      weekly_class_limit < 1 ||
+      weekly_class_limit > 7)
+  ) {
+    throw new Error("Limite inválido.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ weekly_class_limit })
+    .eq("id", user_id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin/pagamentos");
+  revalidatePath(`/admin/students/${user_id}`);
+  revalidatePath("/aulas");
+}
+
+// ----------------------------------------------------------------------------
 // Move a student between the "Aulas de grupo" and "PTs" tabs.
 // Just flips profiles.service_type — payment history is preserved either way.
 // ----------------------------------------------------------------------------
