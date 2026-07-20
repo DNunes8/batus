@@ -6,6 +6,7 @@ export const ADMIN_NAV = [
   { href: "/admin/classes", label: "Modelos" },
   { href: "/admin/students", label: "Alunos" },
   { href: "/admin/pagamentos", label: "Pagamentos" },
+  { href: "/admin/financas", label: "Finanças" },
   { href: "/admin/messages", label: "Mensagens" },
   { href: "/admin/merch", label: "Loja" },
   { href: "/admin/claims", label: "Pedidos" },

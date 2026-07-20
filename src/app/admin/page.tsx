@@ -2,13 +2,7 @@ import Link from "next/link";
 import { TrendingUp, Package, ArrowRight } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { formatEuro, monthKey } from "@/lib/money";
-import {
-  addDays,
-  formatDayHeader,
-  formatTime,
-  todayLisbon,
-} from "@/lib/schedule";
+import { formatDayHeader, formatTime, todayLisbon } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -55,14 +49,6 @@ export default async function AdminDashboardPage() {
   const supabase = await createClient();
   const admin = createAdminClient();
   const today = todayLisbon();
-  const monthStart = monthKey(new Date());
-  // Month end + cutoff (min of month-end and today), used to walk recurring PT
-  // revenue the same way the Pagamentos page does.
-  const [myYear, myMonth] = monthStart.split("-").map(Number);
-  const monthEnd = new Date(Date.UTC(myYear, myMonth, 0))
-    .toISOString()
-    .slice(0, 10);
-  const activityCutoff = monthEnd < today ? monthEnd : today;
 
   const [
     { data: { user } },
@@ -73,12 +59,8 @@ export default async function AdminDashboardPage() {
     pendingClaimsRes,
     unreadMsgRes,
     latestMessagesRes,
-    paymentsThisMonthRes,
-    solosThisMonthRes,
     pendingApprovalsRes,
     birthdaysRes,
-    soloTemplatesRes,
-    soloOverridesRes,
     todayGuestsRes,
   ] = await Promise.all([
     supabase.auth.getUser(),
@@ -114,15 +96,6 @@ export default async function AdminDashboardPage() {
       .order("created_at", { ascending: false })
       .limit(3),
     admin
-      .from("payment_records")
-      .select("amount_cents")
-      .gte("month", monthStart)
-      .eq("status", "paid"),
-    admin
-      .from("solo_sessions")
-      .select("price_cents")
-      .gte("session_date", `${monthStart}T00:00:00`),
-    admin
       .from("profiles")
       .select("id", { count: "exact", head: true })
       .eq("approved", false)
@@ -136,15 +109,6 @@ export default async function AdminDashboardPage() {
       .not("birthday", "is", null)
       .eq("approved", true)
       .eq("is_admin", false),
-    admin
-      .from("solo_session_templates")
-      .select(
-        "id, user_id, day_of_week, price_cents, active_from, active_until, is_preset",
-      ),
-    admin
-      .from("solo_session_overrides")
-      .select("template_id, instance_date, cancelled")
-      .gte("instance_date", monthStart),
     // Coach-added guests today — they occupy seats, so the Hoje card must
     // count them like every other surface does.
     admin
@@ -257,47 +221,6 @@ export default async function AdminDashboardPage() {
     .sort((a, b) =>
       (a.full_name ?? "").localeCompare(b.full_name ?? "", "pt"),
     );
-
-  // Recurring PT revenue this month — mirrors the Pagamentos page so the
-  // dashboard total isn't undercounted. Walk each active recurring template
-  // weekly from month start to today, skipping presets + cancelled overrides.
-  const soloTemplates = soloTemplatesRes.data ?? [];
-  const soloOverrides = soloOverridesRes.data ?? [];
-  let recurringPtCents = 0;
-  for (const tpl of soloTemplates) {
-    if (tpl.is_preset || !tpl.user_id) continue;
-    if (tpl.active_from > monthEnd) continue;
-    if (tpl.active_until && tpl.active_until < monthStart) continue;
-    const start = tpl.active_from > monthStart ? tpl.active_from : monthStart;
-    const end =
-      tpl.active_until && tpl.active_until < activityCutoff
-        ? tpl.active_until
-        : activityCutoff;
-    let cursor = start;
-    while (cursor <= end && dowOf(cursor) !== tpl.day_of_week) {
-      cursor = addDays(cursor, 1);
-    }
-    while (cursor <= end) {
-      const ov = soloOverrides.find(
-        (o) => o.template_id === tpl.id && o.instance_date === cursor,
-      );
-      if (!ov?.cancelled) {
-        recurringPtCents += tpl.price_cents ?? 0;
-      }
-      cursor = addDays(cursor, 7);
-    }
-  }
-
-  const monthEarnings =
-    (paymentsThisMonthRes.data ?? []).reduce(
-      (sum, p) => sum + (p.amount_cents ?? 0),
-      0,
-    ) +
-    (solosThisMonthRes.data ?? []).reduce(
-      (sum, s) => sum + (s.price_cents ?? 0),
-      0,
-    ) +
-    recurringPtCents;
 
   const dayName = PT_DAYS[dowOf(today)];
 
@@ -500,12 +423,21 @@ export default async function AdminDashboardPage() {
       {/* Quick-glance overview stats below the day-of focus. Dropped the
           Aulas/Mensagens counts — the sections above already convey them. */}
       <div className="mt-12 grid gap-4 sm:grid-cols-2">
-        <DashboardCard
-          icon={TrendingUp}
-          label="Receitas este mês"
-          value={formatEuro(monthEarnings)}
-          href="/admin/pagamentos"
-        />
+        <Link
+          href="/admin/financas"
+          className="group block rounded-md border border-border/60 p-5 transition-all hover:-translate-y-0.5 hover:border-foreground/40 hover:shadow-sm"
+        >
+          <div className="flex items-start justify-between">
+            <TrendingUp className="size-4 text-muted-foreground" />
+            <ArrowRight className="size-3.5 -translate-x-1 text-muted-foreground/50 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+          </div>
+          <p className="mt-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            Finanças
+          </p>
+          <p className="mt-2 text-sm text-foreground/80">
+            Receitas, despesas e resultado
+          </p>
+        </Link>
         <DashboardCard
           icon={Package}
           label="Pedidos pendentes"
