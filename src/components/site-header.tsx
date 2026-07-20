@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Menu } from "lucide-react";
 import { studio } from "@/lib/studio.config";
 import { createClient } from "@/lib/supabase/client";
+import { getAuthUser } from "@/lib/supabase/auth-user";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -41,11 +42,12 @@ function useCurrentUser(): HeaderUser {
     let active = true;
 
     async function load() {
-      const {
-        data: { user: u },
-      } = await supabase.auth.getUser();
+      const { user: u, transient } = await getAuthUser(supabase);
       if (!u) {
-        if (active) setUser(null);
+        // Transient blip — keep whatever we last showed rather than flashing
+        // "Entrar" at a logged-in user. onAuthStateChange re-runs on a real
+        // sign-in/out; only a genuine no-session clears the header here.
+        if (active && !transient) setUser(null);
         return;
       }
       const { data: profile } = await supabase

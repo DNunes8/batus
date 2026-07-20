@@ -3,14 +3,14 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/auth-user";
 
 export async function claimItem(formData: FormData) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, transient } = await getAuthUser(supabase);
 
   if (!user) {
+    if (transient) redirect("/loja?offline=1");
     redirect("/login?next=/loja");
   }
 

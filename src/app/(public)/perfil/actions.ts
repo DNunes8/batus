@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/auth-user";
 import { parseBirthdayFromForm } from "@/lib/birthday";
 
 export type ChangePasswordState = {
@@ -30,11 +31,14 @@ export async function changePassword(
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, transient } = await getAuthUser(supabase);
 
   if (!user) {
+    // Keep the session and show a clear message on a transient blip instead of
+    // bouncing to /login; only a genuine no-session redirects.
+    if (transient) {
+      return { error: "Sem ligação ao servidor. Tenta outra vez." };
+    }
     redirect("/login?next=/perfil");
   }
 
@@ -50,11 +54,10 @@ export async function changePassword(
 
 export async function updateOwnProfile(formData: FormData) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, transient } = await getAuthUser(supabase);
 
   if (!user) {
+    if (transient) redirect("/perfil?offline=1");
     redirect("/login?next=/perfil");
   }
 

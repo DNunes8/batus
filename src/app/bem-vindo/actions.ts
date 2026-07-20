@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/auth-user";
 import { safeRelativePath } from "@/lib/safe-redirect";
 import { parseBirthdayFromForm } from "@/lib/birthday";
 
@@ -15,11 +16,15 @@ export async function completeProfile(
   formData: FormData,
 ): Promise<CompleteProfileState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, transient } = await getAuthUser(supabase);
 
   if (!user) {
+    // First-run onboarding — on a transient blip keep the SESSION and show a
+    // message instead of bouncing to /login (React resets the fields on submit,
+    // so it's the session, not the typed values, we're protecting here).
+    if (transient) {
+      return { error: "Sem ligação ao servidor. Tenta outra vez." };
+    }
     redirect("/login");
   }
 
