@@ -9,23 +9,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { approveStudentWithPlan, type ApprovalPlan } from "./actions";
+import { approveStudentWithPlan } from "./actions";
+import { PLAN_OPTIONS, type Plan } from "@/lib/plans";
 
 // Approve-with-plan: tapping "Aprovar" opens this dialog so the coach picks
 // the student's plan in the same gesture — no second step to forget. Built
 // mobile-first: big full-width stacked buttons, generous tap targets.
-
-const PLAN_OPTIONS: Array<{
-  plan: ApprovalPlan;
-  label: string;
-  detail: string;
-}> = [
-  { plan: "1", label: "1 aula por semana", detail: "Grupo · 25€/mês" },
-  { plan: "2", label: "2 aulas por semana", detail: "Grupo · 35€/mês" },
-  { plan: "3", label: "3 aulas por semana", detail: "Grupo · 50€/mês" },
-  { plan: "livre", label: "Livre", detail: "Grupo · 60€/mês" },
-  { plan: "pt", label: "PT", detail: "Sessões individuais" },
-];
 
 export function ApproveDialog({
   student,
@@ -40,7 +29,7 @@ export function ApproveDialog({
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
-  function choose(plan: ApprovalPlan, label: string) {
+  function choose(plan: Plan, label: string) {
     startTransition(async () => {
       try {
         const result = await approveStudentWithPlan({ id: student.id, plan });

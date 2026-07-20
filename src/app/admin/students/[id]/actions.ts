@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { assertAdmin } from "@/lib/auth-guard";
 import { parseEuroToCents } from "@/lib/money";
 import { parseBirthdayFromForm } from "@/lib/birthday";
+import { PLAN_CONFIG, STANDARD_FEES_CENTS, type Plan } from "@/lib/plans";
 
 export async function updateStudentNotesAndGoals(formData: FormData) {
   await assertAdmin();
@@ -17,29 +18,16 @@ export async function updateStudentNotesAndGoals(formData: FormData) {
   const phone = ((formData.get("phone") as string | null) ?? "").trim() || null;
   const birthday = parseBirthdayFromForm(formData);
 
-  // Per-student monthly fee override. Empty input → fall back to studio default.
+  // Per-student monthly fee override. Empty input → "Por definir". Normally set
+  // by the plan (see setStudentPlan); the coach edits it here only for a custom
+  // rate that differs from the tier price.
   const feeRaw = ((formData.get("monthly_fee") as string | null) ?? "").trim();
   const monthly_fee_cents = feeRaw === "" ? null : parseEuroToCents(feeRaw);
 
-  // Which Pagamentos tab this student belongs to + whether their monthly
-  // payment is tracked (relevant for PT students who pay per-session).
-  const service_type =
-    ((formData.get("service_type") as string | null) ?? "group") === "solo"
-      ? "solo"
-      : "group";
+  // Whether this student's monthly payment is tracked (PTs who pay per-session
+  // turn this off). service_type + weekly_class_limit are owned by the plan
+  // card now, so they are intentionally not read or written here.
   const has_monthly_fee = formData.get("has_monthly_fee") === "on";
-  // Plan tier: "" → null (livre); otherwise 1-7 classes per week.
-  const weeklyLimitRaw = (formData.get("weekly_class_limit") as string | null) ?? "";
-  const weekly_class_limit =
-    weeklyLimitRaw === "" ? null : Number(weeklyLimitRaw);
-  if (
-    weekly_class_limit !== null &&
-    (!Number.isInteger(weekly_class_limit) ||
-      weekly_class_limit < 1 ||
-      weekly_class_limit > 7)
-  ) {
-    throw new Error("Limite semanal inválido.");
-  }
 
   if (!id) throw new Error("ID em falta.");
 
@@ -53,9 +41,7 @@ export async function updateStudentNotesAndGoals(formData: FormData) {
       phone,
       birthday,
       monthly_fee_cents,
-      service_type,
       has_monthly_fee,
-      weekly_class_limit,
     })
     .eq("id", id);
 
@@ -157,4 +143,54 @@ export async function togglePaymentStatus(formData: FormData) {
 
   revalidatePath(`/admin/students/${user_id}`);
   revalidatePath("/admin/pagamentos");
+}
+
+// Set an existing student's plan from the plan card. Unlike approval, this also
+// SNAPS the monthly fee to the new tier's standard price — but only when the
+// current fee is plan-derived (null, or one of the standard tier prices). A
+// custom rate the coach set on purpose (any other value) is preserved. PT never
+// sets a fee (those vary per student). Returns { error } for expected failures
+// (Next masks thrown Server Action messages in production).
+export async function setStudentPlan(input: {
+  id: string;
+  plan: Plan;
+}): Promise<{ error?: string }> {
+  await assertAdmin();
+  const { id, plan } = input;
+  if (!id) return { error: "ID em falta." };
+  if (!Object.hasOwn(PLAN_CONFIG, plan)) return { error: "Plano inválido." };
+  const config = PLAN_CONFIG[plan];
+
+  const supabase = await createClient();
+
+  const { data: current, error: readError } = await supabase
+    .from("profiles")
+    .select("monthly_fee_cents")
+    .eq("id", id)
+    .maybeSingle();
+  if (readError) return { error: readError.message };
+
+  const update: Record<string, unknown> = {
+    service_type: config.service_type,
+    weekly_class_limit: config.weekly_class_limit,
+  };
+
+  // Fee follows the plan unless it's a custom (non-standard) rate.
+  const cur = current?.monthly_fee_cents ?? null;
+  const feeIsPlanDerived = cur === null || STANDARD_FEES_CENTS.has(cur);
+  if (config.fee_cents !== null && feeIsPlanDerived) {
+    update.monthly_fee_cents = config.fee_cents;
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update(update)
+    .eq("id", id);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/admin/students/${id}`);
+  revalidatePath("/admin/students");
+  revalidatePath("/admin/pagamentos");
+  revalidatePath("/aulas");
+  return {};
 }

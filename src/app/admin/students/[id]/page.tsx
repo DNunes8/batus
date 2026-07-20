@@ -15,13 +15,14 @@ import {
 } from "@/lib/birthday";
 import { StatusPill } from "@/app/admin/pagamentos/status-pill";
 import type { PaymentStatus } from "@/app/admin/pagamentos/actions";
-import { approveStudent } from "../actions";
+import { ApproveDialog } from "../approve-dialog";
 import {
   setStudentPaused,
   togglePaymentStatus,
   updateStudentNotesAndGoals,
   upsertPaymentRecord,
 } from "./actions";
+import { PlanCard } from "./plan-card";
 
 const SELECT_CLASSES =
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -83,20 +84,14 @@ export default async function StudentDetailPage({
               Este aluno não pode marcar aulas enquanto não for aprovado.
             </p>
           </div>
-          <ConfirmForm
-            message={`Aprovar ${
-              profile.full_name || profile.email
-            }? Vai poder marcar aulas.`}
-            action={approveStudent}
-          >
-            <input type="hidden" name="id" value={profile.id} />
-            <button
-              type="submit"
-              className="h-11 rounded-md bg-foreground px-5 text-sm font-medium uppercase tracking-wider text-background transition-opacity hover:opacity-90"
-            >
-              Aprovar
-            </button>
-          </ConfirmForm>
+          <ApproveDialog
+            student={{
+              id: profile.id,
+              name: profile.full_name || profile.email,
+            }}
+            buttonLabel="Aprovar"
+            buttonClassName="h-11 rounded-md bg-foreground px-5 text-sm font-medium uppercase tracking-wider text-background transition-opacity hover:opacity-90"
+          />
         </div>
       )}
 
@@ -155,6 +150,20 @@ export default async function StudentDetailPage({
             </ConfirmForm>
           </div>
         ))}
+
+      {/* Plan front-and-centre — the current tier reads at a glance and
+          changing it is one tap. Also drives the monthly fee (see
+          setStudentPlan). Only for approved students; a pending one is handled
+          by the approval panel above. */}
+      {profile.approved && !profile.is_admin && (
+        <PlanCard
+          student={{
+            id: profile.id,
+            service_type: profile.service_type,
+            weekly_class_limit: profile.weekly_class_limit,
+          }}
+        />
+      )}
 
       <section className="mt-12">
         <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
@@ -241,60 +250,31 @@ export default async function StudentDetailPage({
               Aparece no dashboard quando for o dia certo.
             </p>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="service_type">Tipo</Label>
-              <select
-                id="service_type"
-                name="service_type"
-                defaultValue={profile.service_type ?? "group"}
-                className={SELECT_CLASSES}
-              >
-                <option value="group">Aulas de grupo</option>
-                <option value="solo">PTs</option>
-              </select>
-              <p className="text-xs text-muted-foreground">
-                Determina o separador onde o aluno aparece em Pagamentos.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="monthly_fee">Mensalidade (€)</Label>
-              <Input
-                id="monthly_fee"
-                name="monthly_fee"
-                inputMode="decimal"
-                defaultValue={
-                  profile.monthly_fee_cents != null
-                    ? (profile.monthly_fee_cents / 100)
-                        .toFixed(2)
-                        .replace(".", ",")
-                    : ""
-                }
-                placeholder="ex: 25"
-              />
-              <p className="text-xs text-muted-foreground">
-                O que este aluno paga por mês. Em branco fica como{" "}
-                <em>Por definir</em> em Pagamentos.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="weekly_class_limit">Aulas por semana (plano)</Label>
-              <select
-                id="weekly_class_limit"
-                name="weekly_class_limit"
-                defaultValue={profile.weekly_class_limit ?? ""}
-                className={SELECT_CLASSES}
-              >
-                <option value="">Livre (ex: 60€)</option>
-                <option value="1">1 aula/semana (ex: 25€)</option>
-                <option value="2">2 aulas/semana (ex: 35€)</option>
-                <option value="3">3 aulas/semana (ex: 50€)</option>
-              </select>
-              <p className="text-xs text-muted-foreground">
-                Quantas aulas de grupo pode marcar por semana (segunda a
-                domingo).
-              </p>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="monthly_fee">Mensalidade (€)</Label>
+            {/* key on the stored fee: the plan card snaps the fee via
+                router.refresh() (no remount), so without this the uncontrolled
+                input keeps its stale value and the next Guardar would revert the
+                snap. Keying to the server value forces a re-sync. */}
+            <Input
+              key={profile.monthly_fee_cents ?? "none"}
+              id="monthly_fee"
+              name="monthly_fee"
+              inputMode="decimal"
+              defaultValue={
+                profile.monthly_fee_cents != null
+                  ? (profile.monthly_fee_cents / 100)
+                      .toFixed(2)
+                      .replace(".", ",")
+                  : ""
+              }
+              placeholder="ex: 25"
+            />
+            <p className="text-xs text-muted-foreground">
+              Segue o plano (definido em cima). Muda só se este aluno pagar um
+              valor à parte — desconto, acordo. Em branco fica como{" "}
+              <em>Por definir</em>.
+            </p>
           </div>
           <label className="flex items-start gap-2 rounded-md border border-border/60 p-3 text-sm">
             <input

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { assertAdmin } from "@/lib/auth-guard";
+import { PLAN_CONFIG, type Plan } from "@/lib/plans";
 
 // Approve a pending student so they can start booking classes.
 // Called from the Alunos list and the student detail page.
@@ -24,26 +25,6 @@ export async function approveStudent(formData: FormData) {
   revalidatePath("/admin");
 }
 
-// The plans the approve dialog offers. Group tiers carry the coach's standard
-// pricing so approval also pre-fills the fee; PT students get configured later
-// in Pagamentos (fees vary per student).
-export type ApprovalPlan = "1" | "2" | "3" | "livre" | "pt";
-
-const PLAN_CONFIG: Record<
-  ApprovalPlan,
-  {
-    service_type: "group" | "solo";
-    weekly_class_limit: number | null;
-    fee_cents: number | null;
-  }
-> = {
-  "1": { service_type: "group", weekly_class_limit: 1, fee_cents: 2500 },
-  "2": { service_type: "group", weekly_class_limit: 2, fee_cents: 3500 },
-  "3": { service_type: "group", weekly_class_limit: 3, fee_cents: 5000 },
-  livre: { service_type: "group", weekly_class_limit: null, fee_cents: 6000 },
-  pt: { service_type: "solo", weekly_class_limit: null, fee_cents: null },
-};
-
 // Approve + configure in one gesture: the dialog on the Alunos list asks which
 // plan the new student is on, so the coach never has to remember a second step
 // in Pagamentos. The standard fee is only PRE-FILLED when none is set yet —
@@ -53,13 +34,13 @@ const PLAN_CONFIG: Record<
 // digest instead of the Portuguese reason (same pattern as commit 1d43536).
 export async function approveStudentWithPlan(input: {
   id: string;
-  plan: ApprovalPlan;
+  plan: Plan;
 }): Promise<{ error?: string }> {
   await assertAdmin();
   const { id, plan } = input;
   if (!id) return { error: "ID em falta." };
+  if (!Object.hasOwn(PLAN_CONFIG, plan)) return { error: "Plano inválido." };
   const config = PLAN_CONFIG[plan];
-  if (!config) return { error: "Plano inválido." };
 
   const supabase = await createClient();
 
