@@ -22,6 +22,10 @@ export type BoardRow = DrawerStudent & {
   // Account-level pause (profiles.is_blocked) — distinct from the monthly
   // payment status. A paused account can't book; it still shows here.
   is_paused: boolean;
+  // Prepaid-pack balance (null = not a pack student). A pack student pays no
+  // monthly fee, so we show their class balance instead of a payment status —
+  // never "Por pagar".
+  class_credits: number | null;
 };
 
 type BulkAction = { status: PaymentStatus; ids: string[] } | null;
@@ -187,7 +191,8 @@ export function PaymentsBoard({
             // "Por definir" instead of a number; coach can tap the row
             // to set it inline in the drawer.
             const amount = r.record?.amount_cents ?? r.resolvedFee;
-            const isPaid = r.effectiveStatus === "paid";
+            const isPack = r.class_credits != null;
+            const isPaid = !isPack && r.effectiveStatus === "paid";
             return (
               <li key={r.id}>
                 <div className="flex items-center gap-3 py-3">
@@ -217,7 +222,13 @@ export function PaymentsBoard({
                         {r.full_name?.trim() || r.email}
                       </p>
                       <div className="mt-1 flex items-center gap-2">
-                        <StatusPill status={r.effectiveStatus} />
+                        {isPack ? (
+                          <span className="inline-flex shrink-0 items-center rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                            Pack
+                          </span>
+                        ) : (
+                          <StatusPill status={r.effectiveStatus} />
+                        )}
                         {r.is_paused && (
                           <span className="inline-flex shrink-0 items-center rounded-full border border-muted-foreground/40 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
                             Conta em pausa
@@ -231,27 +242,41 @@ export function PaymentsBoard({
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
-                      {amount === null ? (
-                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                          Por definir
-                        </p>
+                      {isPack ? (
+                        <>
+                          <p className="text-sm font-medium tabular-nums">
+                            {r.class_credits}{" "}
+                            {r.class_credits === 1 ? "aula" : "aulas"}
+                          </p>
+                          <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                            no pack
+                          </p>
+                        </>
                       ) : (
-                        <p
-                          className={`text-sm font-medium tabular-nums ${
-                            isPaid
-                              ? "text-muted-foreground line-through"
-                              : "text-foreground"
-                          }`}
-                        >
-                          {formatEuro(amount)}
-                        </p>
+                        <>
+                          {amount === null ? (
+                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                              Por definir
+                            </p>
+                          ) : (
+                            <p
+                              className={`text-sm font-medium tabular-nums ${
+                                isPaid
+                                  ? "text-muted-foreground line-through"
+                                  : "text-foreground"
+                              }`}
+                            >
+                              {formatEuro(amount)}
+                            </p>
+                          )}
+                          {/* Plan tier under the fee: price + what it buys. */}
+                          <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                            {r.weekly_class_limit != null
+                              ? `${r.weekly_class_limit}×/semana`
+                              : "Livre"}
+                          </p>
+                        </>
                       )}
-                      {/* Plan tier under the fee: price + what it buys, one glance. */}
-                      <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                        {r.weekly_class_limit != null
-                          ? `${r.weekly_class_limit}×/semana`
-                          : "Livre"}
-                      </p>
                     </div>
                   </button>
                 </div>

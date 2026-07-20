@@ -291,6 +291,26 @@ export default async function PerfilPage({
       {/* Stats + bookings only make sense once the student can actually book. */}
       {isApproved && !isIncomplete && (
         <>
+          {profile?.class_credits != null && (
+            <div className="mt-12 rounded-md border border-border/60 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                Pack de aulas
+              </p>
+              <p className="mt-1 text-lg font-medium">
+                {profile.class_credits}{" "}
+                <span className="text-sm font-normal text-muted-foreground">
+                  {profile.class_credits === 1
+                    ? "aula restante"
+                    : "aulas restantes"}
+                </span>
+              </p>
+              {profile.class_credits <= 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Fala com o treinador para comprares mais.
+                </p>
+              )}
+            </div>
+          )}
           <StreakCard total={stats.total_attended} />
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <StatCard

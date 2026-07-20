@@ -161,6 +161,7 @@ export default async function StudentDetailPage({
             id: profile.id,
             service_type: profile.service_type,
             weekly_class_limit: profile.weekly_class_limit,
+            class_credits: profile.class_credits,
           }}
         />
       )}

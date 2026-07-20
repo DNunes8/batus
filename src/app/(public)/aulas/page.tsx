@@ -49,11 +49,12 @@ export default async function AulasPage({
   let isIncomplete = false;
   let isUnpaid = false;
   let weeklyLimit: number | null = null;
+  let classCredits: number | null = null;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
       .select(
-        "approved, is_admin, is_blocked, full_name, phone, birthday, has_monthly_fee, joined_at, weekly_class_limit",
+        "approved, is_admin, is_blocked, full_name, phone, birthday, has_monthly_fee, joined_at, weekly_class_limit, class_credits",
       )
       .eq("id", user.id)
       .maybeSingle();
@@ -63,12 +64,16 @@ export default async function AulasPage({
       !profile?.is_admin &&
       (!profile?.full_name || !profile?.phone || !profile?.birthday);
     weeklyLimit = profile?.weekly_class_limit ?? null;
+    classCredits = profile?.class_credits ?? null;
     // Payment gate only matters once they're otherwise bookable.
     if (profile && isApproved && !isPaused && !isIncomplete) {
       isUnpaid = await isUnpaidAndBlocked(user.id, profile);
     }
   }
   const isPending = !!user && !isApproved;
+  // Pack student with an empty balance — locked out of booking (the server
+  // enforces it too). Non-pack students have classCredits === null.
+  const packEmpty = classCredits != null && classCredits <= 0;
 
   // Weekly plan limit: count the student's active bookings per ISO week
   // (Mon-Sun) across the weeks the rolling 7-day window touches, so the UI
@@ -198,6 +203,14 @@ export default async function AulasPage({
             </Link>
           </p>
         </div>
+      ) : packEmpty ? (
+        <div className="mt-6 rounded-md border border-foreground/25 bg-muted/40 p-4 sm:p-5">
+          <p className="text-sm font-medium">Sem aulas no teu pack</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Fala com o {studio.coach} para comprares mais. As marcações voltam
+            assim que tiveres aulas no pack.
+          </p>
+        </div>
       ) : (
         <p className="mt-6 max-w-2xl text-sm text-foreground/70">
           Horário aberto a todos. Marca uma aula com um clique
@@ -211,6 +224,14 @@ export default async function AulasPage({
             Perfil
           </Link>
           .
+        </p>
+      )}
+
+      {classCredits != null && classCredits > 0 && (
+        <p className="mt-4 text-sm text-foreground/70">
+          Tens{" "}
+          <span className="font-semibold text-foreground">{classCredits}</span>{" "}
+          {classCredits === 1 ? "aula" : "aulas"} no teu pack.
         </p>
       )}
 
@@ -293,6 +314,7 @@ export default async function AulasPage({
                           isPaused={isPaused}
                           isIncomplete={isIncomplete}
                           isUnpaid={isUnpaid}
+                          packEmpty={packEmpty}
                           notYetOpen={c.date > bookableUntil}
                           dayHasOtherBooking={
                             userBookedThisDay &&
@@ -329,6 +351,7 @@ function BookingControl({
   isPaused,
   isIncomplete,
   isUnpaid,
+  packEmpty,
   notYetOpen,
   dayHasOtherBooking,
   weeklyLimitReached,
@@ -340,6 +363,7 @@ function BookingControl({
   isPaused: boolean;
   isIncomplete: boolean;
   isUnpaid: boolean;
+  packEmpty: boolean;
   notYetOpen: boolean;
   dayHasOtherBooking: boolean;
   weeklyLimitReached: boolean;
@@ -443,6 +467,15 @@ function BookingControl({
     return (
       <span className="inline-flex h-10 items-center rounded-md border border-border/60 px-3 text-xs uppercase tracking-widest text-muted-foreground">
         Pagamento em falta
+      </span>
+    );
+  }
+
+  // Pack student out of classes — locked until the coach adds more.
+  if (packEmpty) {
+    return (
+      <span className="inline-flex h-10 items-center rounded-md border border-border/60 px-3 text-xs uppercase tracking-widest text-muted-foreground">
+        Sem aulas no pack
       </span>
     );
   }

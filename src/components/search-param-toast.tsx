@@ -62,6 +62,11 @@ const TOAST_BY_PARAM: Record<string, ToastConfig> = {
     description:
       "O teu plano renova à segunda-feira. Para mais aulas, fala com o treinador.",
   },
+  nocredits: {
+    type: "error",
+    message: "Sem aulas no teu pack.",
+    description: "Fala com o treinador para comprar mais.",
+  },
   cutoff: {
     type: "error",
     message: "Já não dá para cancelar esta aula.",

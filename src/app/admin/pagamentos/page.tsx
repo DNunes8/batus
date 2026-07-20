@@ -61,7 +61,7 @@ export default async function PagamentosPage({
     supabase
       .from("profiles")
       .select(
-        "id, email, full_name, phone, monthly_fee_cents, goals, notes, joined_at, is_admin, is_blocked, service_type, has_monthly_fee, weekly_class_limit",
+        "id, email, full_name, phone, monthly_fee_cents, goals, notes, joined_at, is_admin, is_blocked, service_type, has_monthly_fee, weekly_class_limit, class_credits",
       )
       // Paused accounts (is_blocked) stay on the board on purpose — the coach
       // wants them visible, just flagged "Conta em pausa" (see buildBoardRow).
@@ -208,6 +208,7 @@ export default async function PagamentosPage({
       service_type: (p.service_type as "group" | "solo") ?? "group",
       has_monthly_fee: p.has_monthly_fee ?? true,
       weekly_class_limit: p.weekly_class_limit ?? null,
+      class_credits: p.class_credits ?? null,
       record: currentRecord
         ? {
             status: currentRecord.status as PaymentStatus,
@@ -239,7 +240,11 @@ export default async function PagamentosPage({
         paid: 1,
         paused: 2,
       };
-      const diff = order[a.effectiveStatus] - order[b.effectiveStatus];
+      // Pack students owe no monthly payment — don't surface them as "unpaid"
+      // at the top; sort them among the settled rows.
+      const rank = (r: BoardRow) =>
+        r.class_credits != null ? 1 : order[r.effectiveStatus];
+      const diff = rank(a) - rank(b);
       if (diff !== 0) return diff;
       return sortAlpha(a, b);
     });
@@ -256,9 +261,13 @@ export default async function PagamentosPage({
     });
 
   // ---- Stats per tab ----
-  const groupPaid = groupRows.filter((r) => r.effectiveStatus === "paid").length;
-  const groupUnpaid = groupRows.filter((r) => r.effectiveStatus === "unpaid").length;
-  const groupPaused = groupRows.filter((r) => r.effectiveStatus === "paused").length;
+  // Pack students carry no monthly status — exclude them from the pago/por-pagar
+  // counts so the coach isn't shown a mensalidade they don't owe.
+  const monthlyRows = groupRows.filter((r) => r.class_credits == null);
+  const groupPaid = monthlyRows.filter((r) => r.effectiveStatus === "paid").length;
+  const groupUnpaid = monthlyRows.filter((r) => r.effectiveStatus === "unpaid").length;
+  const groupPaused = monthlyRows.filter((r) => r.effectiveStatus === "paused").length;
+  const groupPacks = groupRows.filter((r) => r.class_credits != null).length;
 
   const soloTotalSessions = soloRows.reduce(
     (s, r) => s + (r.solo_activity?.sessions_this_month ?? 0),
@@ -391,6 +400,7 @@ export default async function PagamentosPage({
               {groupPaused > 0 && (
                 <Stat n={groupPaused} label="em pausa" />
               )}
+              {groupPacks > 0 && <Stat n={groupPacks} label="packs" />}
             </dl>
           )
         : soloRows.length > 0 && (

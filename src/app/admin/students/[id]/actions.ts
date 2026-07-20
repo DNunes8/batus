@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { assertAdmin } from "@/lib/auth-guard";
 import { parseEuroToCents } from "@/lib/money";
 import { parseBirthdayFromForm } from "@/lib/birthday";
@@ -32,18 +33,34 @@ export async function updateStudentNotesAndGoals(formData: FormData) {
   if (!id) throw new Error("ID em falta.");
 
   const supabase = await createClient();
-  const { error } = await supabase
+
+  // Pack students are billed by their credit balance, not a monthly fee — the
+  // plan card owns has_monthly_fee / monthly_fee_cents for them. Don't let this
+  // form's (possibly stale) checkbox flip has_monthly_fee back on and re-trip
+  // the unpaid-month gate for a paying pack student.
+  const { data: current, error: readError } = await supabase
     .from("profiles")
-    .update({
-      notes,
-      goals,
-      full_name,
-      phone,
-      birthday,
-      monthly_fee_cents,
-      has_monthly_fee,
-    })
-    .eq("id", id);
+    .select("class_credits")
+    .eq("id", id)
+    .maybeSingle();
+  // Fail closed: if we can't read the balance we must NOT assume "not a pack"
+  // and risk re-enabling monthly billing on a pack student.
+  if (readError) throw new Error(readError.message);
+  const isPack = current?.class_credits != null;
+
+  const update: Record<string, unknown> = {
+    notes,
+    goals,
+    full_name,
+    phone,
+    birthday,
+  };
+  if (!isPack) {
+    update.monthly_fee_cents = monthly_fee_cents;
+    update.has_monthly_fee = has_monthly_fee;
+  }
+
+  const { error } = await supabase.from("profiles").update(update).eq("id", id);
 
   if (error) throw new Error(error.message);
 
@@ -165,7 +182,7 @@ export async function setStudentPlan(input: {
 
   const { data: current, error: readError } = await supabase
     .from("profiles")
-    .select("monthly_fee_cents")
+    .select("monthly_fee_cents, class_credits")
     .eq("id", id)
     .maybeSingle();
   if (readError) return { error: readError.message };
@@ -175,11 +192,26 @@ export async function setStudentPlan(input: {
     weekly_class_limit: config.weekly_class_limit,
   };
 
-  // Fee follows the plan unless it's a custom (non-standard) rate.
-  const cur = current?.monthly_fee_cents ?? null;
-  const feeIsPlanDerived = cur === null || STANDARD_FEES_CENTS.has(cur);
-  if (config.fee_cents !== null && feeIsPlanDerived) {
-    update.monthly_fee_cents = config.fee_cents;
+  if (config.is_pack) {
+    // Become a pack student: keep any existing balance, else start at 0. A pack
+    // is paid upfront, so no monthly billing — has_monthly_fee=false also
+    // exempts them from the unpaid-month gate.
+    update.class_credits = current?.class_credits ?? 0;
+    update.has_monthly_fee = false;
+    update.monthly_fee_cents = null;
+  } else {
+    // Leaving pack (or never was one): clear the balance. Group tiers pay
+    // monthly; PT keeps the per-session toggle the coach controls.
+    update.class_credits = null;
+    if (config.service_type === "group") {
+      update.has_monthly_fee = true;
+    }
+    // Fee follows the plan unless it's a custom (non-standard) rate.
+    const cur = current?.monthly_fee_cents ?? null;
+    const feeIsPlanDerived = cur === null || STANDARD_FEES_CENTS.has(cur);
+    if (config.fee_cents !== null && feeIsPlanDerived) {
+      update.monthly_fee_cents = config.fee_cents;
+    }
   }
 
   const { error } = await supabase
@@ -193,4 +225,36 @@ export async function setStudentPlan(input: {
   revalidatePath("/admin/pagamentos");
   revalidatePath("/aulas");
   return {};
+}
+
+// The coach's −1 / +1 / +5 / +10 buttons on a pack student. Atomic via the
+// adjust_class_credits RPC (no read-modify-write race with a live booking),
+// clamped at 0. Runs through the service-role client because class_credits is
+// a protected column; assertAdmin above is the authorization gate.
+export async function adjustStudentCredits(input: {
+  id: string;
+  delta: number;
+}): Promise<{ error?: string; credits?: number }> {
+  await assertAdmin();
+  const { id, delta } = input;
+  if (!id) return { error: "ID em falta." };
+  if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 100) {
+    return { error: "Ajuste inválido." };
+  }
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("adjust_class_credits", {
+    p_user_id: id,
+    p_delta: delta,
+  });
+  if (error) return { error: error.message };
+  if (data == null) {
+    return { error: "Este aluno não tem um pack." };
+  }
+
+  revalidatePath(`/admin/students/${id}`);
+  revalidatePath("/admin/students");
+  revalidatePath("/admin/pagamentos");
+  revalidatePath("/aulas");
+  return { credits: data as number };
 }

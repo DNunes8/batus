@@ -60,8 +60,15 @@ export async function approveStudentWithPlan(input: {
     service_type: config.service_type,
     weekly_class_limit: config.weekly_class_limit,
   };
-  if (config.fee_cents !== null && current?.monthly_fee_cents == null) {
-    update.monthly_fee_cents = config.fee_cents;
+  if (config.is_pack) {
+    // New pack student: empty balance (the coach loads it) and no monthly fee.
+    update.class_credits = 0;
+    update.has_monthly_fee = false;
+  } else {
+    update.class_credits = null;
+    if (config.fee_cents !== null && current?.monthly_fee_cents == null) {
+      update.monthly_fee_cents = config.fee_cents;
+    }
   }
 
   const { error } = await supabase

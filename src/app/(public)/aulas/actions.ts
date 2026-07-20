@@ -31,7 +31,7 @@ export async function bookClass(formData: FormData) {
   const { data: gateProfile } = await supabase
     .from("profiles")
     .select(
-      "approved, is_admin, is_blocked, full_name, phone, birthday, has_monthly_fee, joined_at, weekly_class_limit",
+      "approved, is_admin, is_blocked, full_name, phone, birthday, has_monthly_fee, joined_at, weekly_class_limit, class_credits",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -137,6 +137,12 @@ export async function bookClass(formData: FormData) {
     }
   }
 
+  // Pack students need a class in the bank to book (or waitlist). book_class
+  // re-checks atomically (BATUS_NO_CREDITS); this is the friendly early bounce.
+  if (gateProfile?.class_credits != null && gateProfile.class_credits <= 0) {
+    bounce("nocredits");
+  }
+
   const { data: template } = await supabase
     .from("class_templates")
     .select("capacity")
@@ -168,6 +174,9 @@ export async function bookClass(formData: FormData) {
     }
     if (error.message.includes("BATUS_WEEKLY_LIMIT")) {
       bounce("weeklylimit");
+    }
+    if (error.message.includes("BATUS_NO_CREDITS")) {
+      bounce("nocredits");
     }
     throw new Error(error.message);
   }
@@ -231,20 +240,34 @@ export async function cancelBooking(formData: FormData) {
     }
   }
 
-  const { error } = await supabase
+  // Guard the flip on the status we read, and return the affected row: a
+  // concurrent double-cancel (double-tap / form resubmit) then matches 0 rows
+  // on the second run, so only ONE request runs the side-effects below. Without
+  // this, both requests would refund a pack credit (+1 each) — a class minted
+  // from nothing.
+  const { data: updated, error } = await supabase
     .from("bookings")
     .update({
       status: "cancelled",
       cancelled_at: new Date().toISOString(),
     })
-    .eq("id", booking_id);
+    .eq("id", booking_id)
+    .eq("status", booking.status)
+    .select("id");
 
   if (error) throw new Error(error.message);
 
-  // A confirmed seat may have opened up — promote the first waitlisted
-  // student IF a seat is genuinely free (the shared helper re-counts booked
-  // + guests vs capacity, so a coach-overfilled class doesn't re-inflate).
-  if (wasBooked) {
+  const didCancel = (updated?.length ?? 0) > 0;
+
+  // Only the request that actually cancelled a CONFIRMED booking refunds the
+  // pack credit (no-op for non-pack — the RPC guards on class_credits) and
+  // promotes the waitlist into the freed seat.
+  if (wasBooked && didCancel) {
+    const admin = createAdminClient();
+    await admin.rpc("adjust_class_credits", {
+      p_user_id: user.id,
+      p_delta: 1,
+    });
     await promoteFirstWaitlistedIfSeatFree(
       booking.template_id,
       booking.instance_date,
