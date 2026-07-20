@@ -72,6 +72,14 @@ const TOAST_BY_PARAM: Record<string, ToastConfig> = {
     message: "Esse link expirou ou já foi usado.",
     description: "Pede um novo em “Esqueci-me da palavra-passe”.",
   },
+  // Transient failure to reach Supabase Auth (network blip / free-tier
+  // throttle). The gate bounces here with the session intact instead of
+  // logging the user out — a retry just works.
+  offline: {
+    type: "error",
+    message: "Sem ligação ao servidor.",
+    description: "A tua sessão continua ativa. Tenta outra vez.",
+  },
 };
 
 export function SearchParamToast() {

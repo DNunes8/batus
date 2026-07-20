@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/auth-user";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { addDays, mondayOf, todayLisbon } from "@/lib/schedule";
 import { isUnpaidAndBlocked } from "@/lib/payment";
@@ -11,11 +12,13 @@ import { promoteFirstWaitlistedIfSeatFree } from "@/lib/waitlist";
 
 export async function bookClass(formData: FormData) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, transient } = await getAuthUser(supabase);
 
   if (!user) {
+    // Booking is the most-tapped student action — a transient blip must not
+    // eat a valid session and force a re-login. Bounce back with an "offline"
+    // toast, still logged in; only a genuine no-session goes to /login.
+    if (transient) redirect("/aulas?offline=1");
     redirect("/login?next=/aulas");
   }
 
@@ -178,11 +181,10 @@ export async function bookClass(formData: FormData) {
 
 export async function cancelBooking(formData: FormData) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, transient } = await getAuthUser(supabase);
 
   if (!user) {
+    if (transient) redirect("/perfil?offline=1");
     redirect("/login");
   }
 

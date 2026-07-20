@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/auth-user";
 
 // Defense-in-depth guard for admin server actions.
 //
@@ -14,11 +15,17 @@ import { createClient } from "@/lib/supabase/server";
 // Cheap: one getUser() + one indexed lookup. Admin actions are not hot paths.
 export async function assertAdmin(): Promise<void> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, transient } = await getAuthUser(supabase);
 
   if (!user) {
+    // A transient failure to reach Auth must not look like "logged out" — that
+    // would boot the coach mid-action (e.g. marking a payment). Don't throw:
+    // Next masks Server Action errors in prod, so an uncaught throw would
+    // replace the whole admin UI with the generic error page. Redirect with a
+    // toast param instead; the session stays intact so a retry just works.
+    if (transient) {
+      redirect("/admin?offline=1");
+    }
     redirect("/login");
   }
 

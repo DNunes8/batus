@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/auth-user";
+import { Reconnecting } from "@/components/reconnecting";
 import { studio } from "@/lib/studio.config";
 import { currentMonthLabel, isUnpaidAndBlocked } from "@/lib/payment";
 import { Input } from "@/components/ui/input";
@@ -66,11 +68,10 @@ export default async function PerfilPage({
   const isReset = params.reset === "1";
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, transient } = await getAuthUser(supabase);
 
   if (!user) {
+    if (transient) return <Reconnecting />;
     redirect("/login?next=/perfil");
   }
 

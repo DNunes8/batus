@@ -2,7 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/auth-user";
 import { AdminMobileNav } from "@/components/admin-mobile-nav";
+import { Reconnecting } from "@/components/reconnecting";
 import { ADMIN_NAV } from "@/lib/admin-nav";
 import { studio } from "@/lib/studio.config";
 
@@ -12,11 +14,12 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, transient } = await getAuthUser(supabase);
 
   if (!user) {
+    // Couldn't reach Auth to confirm the session — show a soft reconnect screen
+    // rather than logging a valid user out and forcing a password re-entry.
+    if (transient) return <Reconnecting />;
     redirect("/login?next=/admin");
   }
 

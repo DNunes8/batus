@@ -16,6 +16,7 @@ export const config = {
   matcher: [
     "/aulas/:path*",
     "/perfil/:path*",
+    "/loja/:path*",
     "/admin/:path*",
     "/bem-vindo/:path*",
     "/login",
