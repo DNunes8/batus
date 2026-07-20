@@ -51,7 +51,7 @@ export function PlanCard({
 
   return (
     <section className="mt-6 rounded-md border border-border/60 p-4">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gold">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-foreground">
         Plano
       </p>
       <p className="mt-1 text-lg font-medium">
@@ -80,7 +80,7 @@ export function PlanCard({
             >
               <span className="text-sm font-medium">
                 {opt.label}
-                {isActive && <span className="ml-2 text-gold">✓</span>}
+                {isActive && <span className="ml-2">✓</span>}
               </span>
               <span className="shrink-0 text-xs text-muted-foreground">
                 {isSaving ? "A guardar…" : opt.detail}

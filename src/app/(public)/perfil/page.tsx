@@ -21,6 +21,7 @@ import {
 import { updateOwnProfile } from "./actions";
 import { ChangePasswordForm } from "./change-password-form";
 import { AutoScrollTo } from "./auto-scroll";
+import { StreakCard } from "./streak-card";
 
 export const dynamic = "force-dynamic";
 
@@ -290,12 +291,12 @@ export default async function PerfilPage({
       {/* Stats + bookings only make sense once the student can actually book. */}
       {isApproved && !isIncomplete && (
         <>
-          <div className="mt-12 grid gap-4 sm:grid-cols-3">
+          <StreakCard total={stats.total_attended} />
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <StatCard
               label="Aulas este mês"
               value={stats.attended_this_month}
             />
-            <StatCard label="Total" value={stats.total_attended} />
             <StatCard label="Próximas" value={stats.upcoming.length} />
           </div>
 
