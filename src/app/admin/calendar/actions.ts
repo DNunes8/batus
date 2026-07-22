@@ -607,3 +607,98 @@ export async function removeClassGuest(formData: FormData) {
   revalidatePath("/admin/students");
   revalidatePath("/aulas");
 }
+
+// Remove ONE student from a class instance — the coach's "ceder vagas" tool.
+// A student messages that they can't come; the coach takes them out; the seat
+// frees and the first waitlisted student is promoted into it.
+//
+// This is a deliberate mirror of the student's own cancelBooking
+// (app/(public)/aulas/actions.ts): read the booking, do a status-GUARDED flip
+// so a double-tap can't run the side-effects twice, then — only when a
+// CONFIRMED booking was actually cancelled — refund the pack credit (no-op for
+// non-pack; the RPC guards on class_credits) and promote the waitlist. Two
+// deliberate differences, both required here:
+//   • Service-role client — a student's booking row is outside the coach's RLS
+//     reach, so the coach's cookie client couldn't update it.
+//   • A PLAIN cancelled_reason (no BATUS_CLASS_CANCELLED marker) — so a later
+//     whole-class cancel→restore never resurrects a student the coach removed
+//     on purpose (restoreInstanceBookings only revives marker rows).
+// No student-style cancellation cutoff (the coach may remove someone right up
+// to the start — that's the point), but the class must not have STARTED yet:
+// see the already-started guard below.
+export async function removeStudentBooking(formData: FormData) {
+  await assertAdmin();
+  const booking_id = formData.get("booking_id") as string | null;
+  if (!booking_id) throw new Error("Pedido inválido.");
+
+  const admin = createAdminClient();
+  const { data: booking } = await admin
+    .from("bookings")
+    .select(
+      "id, user_id, template_id, instance_date, status, class_templates!inner(start_time)",
+    )
+    .eq("id", booking_id)
+    .maybeSingle();
+
+  // Already cancelled (or gone) — nothing to undo. Just refresh the view so a
+  // stale tab that double-submitted doesn't error.
+  if (!booking || booking.status === "cancelled") {
+    revalidatePath("/admin/calendar");
+    return;
+  }
+
+  // This tool only frees FUTURE seats. Once the class has STARTED, refuse:
+  // cancelling a past booking would drop the student's lifetime "aulas feitas"
+  // streak, refund a pack credit for a class already delivered (a free class
+  // minted from nothing), and promote a waitlisted student into a class that is
+  // over. Deliberately narrower than the student cutoff — last-minute removal
+  // BEFORE the class starts is the whole point of "ceder vagas". (Server may
+  // run in UTC; Lisbon DST makes this off by at most ~1h — immaterial for an
+  // already-started gate.)
+  const startTime = (booking.class_templates as unknown as {
+    start_time: string;
+  }).start_time;
+  const classStart = new Date(`${booking.instance_date}T${startTime}`);
+  if (Date.now() >= classStart.getTime()) {
+    revalidatePath("/admin/calendar");
+    return;
+  }
+
+  const wasBooked = booking.status === "booked";
+
+  // Guard the flip on the status we read and return the affected row: a
+  // concurrent double-submit matches 0 rows on the second run, so only ONE
+  // request refunds a credit / promotes below. Without this, two requests
+  // could each refund (+1) — a class minted from nothing.
+  const { data: updated, error } = await admin
+    .from("bookings")
+    .update({
+      status: "cancelled",
+      cancelled_at: new Date().toISOString(),
+      cancelled_reason: "Removido pelo estúdio",
+    })
+    .eq("id", booking_id)
+    .eq("status", booking.status)
+    .select("id");
+  if (error) throw new Error(error.message);
+
+  const didCancel = (updated?.length ?? 0) > 0;
+
+  // Only a genuinely-cancelled CONFIRMED booking freed a seat: refund the pack
+  // credit and promote the first waitlisted student into the vacancy. A
+  // waitlisted removal freed nothing and never spent a credit — skip both.
+  if (wasBooked && didCancel) {
+    await admin.rpc("adjust_class_credits", {
+      p_user_id: booking.user_id,
+      p_delta: 1,
+    });
+    await promoteFirstWaitlistedIfSeatFree(
+      booking.template_id,
+      booking.instance_date,
+    );
+  }
+
+  revalidatePath("/admin/calendar");
+  revalidatePath("/aulas");
+  revalidatePath("/perfil");
+}

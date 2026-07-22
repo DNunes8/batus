@@ -27,6 +27,7 @@ import {
 import {
   addClassGuest,
   removeClassGuest,
+  removeStudentBooking,
   reopenDay,
   restoreClassInstance,
   cancelClassInstance,
@@ -512,6 +513,130 @@ function DayCard({
   );
 }
 
+// The class roster, collapsed by default. A bold count badge reads "how many
+// are coming" at a glance — solid when there are students, hollow-dashed when
+// the class is empty — so the coach scans a day without opening anything. One
+// tap opens the full list (booked + waitlisted + guests), each row with an ×
+// that removes them (with a native confirm) and frees the seat. Native
+// <details> keeps this a server component; the × forms are the only client bits.
+function RosterDisclosure({ entry }: { entry: AdminGroupEntry }) {
+  const hasPeople = entry.roster.length > 0 || entry.guests.length > 0;
+  // Past classes are read-only here: the roster still shows (useful history),
+  // but no × is offered — removing someone from a class that already happened
+  // would corrupt streaks/credits. The server action enforces this too; this
+  // just avoids showing a button that would no-op.
+  const isPast = entry.date < todayLisbon();
+
+  const badge = (
+    <span
+      className={`inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-bold tabular-nums ${
+        entry.booked_count > 0
+          ? "bg-foreground text-background"
+          : "border border-dashed border-muted-foreground/50 text-muted-foreground"
+      }`}
+    >
+      {entry.booked_count}
+    </span>
+  );
+  const label = !hasPeople
+    ? "Sem alunos"
+    : entry.booked_count > 0
+      ? "Alunos"
+      : "Sem confirmados";
+
+  // Empty class — show the (hollow) badge so "nobody here" reads instantly,
+  // but there's nothing to expand.
+  if (!hasPeople) {
+    return (
+      <div className="mt-2 flex items-center gap-2">
+        {badge}
+        <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+          {label}
+        </span>
+      </div>
+    );
+  }
+
+  const xButtonClass =
+    "flex size-7 shrink-0 items-center justify-center rounded-md border border-border/60 text-base leading-none text-muted-foreground hover:border-destructive hover:text-destructive";
+  const rowClass =
+    "flex items-center gap-2 border-t border-border/40 py-1.5 first:border-t-0";
+
+  return (
+    <details className="group/roster mt-2">
+      <summary className="flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
+        {badge}
+        <span className="flex-1 text-[10px] uppercase tracking-[0.15em] text-muted-foreground group-hover/roster:text-foreground">
+          {label}
+          {entry.waitlist_count > 0 && <span> · +{entry.waitlist_count} espera</span>}
+        </span>
+        <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open/roster:rotate-90" />
+      </summary>
+
+      <ul className="mt-1 text-[11px] text-muted-foreground">
+        {entry.roster.map((r) => {
+          const name = r.full_name || r.email.split("@")[0];
+          const waitlisted = r.status === "waitlisted";
+          return (
+            <li key={r.booking_id} className={rowClass}>
+              <span className="min-w-0 flex-1 truncate">{name}</span>
+              {waitlisted && (
+                <span className="shrink-0 rounded-sm border border-border/60 px-1 py-0.5 text-[9px] uppercase tracking-wider">
+                  espera{r.waitlist_position ? ` #${r.waitlist_position}` : ""}
+                </span>
+              )}
+              {!isPast && (
+                <ConfirmForm
+                  message={
+                    waitlisted
+                      ? `Tirar ${name} da lista de espera?`
+                      : `Tirar ${name} desta aula? A vaga fica livre.`
+                  }
+                  action={removeStudentBooking}
+                >
+                  <input type="hidden" name="booking_id" value={r.booking_id} />
+                  <button
+                    type="submit"
+                    aria-label={`Remover ${name}`}
+                    className={xButtonClass}
+                  >
+                    ×
+                  </button>
+                </ConfirmForm>
+              )}
+            </li>
+          );
+        })}
+
+        {/* Coach-added guests (aula experimental). They hold seats too. */}
+        {entry.guests.map((g) => (
+          <li key={g.id} className={rowClass}>
+            <span className="min-w-0 flex-1 truncate">{g.name}</span>
+            <span className="shrink-0 rounded-sm border border-gold/50 px-1 py-0.5 text-[9px] uppercase tracking-widest">
+              Exp
+            </span>
+            {!isPast && (
+              <ConfirmForm
+                message={`Tirar ${g.name} desta aula? A vaga fica livre.`}
+                action={removeClassGuest}
+              >
+                <input type="hidden" name="id" value={g.id} />
+                <button
+                  type="submit"
+                  aria-label={`Remover ${g.name}`}
+                  className={xButtonClass}
+                >
+                  ×
+                </button>
+              </ConfirmForm>
+            )}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 function GroupBlock({ entry }: { entry: AdminGroupEntry }) {
   if (entry.cancelled) {
     return (
@@ -573,63 +698,7 @@ function GroupBlock({ entry }: { entry: AdminGroupEntry }) {
         {entry.name}
       </p>
 
-      {entry.roster.length > 0 && (
-        <ul className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
-          {entry.roster.slice(0, 3).map((r) => {
-            const name = r.full_name || r.email.split("@")[0];
-            return (
-              <li
-                key={r.booking_id}
-                className="flex items-baseline justify-between gap-2"
-              >
-                <span className="truncate">{name}</span>
-                {r.status === "waitlisted" && (
-                  <span className="shrink-0 text-[9px]">
-                    espera #{r.waitlist_position}
-                  </span>
-                )}
-              </li>
-            );
-          })}
-          {entry.roster.length > 3 && (
-            <li className="text-muted-foreground/60">
-              +{entry.roster.length - 3} mais
-            </li>
-          )}
-        </ul>
-      )}
-
-      {/* Coach-added guests (aula experimental / manual). They hold seats. */}
-      {entry.guests.length > 0 && (
-        <ul className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
-          {entry.guests.map((g) => (
-            <li
-              key={g.id}
-              className="flex items-center justify-between gap-2"
-            >
-              <span className="truncate">{g.name}</span>
-              <span className="flex shrink-0 items-center gap-1.5">
-                <span className="rounded-sm border border-gold/50 px-1 py-0.5 text-[9px] uppercase tracking-widest">
-                  Exp
-                </span>
-                <ConfirmForm
-                  message={`Tirar ${g.name} desta aula? A vaga fica livre.`}
-                  action={removeClassGuest}
-                >
-                  <input type="hidden" name="id" value={g.id} />
-                  <button
-                    type="submit"
-                    aria-label={`Remover ${g.name}`}
-                    className="px-1 text-sm leading-none text-muted-foreground hover:text-destructive"
-                  >
-                    ×
-                  </button>
-                </ConfirmForm>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <RosterDisclosure entry={entry} />
 
       {/* Add a person by name — always allowed, even past capacity. */}
       <details className="mt-2">
