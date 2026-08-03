@@ -2,7 +2,12 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmForm } from "@/components/confirm-form";
-import { SubmitButton } from "@/components/submit-button";
+import { currentPlan } from "@/lib/plans";
+import {
+  AddPersonPicker,
+  StudentsProvider,
+  type StudentLite,
+} from "./add-person-picker";
 import {
   AddClassDialog,
   type GroupTemplateLite,
@@ -25,7 +30,6 @@ import {
   type AdminScheduleDay,
 } from "@/lib/schedule";
 import {
-  addClassGuest,
   removeClassGuest,
   removeStudentBooking,
   reopenDay,
@@ -34,6 +38,23 @@ import {
   cancelSoloInstance,
   restoreSoloInstance,
 } from "./actions";
+
+// Short plan tag shown beside each name in the add-person suggestions, so the
+// coach picks the right "Ricardo". Reuses the single source of plan truth.
+function planLabel(p: {
+  service_type: string | null;
+  weekly_class_limit: number | null;
+  class_credits: number | null;
+}): string {
+  const plan = currentPlan(p);
+  if (plan === "pack") {
+    const n = p.class_credits ?? 0;
+    return `Pack · ${n} ${n === 1 ? "aula" : "aulas"}`;
+  }
+  if (plan === "pt") return "PT";
+  if (plan === "livre") return "Livre";
+  return `${plan}x/semana`;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -88,7 +109,7 @@ export default async function AdminCalendarPage({
   // templates. PT: presets — reusable PT models that never auto-render on
   // their own. Sorted by day_of_week + start_time for predictable order.
   const supabase = await createClient();
-  const [groupTplRes, soloTplRes] = await Promise.all([
+  const [groupTplRes, soloTplRes, studentsRes] = await Promise.all([
     supabase
       .from("class_templates")
       .select("id, name, day_of_week, start_time, duration_minutes, capacity")
@@ -104,6 +125,16 @@ export default async function AdminCalendarPage({
       .eq("is_preset", true)
       .order("day_of_week", { ascending: true })
       .order("start_time", { ascending: true }),
+    // Everyone the add-person picker can suggest. Approved only (pending
+    // accounts can't hold seats); paused students stay in — removing them is
+    // exactly when the coach might re-add them, and the confirm warns.
+    supabase
+      .from("profiles")
+      .select(
+        "id, full_name, email, is_admin, approved, service_type, weekly_class_limit, class_credits",
+      )
+      .eq("approved", true)
+      .order("full_name", { ascending: true }),
   ]);
 
   const groupTemplates: GroupTemplateLite[] = (groupTplRes.data ?? []).map(
@@ -127,6 +158,14 @@ export default async function AdminCalendarPage({
       price_cents: t.price_cents,
     };
   });
+
+  const students: StudentLite[] = (studentsRes.data ?? [])
+    .filter((p) => !p.is_admin)
+    .map((p) => ({
+      id: p.id,
+      name: p.full_name || p.email?.split("@")[0] || "Aluno",
+      label: planLabel(p),
+    }));
 
   // Selected day for the mobile/tablet "one day at a time" view.
   // Priority: ?day= if it's in this week → today if it's in this week → weekStart.
@@ -155,6 +194,7 @@ export default async function AdminCalendarPage({
       : days;
 
   return (
+    <StudentsProvider students={students}>
     <div className="p-4 sm:p-6 lg:p-10">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border/60 pb-6">
         <div>
@@ -235,6 +275,7 @@ export default async function AdminCalendarPage({
         ))}
       </div>
     </div>
+    </StudentsProvider>
   );
 }
 
@@ -700,29 +741,19 @@ function GroupBlock({ entry }: { entry: AdminGroupEntry }) {
 
       <RosterDisclosure entry={entry} />
 
-      {/* Add a person by name — always allowed, even past capacity. */}
-      <details className="mt-2">
-        <summary className="cursor-pointer list-none text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground">
-          + Adicionar pessoa
-        </summary>
-        <form action={addClassGuest} className="mt-2 flex gap-1.5">
-          <input type="hidden" name="template_id" value={entry.template_id} />
-          <input type="hidden" name="instance_date" value={entry.date} />
-          <input
-            name="name"
-            required
-            maxLength={120}
-            placeholder="Nome (ex: experimental)"
-            className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm"
-          />
-          <SubmitButton
-            className="h-9 shrink-0 px-3 text-xs uppercase tracking-wider"
-            pendingText="…"
-          >
-            Add
-          </SubmitButton>
-        </form>
-      </details>
+      {/* Add a REAL student (books + emails them; guest fallback inside).
+          On past days the picker degrades to guest-only: student adds would
+          corrupt streaks/credits (same rule as removal), but logging
+          yesterday's walk-in as a guest is legitimate history. */}
+      <AddPersonPicker
+        template_id={entry.template_id}
+        instance_date={entry.date}
+        pastDay={entry.date < todayLisbon()}
+        roster={entry.roster.map((r) => ({
+          user_id: r.user_id,
+          status: r.status,
+        }))}
+      />
 
       <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/30 pt-1.5 transition-opacity duration-150 xl:opacity-0 xl:group-hover:opacity-100 xl:group-focus-within:opacity-100">
         <RescheduleDialog

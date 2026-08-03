@@ -36,12 +36,15 @@ type SendArgs = {
   text?: string; // plain-text alt — multipart mail is less spam-prone.
 };
 
+// Returns whether the mail was actually accepted by Resend — callers that
+// surface "email enviado" to the coach should only claim it when this is true.
+// Still never throws: sending email must never break the flow that fired it.
 export async function sendEmail({
   to,
   subject,
   html,
   text,
-}: SendArgs): Promise<void> {
+}: SendArgs): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM;
 
@@ -49,7 +52,7 @@ export async function sendEmail({
     console.warn(
       `[email] skipped "${subject}" — RESEND_API_KEY/RESEND_FROM not set`,
     );
-    return;
+    return false;
   }
 
   try {
@@ -63,9 +66,12 @@ export async function sendEmail({
     });
     if (!res.ok) {
       console.error(`[email] Resend ${res.status}: ${await res.text()}`);
+      return false;
     }
+    return true;
   } catch (err) {
     console.error("[email] send failed:", err);
+    return false;
   }
 }
 
@@ -170,6 +176,57 @@ export async function sendWaitlistPromotionEmail(args: {
   ].join("\n");
 
   await sendEmail({ to, subject, html, text });
+}
+
+// ---------------------------------------------------------------------------
+// Coach add — the coach put this student into a class from the admin calendar
+// (the "ceder vagas" flow's other half). The student didn't book it themselves,
+// so they get told, with the same cancel-to-free-the-seat nudge.
+// ---------------------------------------------------------------------------
+export async function sendCoachAddedEmail(args: {
+  to: string;
+  studentName: string | null;
+  className: string;
+  dateLabel: string;
+  timeLabel: string;
+  siteUrl: string;
+}): Promise<boolean> {
+  const { to, studentName, className, dateLabel, timeLabel, siteUrl } = args;
+  const firstName = studentName?.trim().split(" ")[0] || "Olá";
+
+  const subject = `Estás na aula de ${className}`;
+
+  const bodyHtml = `
+          <p style="margin:0 0 14px;">${escapeHtml(firstName)}, o coach <strong>adicionou-te</strong> a esta aula:</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;border:1px solid #E5E5E0;border-radius:8px;"><tr><td style="padding:14px 16px;">
+            <p style="margin:0 0 4px;font-size:17px;font-weight:700;">${escapeHtml(className)}</p>
+            <p style="margin:0;font-size:14px;color:#777;">${escapeHtml(dateLabel)} · ${escapeHtml(timeLabel)}</p>
+          </td></tr></table>
+          <p style="margin:0;">Já estás confirmado. Se não puderes ir, cancela a marcação para libertar o lugar para outro colega.</p>`;
+
+  const html = emailShell({
+    siteUrl,
+    heading: "Estás na aula",
+    bodyHtml,
+    cta: { label: "Ver as minhas aulas", url: `${siteUrl}/perfil` },
+  });
+
+  const text = [
+    "Estás na aula!",
+    "",
+    `${firstName}, o coach adicionou-te a esta aula:`,
+    "",
+    className,
+    `${dateLabel} · ${timeLabel}`,
+    "",
+    "Já estás confirmado. Se não puderes ir, cancela a marcação para libertar o lugar.",
+    "",
+    `Ver as tuas aulas: ${siteUrl}/perfil`,
+    "",
+    `${studio.fullName} · ${studio.city}`,
+  ].join("\n");
+
+  return sendEmail({ to, subject, html, text });
 }
 
 // ---------------------------------------------------------------------------

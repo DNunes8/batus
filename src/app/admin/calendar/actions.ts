@@ -7,11 +7,14 @@ import { assertAdmin } from "@/lib/auth-guard";
 import {
   addDays,
   dayOfWeek as dowHelper,
+  formatDayHeader,
+  formatTime,
   mondayOf,
   todayLisbon,
 } from "@/lib/schedule";
 import { parseEuroToCents } from "@/lib/money";
 import { promoteFirstWaitlistedIfSeatFree } from "@/lib/waitlist";
+import { getSiteUrl, sendCoachAddedEmail } from "@/lib/email";
 
 export type CalendarActionState = {
   error?: string;
@@ -566,6 +569,15 @@ export async function addClassGuest(formData: FormData) {
   }
 
   const supabase = await createClient();
+
+  // Same stale-tab guard as addStudentToClass: no seats on a closed day.
+  const { data: closed } = await supabase
+    .from("closed_days")
+    .select("date")
+    .eq("date", instance_date)
+    .maybeSingle();
+  if (closed) throw new Error("O estúdio está fechado neste dia.");
+
   const { error } = await supabase.from("class_guests").insert({
     template_id,
     instance_date,
@@ -606,6 +618,213 @@ export async function removeClassGuest(formData: FormData) {
   revalidatePath("/admin/calendar");
   revalidatePath("/admin/students");
   revalidatePath("/aulas");
+}
+
+// ============================================================================
+// Add ONE student to a class instance — the other half of "ceder vagas": a
+// spot opened (or the coach simply decides), and a named student goes in as a
+// REAL confirmed booking (shows on /perfil, counts stats, spends a pack
+// credit) — unlike a guest, which is just a name holding a seat.
+//
+// Two-step by design: called without `confirmed`, it returns informational
+// warnings (class full / weekly limit reached / another class that day / paused
+// account) for the UI to show in a calm confirm — the coach's OK IS the
+// override, so the actual booking (admin_book_class) skips those rules. What
+// it never skips: an empty pack (BATUS_NO_CREDITS) and already-started classes.
+// ============================================================================
+
+export async function addStudentToClass(input: {
+  user_id: string;
+  template_id: string;
+  instance_date: string;
+  confirmed?: boolean;
+}): Promise<{
+  ok?: true;
+  emailed?: boolean;
+  warnings?: string[];
+  error?: string;
+}> {
+  await assertAdmin();
+  const { user_id, template_id, instance_date } = input;
+  if (
+    !user_id ||
+    !template_id ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(instance_date ?? "")
+  ) {
+    return { error: "Pedido inválido." };
+  }
+
+  const admin = createAdminClient();
+  const [profileRes, templateRes, overrideRes, existingRes, closedRes] =
+    await Promise.all([
+      admin
+        .from("profiles")
+        .select(
+          "id, full_name, email, approved, is_blocked, weekly_class_limit, class_credits",
+        )
+        .eq("id", user_id)
+        .maybeSingle(),
+      admin
+        .from("class_templates")
+        .select("name, start_time, capacity")
+        .eq("id", template_id)
+        .maybeSingle(),
+      admin
+        .from("class_overrides")
+        .select("cancelled, override_capacity, override_start_time")
+        .eq("template_id", template_id)
+        .eq("instance_date", instance_date)
+        .maybeSingle(),
+      admin
+        .from("bookings")
+        .select("status")
+        .eq("user_id", user_id)
+        .eq("template_id", template_id)
+        .eq("instance_date", instance_date)
+        .in("status", ["booked", "waitlisted"])
+        .maybeSingle(),
+      admin
+        .from("closed_days")
+        .select("date")
+        .eq("date", instance_date)
+        .maybeSingle(),
+    ]);
+
+  const profile = profileRes.data;
+  const template = templateRes.data;
+  const override = overrideRes.data;
+  if (!profile) return { error: "Aluno não encontrado." };
+  if (!template) return { error: "Aula não encontrada." };
+  if (override?.cancelled) return { error: "A aula está cancelada neste dia." };
+  // Stale-tab guard, same threat as the cancelled-instance stop above: a day
+  // closed from another device renders NO calendar entries, so a booking
+  // forced onto it would be invisible and unremovable — and would burn a pack
+  // credit on a class that won't happen.
+  if (closedRes.data) return { error: "O estúdio está fechado neste dia." };
+
+  // Same started-class gate as removeStudentBooking: adding into the past
+  // would mint stats/streak retroactively and spend a credit on a class that
+  // already happened. The UI hides the picker on past days; this backs it up.
+  const startTime = override?.override_start_time ?? template.start_time;
+  const classStart = new Date(`${instance_date}T${startTime}`);
+  if (Date.now() >= classStart.getTime()) {
+    return { error: "A aula já começou." };
+  }
+
+  if (existingRes.data?.status === "booked") {
+    return { error: "Já está nesta aula." };
+  }
+  const isWaitlisted = existingRes.data?.status === "waitlisted";
+
+  // The one hard money stop — the RPC guards this atomically too; checking
+  // here just gives the coach the friendly message before any confirm.
+  if (profile.class_credits !== null && profile.class_credits <= 0) {
+    return { error: "Pack sem aulas. Ajusta o pack na página do aluno." };
+  }
+
+  if (!input.confirmed) {
+    // Informational only — the rules the coach may override, surfaced the way
+    // book_class would have enforced them. Recomputed fresh; never blocking.
+    const warnings: string[] = [];
+
+    const capacity = override?.override_capacity ?? template.capacity;
+    const [bookedRes, guestsRes] = await Promise.all([
+      admin
+        .from("bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("template_id", template_id)
+        .eq("instance_date", instance_date)
+        .eq("status", "booked"),
+      admin
+        .from("class_guests")
+        .select("id", { count: "exact", head: true })
+        .eq("template_id", template_id)
+        .eq("instance_date", instance_date),
+    ]);
+    const seats = (bookedRes.count ?? 0) + (guestsRes.count ?? 0);
+    if (seats >= capacity) {
+      warnings.push(`A aula está cheia (${seats}/${capacity}).`);
+    }
+
+    if (profile.weekly_class_limit !== null && !isWaitlisted) {
+      // Mirror book_class's weekly count: booked always, waitlisted only
+      // while still upcoming.
+      const weekStart = mondayOf(instance_date);
+      const { data: weekRows } = await admin
+        .from("bookings")
+        .select("id")
+        .eq("user_id", user_id)
+        .gte("instance_date", weekStart)
+        .lte("instance_date", addDays(weekStart, 6))
+        .or(
+          `status.eq.booked,and(status.eq.waitlisted,instance_date.gte.${todayLisbon()})`,
+        );
+      const limit = profile.weekly_class_limit as number;
+      if ((weekRows?.length ?? 0) >= limit) {
+        warnings.push(
+          limit === 1
+            ? "Já tem a aula desta semana."
+            : `Já tem as ${limit} aulas desta semana.`,
+        );
+      }
+    }
+
+    const { data: sameDay } = await admin
+      .from("bookings")
+      .select("id")
+      .eq("user_id", user_id)
+      .eq("instance_date", instance_date)
+      .neq("template_id", template_id)
+      .in("status", ["booked", "waitlisted"])
+      .limit(1);
+    if ((sameDay?.length ?? 0) > 0) {
+      warnings.push("Já tem outra aula neste dia.");
+    }
+
+    if (profile.is_blocked) warnings.push("Está em pausa.");
+    if (!profile.approved) warnings.push("Conta ainda não aprovada.");
+    if (isWaitlisted) warnings.push("Está em lista de espera — passa a confirmado.");
+
+    if (warnings.length > 0) return { warnings };
+  }
+
+  const { error } = await admin.rpc("admin_book_class", {
+    p_user_id: user_id,
+    p_template_id: template_id,
+    p_instance_date: instance_date,
+  });
+  if (error) {
+    if (error.message.includes("BATUS_ALREADY_BOOKED")) {
+      return { error: "Já está nesta aula." };
+    }
+    if (error.message.includes("BATUS_NO_CREDITS")) {
+      return { error: "Pack sem aulas. Ajusta o pack na página do aluno." };
+    }
+    return { error: "Não foi possível adicionar. Tenta de novo." };
+  }
+
+  // Tell the student — best-effort, a mail hiccup must never undo a booking.
+  // `emailed` feeds the coach's toast, which must only claim what happened.
+  let emailed = false;
+  try {
+    if (profile.email) {
+      emailed = await sendCoachAddedEmail({
+        to: profile.email,
+        studentName: profile.full_name,
+        className: template.name,
+        dateLabel: formatDayHeader(instance_date),
+        timeLabel: formatTime(startTime),
+        siteUrl: getSiteUrl(),
+      });
+    }
+  } catch (err) {
+    console.error("[calendar] coach-add email failed:", err);
+  }
+
+  revalidatePath("/admin/calendar");
+  revalidatePath("/aulas");
+  revalidatePath("/perfil");
+  return { ok: true, emailed };
 }
 
 // Remove ONE student from a class instance — the coach's "ceder vagas" tool.
