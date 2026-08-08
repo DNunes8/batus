@@ -1,7 +1,11 @@
 import { type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-export async function proxy(request: NextRequest) {
+// Deliberately the LEGACY middleware.ts convention, not Next 16's proxy.ts:
+// proxy files are hard-locked to the Node.js runtime, which the Cloudflare
+// adapter can't run — middleware.ts still builds as EDGE, which it can. Don't
+// "modernize" this back to proxy.ts without re-checking the Cloudflare story.
+export async function middleware(request: NextRequest) {
   return await updateSession(request);
 }
 
