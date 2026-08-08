@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { assertAdminPage } from "@/lib/auth-guard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,7 +19,8 @@ const DAYS = [
 const SELECT_CLASSES =
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 
-export default function NewPtTemplatePage() {
+export default async function NewPtTemplatePage() {
+  await assertAdminPage();
   return (
     <div className="max-w-2xl p-6 sm:p-10">
       <Link

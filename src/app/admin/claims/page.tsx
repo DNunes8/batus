@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { formatEuro } from "@/lib/money";
 import { cancelClaim, fulfillClaim } from "./actions";
+import { assertAdminPage } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export default async function ClaimsPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
+  await assertAdminPage();
   const params = await searchParams;
   const status: Status = (["pending", "fulfilled", "cancelled"].includes(
     params.status ?? "",

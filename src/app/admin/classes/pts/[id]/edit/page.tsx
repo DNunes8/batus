@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { updateSoloTemplate } from "../../../actions";
+import { assertAdminPage } from "@/lib/auth-guard";
 
 const DAYS = [
   { value: 1, label: "Segunda" },
@@ -25,6 +26,7 @@ export default async function EditPtTemplatePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await assertAdminPage();
   const { id } = await params;
   const supabase = await createClient();
   const { data: t } = await supabase

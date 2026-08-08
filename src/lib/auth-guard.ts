@@ -12,6 +12,36 @@ import { getAuthUser } from "@/lib/supabase/auth-user";
 // redirected out instead of silently failing (or, in the admin-client case,
 // silently succeeding).
 //
+// Page variant of the guard below. Every admin PAGE must call this before its
+// first data fetch: App Router renders layouts and pages CONCURRENTLY, so the
+// layout's redirect does not stop a page from fetching — on a streaming
+// runtime, fetched data can leak into the response body before the redirect
+// applies. The middleware already bounces anonymous requests at the edge; this
+// closes the remaining vector (an authenticated NON-admin hitting an admin
+// URL) right where the data lives.
+//
+// Differences from assertAdmin (the actions guard): on a transient auth
+// failure this returns instead of redirecting — the admin layout renders
+// <Reconnecting/> in that case (discarding page output), and redirecting to
+// /admin?offline=1 from a PAGE would loop while Auth is down.
+export async function assertAdminPage(): Promise<void> {
+  const supabase = await createClient();
+  const { user, transient } = await getAuthUser(supabase);
+
+  if (transient) return;
+  if (!user) redirect("/login?next=/admin");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile?.is_admin) {
+    redirect("/?error=not_admin");
+  }
+}
+
 // Cheap: one getUser() + one indexed lookup. Admin actions are not hot paths.
 export async function assertAdmin(): Promise<void> {
   const supabase = await createClient();

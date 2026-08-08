@@ -23,6 +23,7 @@ import {
   upsertPaymentRecord,
 } from "./actions";
 import { PlanCard } from "./plan-card";
+import { assertAdminPage } from "@/lib/auth-guard";
 
 const SELECT_CLASSES =
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -34,6 +35,7 @@ export default async function StudentDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await assertAdminPage();
   const { id } = await params;
   const supabase = await createClient();
 

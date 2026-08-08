@@ -7,6 +7,7 @@ import { PaymentsBoard, type BoardRow } from "./payments-board";
 import { SoloBoard, type SoloBoardRow } from "./solo-board";
 import type { PaymentStatus } from "./actions";
 import type { HistoryCell } from "./history-strip";
+import { assertAdminPage } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,7 @@ export default async function PagamentosPage({
 }: {
   searchParams: Promise<{ month?: string; tab?: string }>;
 }) {
+  await assertAdminPage();
   const params = await searchParams;
   const selectedMonth = parseMonthParam(params.month);
   const tab: Tab = params.tab === "solo" ? "solo" : "grupo";

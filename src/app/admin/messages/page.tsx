@@ -8,6 +8,7 @@ import {
   markMessageRead,
   markMessageUnread,
 } from "./actions";
+import { assertAdminPage } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
 }
 
 export default async function MessagesPage() {
+  await assertAdminPage();
   const supabase = await createClient();
   const { data: messages } = await supabase
     .from("contact_messages")

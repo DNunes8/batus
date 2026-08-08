@@ -38,6 +38,7 @@ import {
   cancelSoloInstance,
   restoreSoloInstance,
 } from "./actions";
+import { assertAdminPage } from "@/lib/auth-guard";
 
 // Short plan tag shown beside each name in the add-person suggestions, so the
 // coach picks the right "Ricardo". Reuses the single source of plan truth.
@@ -97,6 +98,7 @@ export default async function AdminCalendarPage({
 }: {
   searchParams: Promise<{ week?: string; day?: string }>;
 }) {
+  await assertAdminPage();
   const params = await searchParams;
   const referenceDate = safeReferenceDate(params.week);
   const weekStart = mondayOf(referenceDate);

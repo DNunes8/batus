@@ -3,6 +3,7 @@ import { TrendingUp, Package, ArrowRight } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { formatDayHeader, formatTime, todayLisbon } from "@/lib/schedule";
+import { assertAdminPage } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ function previewText(text: string, maxLen = 80): string {
 }
 
 export default async function AdminDashboardPage() {
+  await assertAdminPage();
   const supabase = await createClient();
   const admin = createAdminClient();
   const today = todayLisbon();

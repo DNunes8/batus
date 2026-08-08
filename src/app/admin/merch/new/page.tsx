@@ -1,11 +1,13 @@
 import Link from "next/link";
+import { assertAdminPage } from "@/lib/auth-guard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { createMerchItem } from "../actions";
 
-export default function NewMerchPage() {
+export default async function NewMerchPage() {
+  await assertAdminPage();
   return (
     <div className="max-w-2xl p-6 sm:p-10">
       <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">

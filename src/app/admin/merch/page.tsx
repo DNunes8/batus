@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { formatEuro } from "@/lib/money";
 import { ConfirmForm } from "@/components/confirm-form";
 import { deleteMerchItem, toggleMerchActive } from "./actions";
+import { assertAdminPage } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function MerchPage() {
+  await assertAdminPage();
   const supabase = await createClient();
   const { data: items } = await supabase
     .from("merch_items")

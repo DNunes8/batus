@@ -10,6 +10,7 @@ import {
   deleteSoloTemplate,
   openNextTwoWeeks,
 } from "./actions";
+import { assertAdminPage } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,7 @@ type PtTemplate = {
 };
 
 export default async function ClassesListPage() {
+  await assertAdminPage();
   const supabase = await createClient();
 
   const [classRes, ptRes] = await Promise.all([

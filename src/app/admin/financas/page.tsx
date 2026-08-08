@@ -4,6 +4,7 @@ import { getFinances, type FinanceMonth } from "@/lib/finances";
 import { formatEuro, formatMonthYear } from "@/lib/money";
 import { todayLisbon } from "@/lib/schedule";
 import { FinanceLog } from "./finance-log";
+import { assertAdminPage } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,7 @@ export default async function FinancasPage({
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
+  await assertAdminPage();
   const params = await searchParams;
   const month = parseMonth(params.month);
   const { current, months, incomeEntries, expenseEntries, alunos } =
