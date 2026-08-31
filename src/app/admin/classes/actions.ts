@@ -11,7 +11,11 @@ import {
   mondayOf,
   todayLisbon,
 } from "@/lib/schedule";
-import { CUTOFF_OPTIONS, nextWindowEnd } from "@/lib/booking-window";
+import {
+  CUTOFF_OPTIONS,
+  cutoffLabel,
+  nextWindowEnd,
+} from "@/lib/booking-window";
 
 // Open booking for the next two weeks — the wife's fortnightly "set up the
 // next 2 weeks" button. Stores the cutoff date in settings.bookable_until;
@@ -51,7 +55,12 @@ export async function setCancellationCutoff(formData: FormData) {
 
   revalidatePath("/admin/classes");
   revalidatePath("/perfil");
-  redirect("/admin/classes?cutoffset=1");
+  revalidatePath("/aulas");
+  // Name the rule that took effect — "Guardado." wouldn't tell him what is
+  // now live for his students.
+  redirect(
+    `/admin/classes?cutoffset=${encodeURIComponent(cutoffLabel(hours))}`,
+  );
 }
 
 export async function createClassTemplate(formData: FormData) {

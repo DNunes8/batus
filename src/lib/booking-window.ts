@@ -10,7 +10,10 @@ export const DEFAULT_CANCELLATION_CUTOFF_HOURS = 4;
 // rather than a free number box: he reads the option instead of translating a
 // number into a rule, and a typo can't lock every student out. Fractional
 // hours are allowed (0.5 = 30 minutes) — do not round these.
-export const CUTOFF_OPTIONS = [0, 0.5, 1, 2, 4] as const;
+//
+// No "à hora da aula" (0): cancelling as the class begins leaves nobody time
+// to take the freed seat, so the shortest useful rule is 30 minutes.
+export const CUTOFF_OPTIONS = [0.5, 1, 2, 4] as const;
 
 export function cutoffLabel(hours: number): string {
   if (hours === 0) return "à hora da aula";

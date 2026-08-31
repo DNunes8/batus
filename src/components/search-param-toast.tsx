@@ -87,12 +87,40 @@ const TOAST_BY_PARAM: Record<string, ToastConfig> = {
   },
 };
 
+// Params whose VALUE is part of the message ("?cutoffset=1 hora antes"), for
+// confirmations that must name what was actually saved — telling the coach
+// "Guardado." is useless if he can't see which option took effect.
+const DYNAMIC_BY_PARAM: Record<
+  string,
+  { type: "success" | "info"; message: (v: string) => string; description?: string }
+> = {
+  cutoffset: {
+    type: "success",
+    message: (v) => `Os alunos podem cancelar até ${v}.`,
+    description: "Já está a valer para toda a gente.",
+  },
+};
+
 export function SearchParamToast() {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
+    for (const [key, config] of Object.entries(DYNAMIC_BY_PARAM)) {
+      const value = params.get(key);
+      if (value) {
+        toast[config.type](config.message(value), {
+          description: config.description,
+        });
+        const next = new URLSearchParams(params);
+        next.delete(key);
+        const qs = next.toString();
+        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+        return;
+      }
+    }
+
     for (const [key, config] of Object.entries(TOAST_BY_PARAM)) {
       if (params.get(key) === "1") {
         const action = config.action;

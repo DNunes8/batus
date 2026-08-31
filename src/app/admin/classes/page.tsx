@@ -14,9 +14,9 @@ import {
   deleteClassTemplate,
   deleteSoloTemplate,
   openNextTwoWeeks,
-  setCancellationCutoff,
 } from "./actions";
 import { assertAdminPage } from "@/lib/auth-guard";
+import { CutoffChips } from "./cutoff-chips";
 
 export const dynamic = "force-dynamic";
 
@@ -128,41 +128,22 @@ export default async function ClassesListPage() {
 
         {/* Cancellation cutoff — the coach's rule, in his own hands. Tap to
             choose (same gesture as the student plan buttons) rather than a
-            number box: he reads the option instead of translating a number,
-            and one tap saves. Plain submit buttons, so no client JS. */}
-        <form
-          action={setCancellationCutoff}
-          className="mt-3 rounded-md border border-border/60 p-4"
-        >
-          <p className="text-sm font-medium">
-            Até quando podem desmarcar?
-          </p>
+            number box: he reads the option instead of translating a number.
+            Tap → confirm naming the option → live, with a toast saying which
+            rule is now in force. */}
+        <div className="mt-3 rounded-md border border-border/60 p-4">
+          <p className="text-sm font-medium">Até quando podem desmarcar?</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Depois disto o aluno já não vê o botão Cancelar e fala contigo.
           </p>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
-            {CUTOFF_OPTIONS.map((h) => {
-              const label = cutoffLabel(h);
-              const selected = h === cutoffHours;
-              return (
-                <button
-                  key={h}
-                  type="submit"
-                  name="hours"
-                  value={h}
-                  aria-pressed={selected}
-                  className={`flex h-12 items-center justify-center rounded-md border px-2 text-center text-sm font-medium transition-colors ${
-                    selected
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-border/60 hover:border-foreground"
-                  }`}
-                >
-                  {label.charAt(0).toUpperCase() + label.slice(1)}
-                </button>
-              );
-            })}
-          </div>
-        </form>
+          <CutoffChips
+            current={cutoffHours}
+            options={CUTOFF_OPTIONS.map((h) => ({
+              hours: h,
+              label: cutoffLabel(h),
+            }))}
+          />
+        </div>
 
         {templates.length === 0 ? (
           <div className="mt-8 rounded-md border border-dashed border-border/60 p-10 text-center">
