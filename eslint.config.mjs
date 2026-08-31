@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The Cloudflare adapter's output. Flat config honours neither .gitignore
+    // nor dot-directories, so without this `npm run lint` walks the whole
+    // 45 MB bundle and reports on generated code.
+    ".open-next/**",
+    ".wrangler/**",
   ]),
 ]);
 

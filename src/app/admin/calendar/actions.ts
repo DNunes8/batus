@@ -258,10 +258,13 @@ async function cancelInstanceBookings(
 // Restore bookings that were cancelled by a coach cancel/close — back to
 // their recorded status — skipping any student who has meanwhile booked a
 // different class that day (one-per-day must keep holding).
+// Returns false when it refused because a read failed — the caller turns that
+// into a toast the coach can act on. A thrown error here would surface as
+// Next's generic English error page in production, which tells him nothing.
 async function restoreInstanceBookings(
   template_id: string | null,
   instance_date: string,
-) {
+): Promise<boolean> {
   const admin = createAdminClient();
 
   let markedQ = admin
@@ -280,11 +283,10 @@ async function restoreInstanceBookings(
   // still cancelled, nobody is over their weekly limit. Refuse instead —
   // nothing has been written yet, and the markers survive for the next tap.
   if (markedError) {
-    throw new Error(
-      `Não foi possível ler as marcações desta aula (${markedError.message}). Tenta outra vez.`,
-    );
+    console.error("[calendar] restore: bookings read failed:", markedError.message);
+    return false;
   }
-  if (!marked || marked.length === 0) return;
+  if (!marked || marked.length === 0) return true;
 
   // Same-day active bookings for the affected students → conflicts to skip.
   const userIds = [...new Set(marked.map((m) => m.user_id))];
@@ -295,9 +297,8 @@ async function restoreInstanceBookings(
     .in("status", ["booked", "waitlisted"])
     .in("user_id", userIds);
   if (sameDayError) {
-    throw new Error(
-      `Não foi possível verificar as outras marcações do dia (${sameDayError.message}). Tenta outra vez.`,
-    );
+    console.error("[calendar] restore: same-day read failed:", sameDayError.message);
+    return false;
   }
   const conflicted = new Set((sameDay ?? []).map((b) => b.user_id));
 
@@ -310,9 +311,8 @@ async function restoreInstanceBookings(
     .eq("instance_date", instance_date)
     .eq("cancelled", true);
   if (stillCancelledError) {
-    throw new Error(
-      `Não foi possível verificar que aulas continuam canceladas (${stillCancelledError.message}). Tenta outra vez.`,
-    );
+    console.error("[calendar] restore: overrides read failed:", stillCancelledError.message);
+    return false;
   }
   const cancelledTemplates = new Set(
     (stillCancelled ?? []).map((o) => o.template_id as string),
@@ -333,9 +333,8 @@ async function restoreInstanceBookings(
   // free and telling no one. Nothing has been written yet, so failing here is
   // clean: the markers stay put and the coach's next tap does the whole job.
   if (profilesError) {
-    throw new Error(
-      `Não foi possível ler os alunos desta aula (${profilesError.message}). Tenta outra vez.`,
-    );
+    console.error("[calendar] restore: profiles read failed:", profilesError.message);
+    return false;
   }
   const limitByUser = new Map(
     (userProfiles ?? [])
@@ -357,9 +356,8 @@ async function restoreInstanceBookings(
         `status.eq.booked,and(status.eq.waitlisted,instance_date.gte.${todayLisbon()})`,
       );
     if (weekRowsError) {
-      throw new Error(
-        `Não foi possível contar as aulas da semana (${weekRowsError.message}). Tenta outra vez.`,
-      );
+      console.error("[calendar] restore: week count failed:", weekRowsError.message);
+      return false;
     }
     const weekCount = new Map<string, number>();
     for (const b of weekRows ?? []) {
@@ -443,14 +441,20 @@ async function restoreInstanceBookings(
         "charge_class_credit",
         { p_user_id: row.user_id },
       );
-      if (chargeError || didCharge !== true) {
-        if (chargeError) {
-          console.error(
-            `[calendar] CREDIT CHARGE FAILED for user ${row.user_id} on ${instance_date}:`,
-            chargeError.message,
-          );
-        }
-        // Can't pay (or couldn't be charged) → don't restore the seat.
+      if (chargeError) {
+        // COULDN'T ASK is not the same as WAS REFUSED. Sending this row to
+        // staleIds would strip its marker, and the marker is the only way a
+        // later restore can find it — one transient RPC failure would put the
+        // seat permanently beyond recovery. Leave the row untouched instead,
+        // so the coach's next tap picks it up exactly as it is now.
+        console.error(
+          `[calendar] CREDIT CHARGE FAILED for user ${row.user_id} on ${instance_date} — booking left as it was:`,
+          chargeError.message,
+        );
+        continue;
+      }
+      if (didCharge !== true) {
+        // A real refusal: the pack is empty. Don't restore a seat for free.
         staleIds.push(row.id as string);
         continue;
       }
@@ -520,7 +524,13 @@ async function restoreInstanceBookings(
     }
   }
 
-  if (flipError) throw flipError;
+  if (flipError) {
+    console.error(
+      `[calendar] restore: seat flip failed on ${instance_date} (credits returned):`,
+      flipError.message,
+    );
+    return false;
+  }
 
   for (const { row, charged } of toRestore) {
     if (!restoredIds.has(row.id as string)) continue;
@@ -556,6 +566,8 @@ async function restoreInstanceBookings(
       console.error("[calendar] restore emails failed:", err);
     }
   }
+
+  return true;
 }
 
 // One-tap "add this model to today". Clones an existing class_template's
@@ -721,7 +733,11 @@ export async function reopenDay(formData: FormData) {
 
   // Put the day's coach-cancelled bookings back (skips students who booked
   // elsewhere in the meantime).
-  await restoreInstanceBookings(null, date);
+  const reopened = await restoreInstanceBookings(null, date);
+  if (!reopened) {
+    revalidatePath("/admin/calendar");
+    redirect(`/admin/calendar?week=${mondayOf(date)}&day=${date}&offline=1`);
+  }
 
   revalidatePath("/admin/calendar");
   revalidatePath("/aulas");
@@ -810,7 +826,13 @@ export async function restoreClassInstance(formData: FormData) {
 
   // Bring the cancelled bookings back to their pre-cancel status (skipping
   // students who booked a different class this day in the meantime).
-  await restoreInstanceBookings(template_id, instance_date);
+  const restored = await restoreInstanceBookings(template_id, instance_date);
+  if (!restored) {
+    revalidatePath("/admin/calendar");
+    redirect(
+      `/admin/calendar?week=${mondayOf(instance_date)}&day=${instance_date}&offline=1`,
+    );
+  }
 
   revalidatePath("/admin/calendar");
   revalidatePath("/aulas");

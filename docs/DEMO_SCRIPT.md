@@ -1,16 +1,16 @@
 # Demo script — Batus walk-through with Baltaru
 
-_Updated 2026-05-18._ A ~10-minute path through the app. Tabs to have ready:
+_Updated 2026-08-31._ A ~10-minute path through the app. Tabs to have ready:
 
-1. https://batus-mu.vercel.app/ — the public site (an incognito window helps for the "as a student" view)
-2. https://batus-mu.vercel.app/admin — logged in as you
+1. https://batusboxe.com/ — the public site (an incognito window helps for the "as a student" view)
+2. https://batusboxe.com/admin — logged in as you
 3. (optional) Supabase dashboard → Table Editor — to show the data is real
 
 ---
 
 ## 1. Public site (2–3 min)
 
-**Home — https://batus-mu.vercel.app/**
+**Home — https://batusboxe.com/**
 - Hero, manifesto band, coach section, a live weekly-schedule preview (pulled from the database), and a student testimonial.
 - CTAs: "Ver horário" → /aulas, "Contactar" → /contacto.
 
@@ -81,9 +81,7 @@ The admin area has its own layout — a sidebar on desktop, a top bar on mobile 
 The app works today; these are the calls only he can make. Full list in [TALK_LIST.md](./TALK_LIST.md) — the headlines:
 
 - Real logo file, photos, and his bio for /sobre
-- Accent colour — gold (current) or Portuguese red
-- Domain — batusboxing.pt vs batusboxe.pt
-- Cancellation cutoff (currently 4h); public pricing yes/no
+- Public pricing on the site: yes or no
 - Free / trial-class rules; no-show policy
 - Importing the existing student list from Regybox
 - His legal name + NIF to complete the Terms / Privacy pages

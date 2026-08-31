@@ -17,7 +17,9 @@ type ToastConfig = {
 
 const TOAST_BY_PARAM: Record<string, ToastConfig> = {
   saved: { type: "success", message: "Guardado." },
-  sent: { type: "success", message: "Mensagem enviada." },
+  // No "sent" entry: /contacto is the only producer of ?sent=1 and it renders
+  // its own OBRIGADO panel from that param. A toast here would fire, strip the
+  // param, and take the panel down with it a moment after it appeared.
   booked: {
     type: "success",
     message: "Aula marcada.",

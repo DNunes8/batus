@@ -66,7 +66,7 @@ export async function bulkSetPaymentStatus(input: {
   user_ids: string[];
   month: string;
   status: PaymentStatus;
-}): Promise<{ updated: number; skipped: string[] }> {
+}): Promise<{ updated: number; skipped: string[]; error?: string }> {
   await assertAdmin();
   const { user_ids, month, status } = input;
   if (user_ids.length === 0) return { updated: 0, skipped: [] };
@@ -93,10 +93,15 @@ export async function bulkSetPaymentStatus(input: {
   // one is the dangerous half: with no existing rows in hand, every student's
   // standing fee would be written straight over the amount the coach set for
   // this month in the drawer.
+  // Returned, not thrown: Next masks a thrown server-action message in
+  // production, so the coach would see React's English "unexpected error"
+  // instead of this.
   if (profilesRes.error || existingRes.error) {
-    throw new Error(
-      "Sem ligação ao servidor. Nada foi alterado — tenta outra vez.",
-    );
+    return {
+      updated: 0,
+      skipped: [],
+      error: "Sem ligação ao servidor. Nada foi alterado — tenta outra vez.",
+    };
   }
 
   const feeByStudent = new Map<string, number | null>();

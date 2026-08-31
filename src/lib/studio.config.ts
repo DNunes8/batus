@@ -34,7 +34,7 @@ export const studio = {
     registeredAddress: "TBD",
     // Date the legal pages were last reviewed — shown as "Última atualização".
     // Update this whenever you edit the Termos or Privacidade text.
-    lastUpdated: "18 de maio de 2026",
+    lastUpdated: "31 de agosto de 2026",
   },
 
   // Monochrome system + single accent. Logo is pure black on white;

@@ -73,7 +73,7 @@ export default function PrivacidadePage() {
               {studio.coach}, em {studio.city}, {studio.country}. Para qualquer
               questão sobre privacidade — ou para saberes a identificação legal
               completa do responsável pelo tratamento — {reachUs}. Respondemos
-              com a informação que precisares.
+              com a informação de que precisares.
             </p>
           )}
         </section>
@@ -97,7 +97,10 @@ export default function PrivacidadePage() {
               <span className="font-medium text-foreground">
                 Dados de perfil
               </span>{" "}
-              — o teu nome e, se o indicares, o teu telefone.
+              — o teu nome, o teu telefone e a tua data de nascimento. São
+              pedidos ao criares a conta: o telefone para o treinador te
+              contactar sobre as aulas, a data de nascimento para confirmar
+              que tens idade para treinar.
             </li>
             <li>
               <span className="font-medium text-foreground">

@@ -23,10 +23,11 @@ import { studio } from "@/lib/studio.config";
 // could differ from the batusboxe.com address we send FROM. Override with
 // NEXT_PUBLIC_SITE_URL if the domain ever changes. No trailing slash.
 export function getSiteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://batusboxe.com").replace(
-    /\/$/,
-    "",
-  );
+  // `||`, not `??`: .env.example ships the key with an empty value, and an
+  // empty origin would turn every link and the logo in every email into a
+  // relative path that resolves against the mail client.
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  return (configured || "https://batusboxe.com").replace(/\/$/, "");
 }
 
 type SendArgs = {

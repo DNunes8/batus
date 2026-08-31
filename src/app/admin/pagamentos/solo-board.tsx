@@ -106,6 +106,10 @@ export function SoloBoard({
           month,
           status,
         });
+        if (result.error) {
+          toast.error(result.error);
+          return;
+        }
         // "0 alunos marcados como pagos" helps nobody — when everything was
         // skipped, the warning below is the whole message.
         if (result.updated > 0) {
