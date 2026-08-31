@@ -190,8 +190,10 @@ export default async function Home() {
 
             <figure className="mt-10 border-l-2 border-foreground pl-5">
               <blockquote className="font-display text-xl leading-snug tracking-[0.02em] sm:text-2xl">
-                "Treinar boxe é treinar a si próprio. <br className="hidden sm:block" />
-                A técnica vem depois — primeiro, o respeito pelo desporto."
+                &ldquo;Treinar boxe é treinar a si próprio.{" "}
+                <br className="hidden sm:block" />
+                A técnica vem depois — primeiro, o respeito pelo
+                desporto.&rdquo;
               </blockquote>
             </figure>
 

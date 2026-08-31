@@ -66,7 +66,9 @@ export default async function ClassesListPage() {
   const templates = classRes.data ?? [];
   const ptTemplates = (ptRes.data ?? []) as unknown as PtTemplate[];
   const bookableUntil = await getBookableUntil();
-  const windowOpen = bookableUntil > todayLisbon();
+  // Inclusive: a window ending today still allows today's classes (every gate
+  // is `date > bookableUntil`). Matches the dashboard banner.
+  const windowOpen = bookableUntil >= todayLisbon();
   const cutoffHours = await getCancellationCutoffHours();
 
   return (

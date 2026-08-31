@@ -136,11 +136,24 @@ async function cancelInstanceBookings(
   // (class_credits is null for everyone else), and the RPC is a no-op for the
   // rest, so skipping them costs nothing and keeps the request small.
   const userIds = [...new Set(upcoming.map((r) => r.user_id))];
-  const { data: profiles } = await admin
+  const { data: profiles, error: profilesError } = await admin
     .from("profiles")
     .select("id, email, full_name, class_credits")
     .in("id", userIds);
   const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+  // If that read failed we know nothing about who holds a pack, and an empty
+  // map would read as "nobody does" — silently swallowing every refund on a
+  // day the studio cancelled. Fall back to asking the RPC about each booked
+  // row, the way this did before the pack shortcut existed: slower, but it
+  // cannot lose a credit. Retrying the cancel would not help — the bookings
+  // are already flipped, so a second run finds nothing to refund.
+  const packUnknown = !!profilesError || !profiles;
+  if (packUnknown) {
+    console.error(
+      `[calendar] PROFILE READ FAILED on ${instance_date}; refunding without the pack shortcut:`,
+      profilesError?.message ?? "no rows returned",
+    );
+  }
 
   // Give pack students their class back. The studio cancelled — they must not
   // pay for a class that never ran. Refunding here (rather than leaving the
@@ -149,12 +162,17 @@ async function cancelInstanceBookings(
   const refundedBookingIds: string[] = [];
   for (const row of upcoming) {
     if (row.priorStatus !== "booked") continue; // waitlist never spent a credit
-    if (byId.get(row.user_id)?.class_credits == null) continue; // not a pack
+    if (!packUnknown && byId.get(row.user_id)?.class_credits == null) {
+      continue; // not a pack
+    }
     try {
-      const { error: refundError } = await admin.rpc("adjust_class_credits", {
-        p_user_id: row.user_id,
-        p_delta: 1,
-      });
+      const { data: newBalance, error: refundError } = await admin.rpc(
+        "adjust_class_credits",
+        { p_user_id: row.user_id, p_delta: 1 },
+      );
+      if (!refundError && packUnknown && newBalance == null) {
+        continue; // the RPC's own answer: not a pack student
+      }
       if (refundError) {
         // Loud: a swallowed failure here means a student quietly paid for a
         // class that never ran, and nothing else in the system would notice.
@@ -398,31 +416,53 @@ async function restoreInstanceBookings(
   // status = 'cancelled' so a concurrent second restore matches no rows. The
   // returned ids are the rows THIS call actually restored.
   const restoredIds = new Set<string>();
-  for (const status of ["booked", "waitlisted"] as const) {
-    const ids = toRestore
-      .filter((t) => t.prior === status)
-      .map((t) => t.row.id as string);
-    if (ids.length === 0) continue;
-    const { data: flipped, error } = await admin
-      .from("bookings")
-      .update({ status, cancelled_at: null, cancelled_reason: null })
-      .in("id", ids)
-      .eq("status", "cancelled")
-      .select("id");
-    if (error) throw new Error(error.message);
-    for (const r of flipped ?? []) restoredIds.add(r.id as string);
+  let flipError: Error | null = null;
+  try {
+    for (const status of ["booked", "waitlisted"] as const) {
+      const ids = toRestore
+        .filter((t) => t.prior === status)
+        .map((t) => t.row.id as string);
+      if (ids.length === 0) continue;
+      const { data: flipped, error } = await admin
+        .from("bookings")
+        .update({ status, cancelled_at: null, cancelled_reason: null })
+        .in("id", ids)
+        .eq("status", "cancelled")
+        .select("id");
+      if (error) throw new Error(error.message);
+      for (const r of flipped ?? []) restoredIds.add(r.id as string);
+    }
+  } catch (err) {
+    // Do NOT leave here without paying the credits back. The charges above all
+    // happened before any seat was flipped, so throwing straight out would take
+    // a credit from every pack student on the day and give back not one seat —
+    // and their rows would still say ":r", so the coach's next attempt would
+    // charge them a second time.
+    flipError = err instanceof Error ? err : new Error(String(err));
   }
 
   // Anything charged for a seat that didn't come back (someone else restored it
-  // first) gets its credit returned, so one seat is never paid for twice.
+  // first, or the flip above failed) gets its credit returned, so one seat is
+  // never paid for twice.
   const refundBack = new Map<string, number>();
   for (const { row, charged } of toRestore) {
     if (!charged || restoredIds.has(row.id as string)) continue;
     refundBack.set(row.user_id, (refundBack.get(row.user_id) ?? 0) + 1);
   }
   for (const [uid, n] of refundBack) {
-    await admin.rpc("adjust_class_credits", { p_user_id: uid, p_delta: n });
+    const { error } = await admin.rpc("adjust_class_credits", {
+      p_user_id: uid,
+      p_delta: n,
+    });
+    if (error) {
+      console.error(
+        `[calendar] COULD NOT RETURN ${n} credit(s) to user ${uid} after a failed restore on ${instance_date}:`,
+        error.message,
+      );
+    }
   }
+
+  if (flipError) throw flipError;
 
   for (const { row, charged } of toRestore) {
     if (!restoredIds.has(row.id as string)) continue;
@@ -670,6 +710,21 @@ export async function restoreClassInstance(formData: FormData) {
   }
 
   const supabase = await createClient();
+
+  // The whole day may have been closed since — from another device, or by the
+  // coach forgetting. A closed day renders no classes at all, so restoring one
+  // into it would put students back on a seat nobody can see, with an email
+  // telling them the class is on. Reopen the day first. Every sibling write
+  // path (guests, adding a student) already refuses this way.
+  const { data: closed } = await supabase
+    .from("closed_days")
+    .select("date")
+    .eq("date", instance_date)
+    .maybeSingle();
+  if (closed) {
+    redirect(`/admin/calendar?week=${mondayOf(instance_date)}&dayclosed=1`);
+  }
+
   // Un-cancel, don't delete. The row also carries override_start_time (the
   // coach's "Adiar") and override_capacity; deleting it silently reverted an
   // 18:00 -> 19:00 move back to 18:00 — and, because the row was already gone

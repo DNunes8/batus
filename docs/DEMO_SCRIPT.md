@@ -92,7 +92,7 @@ The app works today; these are the calls only he can make. Full list in [TALK_LI
 
 ## 5. Hand-off mechanics (1 min)
 
-- All infrastructure sits under `batusboxing@gmail.com` — hand him that Gmail's password and he owns Vercel + Supabase + (future domain).
+- All infrastructure sits under `batusboxing@gmail.com` — hand him that Gmail's password and he owns Cloudflare + Supabase + Resend (the domain is registered at Vercel).
 - Source code: public on github.com/DNunes8/batus.
-- Cost today: €0/month (Vercel free + Supabase free). Domain when bought: ~€15/year.
+- Cost today: €0/month (Cloudflare free + Supabase free + Resend free). Domain: ~€15/year.
 - See [HANDOVER.md](./HANDOVER.md) for the full transfer steps.

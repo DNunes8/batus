@@ -84,7 +84,7 @@ export function CloseDayDialog({ date }: { date: string }) {
               placeholder="ex: Feriado · Doença · Manutenção"
             />
             <p className="text-xs text-muted-foreground">
-              Se não preencheres, aparece só "Fechado".
+              Se não preencheres, aparece só &ldquo;Fechado&rdquo;.
             </p>
           </div>
 

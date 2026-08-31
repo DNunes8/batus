@@ -52,8 +52,13 @@ own — it does not rebuild, so it will happily ship whatever is already in
 Before deploying:
 
 ```bash
-npm run check      # types, lint, and a production build
+npm run check      # types and a production build
 ```
+
+`npm run lint` is separate and currently reports four React-hooks findings in
+older dialogs (`login`, `add-class-dialog`, `payment-drawer`, `contacto`). They
+are real lint rules, not build failures — worth a careful pass with the app
+open in a browser, which is why they are not folded into `check`.
 
 ## Database changes
 

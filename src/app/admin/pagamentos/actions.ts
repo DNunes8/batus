@@ -74,7 +74,7 @@ export async function bulkSetPaymentStatus(input: {
   const [profilesRes, existingRes] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, monthly_fee_cents")
+      .select("id, full_name, monthly_fee_cents, class_credits")
       .in("id", user_ids),
     supabase
       .from("payment_records")
@@ -85,9 +85,15 @@ export async function bulkSetPaymentStatus(input: {
 
   const feeByStudent = new Map<string, number | null>();
   const nameByStudent = new Map<string, string>();
+  // Pack students pay per bundle of classes, not per month — the board already
+  // leaves them out of the pago/por-pagar counts. "Selecionar todos" still
+  // ticks them, so exclude them here rather than telling the coach to go and
+  // set a monthly fee they are not supposed to have.
+  const packStudents = new Set<string>();
   for (const p of profilesRes.data ?? []) {
     feeByStudent.set(p.id, p.monthly_fee_cents ?? null);
     nameByStudent.set(p.id, p.full_name || "Sem nome");
+    if (p.class_credits != null) packStudents.add(p.id);
   }
 
   const existingByStudent = new Map<
@@ -105,12 +111,13 @@ export async function bulkSetPaymentStatus(input: {
   const skipped: string[] = [];
   const rows = [];
   for (const uid of user_ids) {
+    if (packStudents.has(uid)) continue;
     const existing = existingByStudent.get(uid);
-    // Preserve customised amount/notes for students who already have a row,
-    // so flipping "unpaid → paid" doesn't wipe a custom price the coach set.
-    // An existing 0 counts as unknown too: that is what the old bulk action
-    // wrote, so trusting it would keep the wrong number alive forever.
-    const known = existing?.amount_cents || feeByStudent.get(uid) || null;
+    // Preserve customised amount/notes for students who already have a row, so
+    // flipping "unpaid → paid" doesn't wipe a price the coach set on purpose —
+    // including a deliberate 0 for a free month. Only a genuinely absent amount
+    // counts as unknown.
+    const known = existing?.amount_cents ?? feeByStudent.get(uid) ?? null;
     if (status === "paid" && known === null) {
       skipped.push(nameByStudent.get(uid) ?? "Sem nome");
       continue;

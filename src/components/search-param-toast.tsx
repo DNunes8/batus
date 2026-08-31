@@ -88,6 +88,30 @@ const TOAST_BY_PARAM: Record<string, ToastConfig> = {
     message: "Esse link expirou ou já foi usado.",
     description: "Pede um novo em “Esqueci-me da palavra-passe”.",
   },
+  // Admin refusals. These server actions already redirected with a param, but
+  // none of them had an entry here — so a refused tap looked like a tap that
+  // did nothing at all.
+  started: {
+    type: "error",
+    message: "Essa aula já começou.",
+    description: "Já não dá para mexer nas marcações desta aula.",
+  },
+  dayclosed: {
+    type: "error",
+    message: "O dia está fechado.",
+    description: "Reabre o dia primeiro e volta a restaurar a aula.",
+  },
+  hasbookings: {
+    type: "error",
+    message: "Essa aula tem marcações.",
+    description:
+      "Apagar levava o histórico com ela. Edita as datas para a desativar.",
+  },
+  cutofferr: {
+    type: "error",
+    message: "Essa opção não é válida.",
+    description: "Escolhe um dos limites da lista.",
+  },
   // Transient failure to reach Supabase Auth (network blip / free-tier
   // throttle). The gate bounces here with the session intact instead of
   // logging the user out — a retry just works.
@@ -103,7 +127,15 @@ const TOAST_BY_PARAM: Record<string, ToastConfig> = {
 // "Guardado." is useless if he can't see which option took effect.
 const DYNAMIC_BY_PARAM: Record<
   string,
-  { type: "success" | "info"; message: (v: string) => string; description?: string }
+  {
+    type: "success" | "info";
+    message: (v: string) => string;
+    description?: string;
+    // The value is interpolated into the message, so a stale or hand-typed URL
+    // could put anything there ("Marcações abertas até 1."). Each entry says
+    // what a real value looks like.
+    valid?: (v: string) => boolean;
+  }
 > = {
   cutoffset: {
     type: "success",
@@ -114,6 +146,9 @@ const DYNAMIC_BY_PARAM: Record<
     type: "success",
     message: (v) => `Marcações abertas até ${v}.`,
     description: "Os alunos já podem marcar este bloco.",
+    // A formatted day header ("Sábado, 14 setembro") — never the bare "1" the
+    // old redirect used, which still sits in browser history.
+    valid: (v) => /\p{L}/u.test(v),
   },
 };
 
@@ -125,7 +160,7 @@ export function SearchParamToast() {
   useEffect(() => {
     for (const [key, config] of Object.entries(DYNAMIC_BY_PARAM)) {
       const value = params.get(key);
-      if (value) {
+      if (value && (!config.valid || config.valid(value))) {
         toast[config.type](config.message(value), {
           description: config.description,
         });

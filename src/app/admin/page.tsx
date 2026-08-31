@@ -244,8 +244,11 @@ export default async function AdminDashboardPage() {
   // and no student can book — with nothing anywhere to say why. The state lived
   // only on Modelos, a page the coach rarely opens; it belongs on the page he
   // does. Warn from three days out so he is never caught by a closed weekend.
+  // bookable_until is INCLUSIVE — every booking gate is `date > bookableUntil`
+  // — so a window ending today still lets students book today's classes. Only
+  // a date already past means nothing at all can be booked.
   const windowDaysLeft = daysUntil(today, bookableUntil);
-  const windowClosed = windowDaysLeft <= 0;
+  const windowClosed = windowDaysLeft < 0;
   const windowEndingSoon = !windowClosed && windowDaysLeft <= 3;
 
   return (
@@ -268,14 +271,18 @@ export default async function AdminDashboardPage() {
           <p className="text-sm font-medium">
             {windowClosed
               ? "Marcações fechadas — ninguém consegue marcar aulas."
-              : `Marcações abertas só até ${formatDayHeader(bookableUntil)}.`}
+              : windowDaysLeft === 0
+                ? "Marcações abertas só até hoje."
+                : `Marcações abertas só até ${formatDayHeader(bookableUntil)}.`}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             {windowClosed
               ? "Os alunos veem “Abre em breve” em todas as aulas. Abre o próximo bloco."
-              : windowDaysLeft === 1
-                ? "Falta 1 dia. Abre o próximo bloco para os alunos continuarem a marcar."
-                : `Faltam ${windowDaysLeft} dias. Abre o próximo bloco para os alunos continuarem a marcar.`}
+              : windowDaysLeft === 0
+                ? "A partir de amanhã ninguém consegue marcar. Abre o próximo bloco."
+                : windowDaysLeft === 1
+                  ? "Falta 1 dia. Abre o próximo bloco para os alunos continuarem a marcar."
+                  : `Faltam ${windowDaysLeft} dias. Abre o próximo bloco para os alunos continuarem a marcar.`}
           </p>
           <ConfirmForm
             message="Abrir marcações para as próximas 2 semanas?"
