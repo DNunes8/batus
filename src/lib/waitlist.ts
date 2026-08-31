@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { formatDayHeader, formatTime } from "@/lib/schedule";
+import { formatDayHeader, formatTime, isClassInPast } from "@/lib/schedule";
 import { sendWaitlistPromotionEmail, getSiteUrl } from "@/lib/email";
 
 // Promote the first waitlisted student of a class instance — but ONLY if a
@@ -42,6 +42,13 @@ export async function promoteFirstWaitlistedIfSeatFree(
     if (!template) return;
     // Cancelled instance — nothing to promote into.
     if (override?.cancelled) return;
+
+    // Nor into a class that has already started. Every seat-freeing path funnels
+    // through here, so this one check covers them all: removing a guest from a
+    // finished class used to promote someone, spend their pack credit and email
+    // them "tens vaga" for a class that was already over.
+    const startTime = override?.override_start_time ?? template.start_time;
+    if (isClassInPast(instance_date, startTime)) return;
 
     const capacity = override?.override_capacity ?? template.capacity;
 

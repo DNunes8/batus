@@ -70,6 +70,7 @@ export async function getFinances(monthIso: string): Promise<Finances> {
     merchRes,
     entriesRes,
     profilesRes,
+    closedDaysRes,
   ] = await Promise.all([
     admin
       .from("payment_records")
@@ -100,7 +101,17 @@ export async function getFinances(monthIso: string): Promise<Finances> {
       .select("id, kind, category, amount_cents, entry_date, note")
       .gte("entry_date", oldest),
     admin.from("profiles").select("approved, is_blocked, is_admin, joined_at"),
+    // Days the studio was shut. Only the GENERATED recurring PT instances are
+    // filtered by this: those are inferred from a template, and the calendar
+    // hides them on a closed day, so counting them would invent revenue. A
+    // one-off solo_sessions row is the opposite — a fact the coach typed in —
+    // and still counts even if the day was later marked closed.
+    admin.from("closed_days").select("date").gte("date", oldest),
   ]);
+
+  const closedDays = new Set(
+    (closedDaysRes.data ?? []).map((d) => d.date as string),
+  );
 
   const byMonth = new Map<string, FinanceMonth>();
   for (const m of months) {
@@ -151,7 +162,7 @@ export async function getFinances(monthIso: string): Promise<Finances> {
       const ov = overrides.find(
         (o) => o.template_id === tpl.id && o.instance_date === cursor,
       );
-      if (!ov?.cancelled) {
+      if (!ov?.cancelled && !closedDays.has(cursor)) {
         const b = byMonth.get(monthOf(cursor));
         if (b) b.pts += (tpl.price_cents as number) ?? 0;
       }

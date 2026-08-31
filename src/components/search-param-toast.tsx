@@ -67,6 +67,17 @@ const TOAST_BY_PARAM: Record<string, ToastConfig> = {
     message: "Sem aulas no teu pack.",
     description: "Fala com o treinador para comprar mais.",
   },
+  classgone: {
+    type: "error",
+    message: "Essa aula já não existe.",
+    description:
+      "O treinador cancelou-a ou fechou o dia. Vê o horário atualizado.",
+  },
+  classpast: {
+    type: "error",
+    message: "Essa aula já começou.",
+    description: "Vê as próximas no horário.",
+  },
   cutoff: {
     type: "error",
     message: "Já não dá para cancelar esta aula.",

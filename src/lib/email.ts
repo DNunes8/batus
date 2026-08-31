@@ -230,6 +230,297 @@ export async function sendCoachAddedEmail(args: {
 }
 
 // ---------------------------------------------------------------------------
+// Studio-initiated changes to a class the student had booked. All three are
+// BATCH senders: closing a busy day can touch dozens of students, and one
+// Resend POST per student inside a server action would blow through the
+// Workers subrequest budget and rate limits, half-delivering and leaving the
+// rest silently untold. Resend's batch endpoint takes up to 100 per call.
+// ---------------------------------------------------------------------------
+
+const RESEND_BATCH_MAX = 100;
+
+type BuiltEmail = { to: string; subject: string; html: string; text: string };
+
+// Post pre-built messages in chunks. Returns how many were accepted.
+async function sendBatch(messages: BuiltEmail[], label: string): Promise<number> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM;
+  if (!apiKey || !from) {
+    console.warn(
+      `[email] skipped ${label} batch (${messages.length}) — RESEND_API_KEY/RESEND_FROM not set`,
+    );
+    return 0;
+  }
+  if (messages.length === 0) return 0;
+
+  let sent = 0;
+  for (let i = 0; i < messages.length; i += RESEND_BATCH_MAX) {
+    const chunk = messages.slice(i, i + RESEND_BATCH_MAX);
+    try {
+      const res = await fetch("https://api.resend.com/emails/batch", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(chunk.map((m) => ({ from, ...m }))),
+      });
+      if (!res.ok) {
+        console.error(
+          `[email] ${label} batch ${res.status}: ${await res.text()}`,
+        );
+        continue;
+      }
+      sent += chunk.length;
+    } catch (err) {
+      console.error(`[email] ${label} batch failed:`, err);
+    }
+  }
+  return sent;
+}
+
+export type ClassChangeRecipient = {
+  to: string;
+  studentName: string | null;
+  className: string;
+  timeLabel: string;
+  refunded?: boolean;
+  oldTimeLabel?: string;
+};
+
+// --- cancelled -------------------------------------------------------------
+
+function buildClassCancelled(args: {
+  to: string;
+  studentName: string | null;
+  className: string;
+  dateLabel: string;
+  timeLabel: string;
+  reason?: string | null;
+  refunded?: boolean;
+  siteUrl: string;
+}): BuiltEmail {
+  const { to, studentName, className, dateLabel, timeLabel, reason, refunded, siteUrl } = args;
+  const firstName = studentName?.trim().split(" ")[0] || "Olá";
+
+  const reasonHtml = reason
+    ? `<p style="margin:0 0 14px;">Motivo: <strong>${escapeHtml(reason)}</strong></p>`
+    : "";
+  // Only claim the credit came back when it actually did.
+  const refundHtml = refunded
+    ? `<p style="margin:14px 0 0;">A aula foi devolvida ao teu pack — podes usá-la noutro dia.</p>`
+    : "";
+
+  const bodyHtml = `
+          <p style="margin:0 0 14px;">${escapeHtml(firstName)}, esta aula <strong>não se vai realizar</strong>:</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;border:1px solid #E5E5E0;border-radius:8px;"><tr><td style="padding:14px 16px;">
+            <p style="margin:0 0 4px;font-size:17px;font-weight:700;">${escapeHtml(className)}</p>
+            <p style="margin:0;font-size:14px;color:#777;">${escapeHtml(dateLabel)} · ${escapeHtml(timeLabel)}</p>
+          </td></tr></table>
+          ${reasonHtml}
+          <p style="margin:0;">A tua marcação foi anulada — não precisas de fazer nada. Podes marcar outra aula quando quiseres.</p>
+          ${refundHtml}`;
+
+  const text = [
+    "Aula cancelada",
+    "",
+    `${firstName}, esta aula não se vai realizar:`,
+    "",
+    className,
+    `${dateLabel} · ${timeLabel}`,
+    ...(reason ? [`Motivo: ${reason}`] : []),
+    "",
+    "A tua marcação foi anulada — não precisas de fazer nada.",
+    ...(refunded ? ["A aula foi devolvida ao teu pack."] : []),
+    "",
+    `Ver o horário: ${siteUrl}/aulas`,
+    "",
+    `${studio.fullName} · ${studio.city}`,
+  ].join("\n");
+
+  return {
+    to,
+    subject: `Aula cancelada — ${className}, ${dateLabel}`,
+    html: emailShell({
+      siteUrl,
+      heading: "Aula cancelada",
+      bodyHtml,
+      cta: { label: "Ver o horário", url: `${siteUrl}/aulas` },
+    }),
+    text,
+  };
+}
+
+export async function sendClassCancelledBatch(
+  recipients: ClassChangeRecipient[],
+  common: { dateLabel: string; reason?: string | null; siteUrl: string },
+): Promise<number> {
+  return sendBatch(
+    recipients.map((r) =>
+      buildClassCancelled({
+        to: r.to,
+        studentName: r.studentName,
+        className: r.className,
+        dateLabel: common.dateLabel,
+        timeLabel: r.timeLabel,
+        reason: common.reason,
+        refunded: r.refunded,
+        siteUrl: common.siteUrl,
+      }),
+    ),
+    "class-cancelled",
+  );
+}
+
+// --- back on --------------------------------------------------------------
+
+function buildClassRestored(args: {
+  to: string;
+  studentName: string | null;
+  className: string;
+  dateLabel: string;
+  timeLabel: string;
+  charged?: boolean;
+  siteUrl: string;
+}): BuiltEmail {
+  const { to, studentName, className, dateLabel, timeLabel, charged, siteUrl } = args;
+  const firstName = studentName?.trim().split(" ")[0] || "Olá";
+
+  const chargedHtml = charged
+    ? `<p style="margin:14px 0 0;">A aula voltou a ser descontada do teu pack.</p>`
+    : "";
+
+  const bodyHtml = `
+          <p style="margin:0 0 14px;">${escapeHtml(firstName)}, boas notícias — esta aula <strong>afinal realiza-se</strong> e a tua marcação foi reposta:</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;border:1px solid #E5E5E0;border-radius:8px;"><tr><td style="padding:14px 16px;">
+            <p style="margin:0 0 4px;font-size:17px;font-weight:700;">${escapeHtml(className)}</p>
+            <p style="margin:0;font-size:14px;color:#777;">${escapeHtml(dateLabel)} · ${escapeHtml(timeLabel)}</p>
+          </td></tr></table>
+          <p style="margin:0;">Se entretanto já não puderes ir, cancela no site para libertar o lugar.</p>
+          ${chargedHtml}`;
+
+  const text = [
+    "A aula volta a realizar-se",
+    "",
+    `${firstName}, esta aula afinal realiza-se e a tua marcação foi reposta:`,
+    "",
+    className,
+    `${dateLabel} · ${timeLabel}`,
+    ...(charged ? ["A aula voltou a ser descontada do teu pack."] : []),
+    "",
+    "Se já não puderes ir, cancela no site para libertar o lugar.",
+    "",
+    `Ver as tuas aulas: ${siteUrl}/perfil`,
+    "",
+    `${studio.fullName} · ${studio.city}`,
+  ].join("\n");
+
+  return {
+    to,
+    subject: `A aula volta a realizar-se — ${className}, ${dateLabel}`,
+    html: emailShell({
+      siteUrl,
+      heading: "Aula reposta",
+      bodyHtml,
+      cta: { label: "Ver as minhas aulas", url: `${siteUrl}/perfil` },
+    }),
+    text,
+  };
+}
+
+export async function sendClassRestoredBatch(
+  recipients: Array<ClassChangeRecipient & { charged?: boolean }>,
+  common: { dateLabel: string; siteUrl: string },
+): Promise<number> {
+  return sendBatch(
+    recipients.map((r) =>
+      buildClassRestored({
+        to: r.to,
+        studentName: r.studentName,
+        className: r.className,
+        dateLabel: common.dateLabel,
+        timeLabel: r.timeLabel,
+        charged: r.charged,
+        siteUrl: common.siteUrl,
+      }),
+    ),
+    "class-restored",
+  );
+}
+
+// --- moved ----------------------------------------------------------------
+
+function buildClassRescheduled(args: {
+  to: string;
+  studentName: string | null;
+  className: string;
+  dateLabel: string;
+  oldTimeLabel: string;
+  newTimeLabel: string;
+  siteUrl: string;
+}): BuiltEmail {
+  const { to, studentName, className, dateLabel, oldTimeLabel, newTimeLabel, siteUrl } = args;
+  const firstName = studentName?.trim().split(" ")[0] || "Olá";
+
+  const bodyHtml = `
+          <p style="margin:0 0 14px;">${escapeHtml(firstName)}, a tua aula <strong>mudou de hora</strong>:</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;border:1px solid #E5E5E0;border-radius:8px;"><tr><td style="padding:14px 16px;">
+            <p style="margin:0 0 4px;font-size:17px;font-weight:700;">${escapeHtml(className)}</p>
+            <p style="margin:0;font-size:14px;color:#777;">${escapeHtml(dateLabel)}</p>
+            <p style="margin:8px 0 0;font-size:15px;"><span style="text-decoration:line-through;color:#999;">${escapeHtml(oldTimeLabel)}</span> &rarr; <strong>${escapeHtml(newTimeLabel)}</strong></p>
+          </td></tr></table>
+          <p style="margin:0;">A tua marcação continua de pé — só mudou a hora. Se já não te der jeito, cancela no site.</p>`;
+
+  const text = [
+    "A tua aula mudou de hora",
+    "",
+    `${firstName}, a tua aula mudou de hora:`,
+    "",
+    className,
+    dateLabel,
+    `${oldTimeLabel} -> ${newTimeLabel}`,
+    "",
+    "A marcação continua de pé. Se já não te der jeito, cancela no site.",
+    "",
+    `Ver as tuas aulas: ${siteUrl}/perfil`,
+    "",
+    `${studio.fullName} · ${studio.city}`,
+  ].join("\n");
+
+  return {
+    to,
+    subject: `Nova hora — ${className}, ${dateLabel}`,
+    html: emailShell({
+      siteUrl,
+      heading: "Nova hora",
+      bodyHtml,
+      cta: { label: "Ver as minhas aulas", url: `${siteUrl}/perfil` },
+    }),
+    text,
+  };
+}
+
+export async function sendClassRescheduledBatch(
+  recipients: ClassChangeRecipient[],
+  common: { dateLabel: string; newTimeLabel: string; siteUrl: string },
+): Promise<number> {
+  return sendBatch(
+    recipients.map((r) =>
+      buildClassRescheduled({
+        to: r.to,
+        studentName: r.studentName,
+        className: r.className,
+        dateLabel: common.dateLabel,
+        oldTimeLabel: r.oldTimeLabel ?? "",
+        newTimeLabel: common.newTimeLabel,
+        siteUrl: common.siteUrl,
+      }),
+    ),
+    "class-rescheduled",
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Welcome — fired on signup. New students land pending, so this nudges them
 // to reach the coach for approval before they can book.
 // ---------------------------------------------------------------------------

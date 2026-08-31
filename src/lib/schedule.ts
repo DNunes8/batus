@@ -204,6 +204,97 @@ export async function effectiveStartTime(
   return map.get(`${template_id}|${instance_date}`) ?? templateStartTime;
 }
 
+export type ResolvedInstance = {
+  template_id: string;
+  instance_date: string;
+  name: string;
+  start_time: string; // effective (override applied)
+  duration_minutes: number;
+  capacity: number; // effective (override applied)
+};
+
+export type InstanceProblem =
+  | "notfound" // template id doesn't exist
+  | "notonthisday" // template doesn't run on that weekday
+  | "outofwindow" // date is outside the template's active_from/active_until
+  | "cancelled" // this instance was cancelled by the coach
+  | "closed" // the whole day is closed
+  | "past"; // the class has already started
+
+// Does this (template, date) pair name a class that REALLY EXISTS and can
+// still be booked? The rendering side already answers this — it only draws
+// instances that pass every one of these tests — but the write side used to
+// take the ids from the form and trust them, so a page opened before the coach
+// cancelled a class (or closed the day) could still book into it. One resolver,
+// used by the write paths, so the two can't drift.
+export async function resolveClassInstance(
+  template_id: string,
+  instance_date: string,
+): Promise<
+  { ok: true; instance: ResolvedInstance } | { ok: false; problem: InstanceProblem }
+> {
+  const admin = createAdminClient();
+
+  const [templateRes, overrideRes, closedRes] = await Promise.all([
+    admin
+      .from("class_templates")
+      .select(
+        "id, name, day_of_week, start_time, duration_minutes, capacity, active_from, active_until",
+      )
+      .eq("id", template_id)
+      .maybeSingle(),
+    admin
+      .from("class_overrides")
+      .select("cancelled, override_start_time, override_capacity")
+      .eq("template_id", template_id)
+      .eq("instance_date", instance_date)
+      .maybeSingle(),
+    admin
+      .from("closed_days")
+      .select("date")
+      .eq("date", instance_date)
+      .maybeSingle(),
+  ]);
+
+  const t = templateRes.data;
+  if (!t) return { ok: false, problem: "notfound" };
+  if (closedRes.data) return { ok: false, problem: "closed" };
+  if (overrideRes.data?.cancelled) return { ok: false, problem: "cancelled" };
+
+  // The schedule only renders a template on its own weekday, inside its active
+  // window — so a date that fails either test is not a real class.
+  if (dayOfWeek(instance_date) !== t.day_of_week) {
+    return { ok: false, problem: "notonthisday" };
+  }
+  if (
+    instance_date < (t.active_from as string) ||
+    (t.active_until && instance_date > (t.active_until as string))
+  ) {
+    return { ok: false, problem: "outofwindow" };
+  }
+
+  const start_time =
+    (overrideRes.data?.override_start_time as string | null) ??
+    (t.start_time as string);
+  if (isClassInPast(instance_date, start_time)) {
+    return { ok: false, problem: "past" };
+  }
+
+  return {
+    ok: true,
+    instance: {
+      template_id,
+      instance_date,
+      name: t.name as string,
+      start_time,
+      duration_minutes: t.duration_minutes as number,
+      capacity:
+        (overrideRes.data?.override_capacity as number | null) ??
+        (t.capacity as number),
+    },
+  };
+}
+
 const PT_DAYS = [
   "Domingo",
   "Segunda",

@@ -202,6 +202,12 @@ export async function setStudentPlan(input: {
   } else {
     // Leaving pack (or never was one): clear the balance. Group tiers pay
     // monthly; PT keeps the per-session toggle the coach controls.
+    //
+    // NOTE: this discards prepaid classes and there is no ledger to recover
+    // them from, so the plan card confirms first when the balance is > 0. The
+    // balance cannot simply be kept — currentPlan() treats any non-null
+    // class_credits as "this is a pack student", and book_class would then
+    // demand credits from someone on a monthly plan.
     update.class_credits = null;
     if (config.service_type === "group") {
       update.has_monthly_fee = true;

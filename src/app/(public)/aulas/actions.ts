@@ -9,6 +9,7 @@ import {
   addDays,
   effectiveStartTime,
   mondayOf,
+  resolveClassInstance,
   todayLisbon,
 } from "@/lib/schedule";
 import {
@@ -85,7 +86,9 @@ export async function bookClass(formData: FormData) {
   // redirect here with a toast param instead of throwing: Next masks thrown
   // messages in production, so a throw would show the generic error page.
   const return_to = (formData.get("return_to") as string | null)?.trim();
-  const bounce = (param: string): never => {
+  // Annotated as a never-returning alias so TypeScript treats the code after
+  // a bounce() as unreachable and narrows accordingly.
+  const bounce: (param: string) => never = (param) => {
     if (return_to) {
       const separator = return_to.includes("?") ? "&" : "?";
       redirect(`${return_to}${separator}${param}=1`);
@@ -152,15 +155,19 @@ export async function bookClass(formData: FormData) {
     bounce("nocredits");
   }
 
-  const { data: template } = await supabase
-    .from("class_templates")
-    .select("capacity")
-    .eq("id", template_id)
-    .single();
-
-  if (!template) {
-    throw new Error("Aula não encontrada.");
+  // Is this a real, still-bookable class? The schedule only draws instances
+  // that pass these tests, but the form's ids arrive from whatever page the
+  // student had open — which may predate the coach cancelling the class or
+  // closing the day. Without this a stale tab books a class that will not
+  // happen: the credit is spent, the one-per-day slot is burned, and the
+  // booking never shows on the coach's calendar so he cannot even remove it.
+  const resolved = await resolveClassInstance(template_id, instance_date);
+  if (!resolved.ok) {
+    // "It already started" and "it no longer exists" are different things to
+    // hear when you were about to book.
+    bounce(resolved.problem === "past" ? "classpast" : "classgone");
   }
+  const instance = resolved.instance;
 
   // Capacity check, the booked-vs-waitlisted decision, and the write all
   // happen atomically inside the book_class DB function (migration 0012):
@@ -171,7 +178,7 @@ export async function bookClass(formData: FormData) {
     p_user_id: user.id,
     p_template_id: template_id,
     p_instance_date: instance_date,
-    p_capacity: template.capacity,
+    p_capacity: instance.capacity,
   });
 
   if (error) {

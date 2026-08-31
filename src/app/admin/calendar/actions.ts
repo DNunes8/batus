@@ -11,13 +11,21 @@ import {
   effectiveStartTime,
   formatDayHeader,
   formatTime,
+  getStartTimeOverrides,
+  isClassInPast,
   lisbonInstant,
   mondayOf,
   todayLisbon,
 } from "@/lib/schedule";
 import { parseEuroToCents } from "@/lib/money";
 import { promoteFirstWaitlistedIfSeatFree } from "@/lib/waitlist";
-import { getSiteUrl, sendCoachAddedEmail } from "@/lib/email";
+import {
+  getSiteUrl,
+  sendClassCancelledBatch,
+  sendClassRescheduledBatch,
+  sendClassRestoredBatch,
+  sendCoachAddedEmail,
+} from "@/lib/email";
 
 export type CalendarActionState = {
   error?: string;
@@ -44,20 +52,153 @@ async function cancelInstanceBookings(
   reason: string,
 ) {
   const admin = createAdminClient();
-  for (const status of ["booked", "waitlisted"] as const) {
+
+  // Flip the rows and act ONLY on what this call actually changed. Reading the
+  // list first and acting on that would let a double-tap (two requests reading
+  // the same active rows before either writes) refund the same credit twice —
+  // the update's own result is the single source of truth for "I am the request
+  // that cancelled this booking", the same guard the student cancel uses.
+  //
+  // Waitlisted first: a promotion landing in the gap moves a row
+  // waitlisted -> booked, and the second pass then catches it. The other order
+  // would let that row escape the cancel entirely.
+  const affected: {
+    booking_id: string;
+    user_id: string;
+    template_id: string;
+    priorStatus: "booked" | "waitlisted";
+    className: string;
+    templateStartTime: string;
+    refunded: boolean;
+  }[] = [];
+
+  for (const status of ["waitlisted", "booked"] as const) {
     let q = admin
       .from("bookings")
       .update({
         status: "cancelled",
         cancelled_at: new Date().toISOString(),
-        // Marker + prior status (for restore) + human reason (for the coach).
-        cancelled_reason: `${COACH_CANCEL_MARKER}${status}|${reason}`,
+        // Marker + prior status + settlement flag (n = no credit returned yet)
+        // + human reason. The restore reads the flag rather than guessing from
+        // the student's current balance.
+        cancelled_reason: `${COACH_CANCEL_MARKER}${status}:n|${reason}`,
       })
       .eq("instance_date", instance_date)
       .eq("status", status);
     if (template_id) q = q.eq("template_id", template_id);
-    const { error } = await q;
+    const { data: flipped, error } = await q.select(
+      "id, user_id, template_id, class_templates!inner(name, start_time)",
+    );
     if (error) throw new Error(error.message);
+    for (const row of flipped ?? []) {
+      const tpl = row.class_templates as unknown as {
+        name: string;
+        start_time: string;
+      };
+      affected.push({
+        booking_id: row.id as string,
+        user_id: row.user_id as string,
+        template_id: row.template_id as string,
+        priorStatus: status,
+        className: tpl.name,
+        templateStartTime: tpl.start_time,
+        refunded: false,
+      });
+    }
+  }
+
+  if (affected.length === 0) return;
+
+  // Effective start times ("Adiar" moves the hour without touching the
+  // template), used both to skip classes that already happened and to tell the
+  // student the hour they were actually expecting.
+  const overrides = await getStartTimeOverrides(
+    affected.map((r) => ({ template_id: r.template_id, instance_date })),
+  );
+  const startTimeOf = (r: { template_id: string; templateStartTime: string }) =>
+    overrides.get(`${r.template_id}|${instance_date}`) ?? r.templateStartTime;
+
+  // Tidying up a class that already happened is bookkeeping, not a
+  // cancellation: nobody is owed a credit back for a class that ran, and
+  // emailing "esta aula não se vai realizar" about last Tuesday is nonsense.
+  // The booking rows are still flipped above — only the money and the mail are
+  // skipped.
+  const upcoming = affected.filter(
+    (r) => !isClassInPast(instance_date, startTimeOf(r)),
+  );
+  if (upcoming.length === 0) return;
+
+  // Give pack students their class back. The studio cancelled — they must not
+  // pay for a class that never ran. Refunding here (rather than leaving the
+  // credit "parked" in the cancelled row) means no booking ever carries an
+  // unsettled credit, so a re-book charges normally. adjust_class_credits is a
+  // no-op for non-pack students and returns the new balance.
+  for (const row of upcoming) {
+    if (row.priorStatus !== "booked") continue; // waitlist never spent a credit
+    try {
+      const { data: newBalance, error: refundError } = await admin.rpc(
+        "adjust_class_credits",
+        { p_user_id: row.user_id, p_delta: 1 },
+      );
+      if (refundError) {
+        // Loud: a swallowed failure here means a student quietly paid for a
+        // class that never ran, and nothing else in the system would notice.
+        console.error(
+          `[calendar] CREDIT REFUND FAILED for user ${row.user_id} on ${instance_date}:`,
+          refundError.message,
+        );
+        continue;
+      }
+      if (newBalance === null || newBalance === undefined) continue; // not a pack
+      row.refunded = true;
+      // Record the settlement in the row itself. The restore must charge only
+      // when a refund actually landed — deriving that from the student's
+      // current balance would double-charge whenever a refund had failed.
+      await admin
+        .from("bookings")
+        .update({
+          cancelled_reason: `${COACH_CANCEL_MARKER}${row.priorStatus}:r|${reason}`,
+        })
+        .eq("id", row.booking_id);
+    } catch (err) {
+      console.error("[calendar] credit refund threw:", err);
+    }
+  }
+
+  // Tell them, in ONE batched send. A per-student POST inside a server action
+  // would blow the Workers subrequest budget on a busy day and half-deliver.
+  // Best-effort: a mail problem must never leave the class half-cancelled.
+  try {
+    const userIds = [...new Set(upcoming.map((r) => r.user_id))];
+    const { data: profiles } = await admin
+      .from("profiles")
+      .select("id, email, full_name")
+      .in("id", userIds);
+    const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+
+    const recipients = upcoming.flatMap((row) => {
+      const profile = byId.get(row.user_id);
+      if (!profile?.email) return [];
+      return [
+        {
+          to: profile.email,
+          studentName: profile.full_name,
+          className: row.className,
+          timeLabel: formatTime(startTimeOf(row)),
+          // Per ROW, not per user: someone with two bookings that day may have
+          // been refunded for one and not the other.
+          refunded: row.refunded,
+        },
+      ];
+    });
+
+    await sendClassCancelledBatch(recipients, {
+      dateLabel: formatDayHeader(instance_date),
+      reason,
+      siteUrl: getSiteUrl(),
+    });
+  } catch (err) {
+    console.error("[calendar] cancellation emails failed:", err);
   }
 }
 
@@ -72,7 +213,9 @@ async function restoreInstanceBookings(
 
   let markedQ = admin
     .from("bookings")
-    .select("id, user_id, cancelled_reason")
+    .select(
+      "id, user_id, template_id, cancelled_reason, class_templates!inner(name, start_time)",
+    )
     .eq("instance_date", instance_date)
     .eq("status", "cancelled")
     .like("cancelled_reason", `${COACH_CANCEL_MARKER}%`);
@@ -90,19 +233,34 @@ async function restoreInstanceBookings(
     .in("user_id", userIds);
   const conflicted = new Set((sameDay ?? []).map((b) => b.user_id));
 
+  // A day can be reopened while individual classes on it are still cancelled
+  // in their own right. Those bookings must stay cancelled — reopening the day
+  // is not the same as un-cancelling every class in it.
+  const { data: stillCancelled } = await admin
+    .from("class_overrides")
+    .select("template_id")
+    .eq("instance_date", instance_date)
+    .eq("cancelled", true);
+  const cancelledTemplates = new Set(
+    (stillCancelled ?? []).map((o) => o.template_id as string),
+  );
+
   // Weekly plan limits: a restore must not push a limited student over their
   // cap (they may have legitimately booked a replacement class this week
   // while the instance was cancelled). Count each limited student's active
   // week bookings the same way book_class does — booked always, waitlisted
   // only while still upcoming.
-  const { data: limitedProfiles } = await admin
+  const { data: userProfiles } = await admin
     .from("profiles")
-    .select("id, weekly_class_limit")
-    .in("id", userIds)
-    .not("weekly_class_limit", "is", null);
+    .select("id, email, full_name, weekly_class_limit")
+    .in("id", userIds);
   const limitByUser = new Map(
-    (limitedProfiles ?? []).map((p) => [p.id, p.weekly_class_limit as number]),
+    (userProfiles ?? [])
+      .filter((p) => p.weekly_class_limit !== null)
+      .map((p) => [p.id, p.weekly_class_limit as number]),
   );
+  const profileById = new Map((userProfiles ?? []).map((p) => [p.id, p]));
+
   const weekStart = mondayOf(instance_date);
   const overLimit = new Set<string>();
   if (limitByUser.size > 0) {
@@ -124,32 +282,135 @@ async function restoreInstanceBookings(
     }
   }
 
+  const overrides = await getStartTimeOverrides(
+    marked.map((m) => ({
+      template_id: m.template_id as string,
+      instance_date,
+    })),
+  );
+
+  const restoredRecipients: {
+    to: string;
+    studentName: string | null;
+    className: string;
+    timeLabel: string;
+    charged: boolean;
+  }[] = [];
+
   for (const row of marked) {
-    const prior = (row.cancelled_reason ?? "")
+    // Marker is BATUS_CLASS_CANCELLED:<status>[:<r|n>]|<reason>. Rows written
+    // before the settlement flag existed carry no flag — and were never
+    // refunded — so the absent case must mean "do not charge".
+    const head = (row.cancelled_reason ?? "")
       .slice(COACH_CANCEL_MARKER.length)
       .split("|")[0];
+    const [prior, settled] = head.split(":");
+    const wasRefunded = settled === "r";
+
+    // The class itself is still cancelled — leave this row alone entirely.
+    // Stripping the marker here would make that class's own "Restaurar"
+    // permanently a no-op, because the marker is how it finds these rows.
+    if (cancelledTemplates.has(row.template_id as string)) continue;
+
     if (
       conflicted.has(row.user_id) ||
       overLimit.has(row.user_id) ||
       (prior !== "booked" && prior !== "waitlisted")
     ) {
-      // Leave cancelled, but strip the marker so a later restore of another
-      // cancel/restore cycle can't resurrect a stale row.
+      // Leave cancelled, but strip the marker so a later cancel/restore cycle
+      // can't resurrect a stale row. Any refunded credit stays refunded — the
+      // student keeps the class they paid for.
       await admin
         .from("bookings")
         .update({ cancelled_reason: "Aula cancelada pelo estúdio" })
         .eq("id", row.id);
       continue;
     }
-    const { error } = await admin
+
+    // Take the credit back BEFORE handing back the seat, and only if the cancel
+    // actually returned one. charge_class_credit refuses (returns false) rather
+    // than clamping at zero, so a student who has since spent the credit is not
+    // silently restored for free.
+    let charged = false;
+    if (wasRefunded && prior === "booked") {
+      const { data: didCharge, error: chargeError } = await admin.rpc(
+        "charge_class_credit",
+        { p_user_id: row.user_id },
+      );
+      if (chargeError || didCharge !== true) {
+        if (chargeError) {
+          console.error(
+            `[calendar] CREDIT CHARGE FAILED for user ${row.user_id} on ${instance_date}:`,
+            chargeError.message,
+          );
+        }
+        // Can't pay (or couldn't be charged) → don't restore the seat.
+        await admin
+          .from("bookings")
+          .update({ cancelled_reason: "Aula cancelada pelo estúdio" })
+          .eq("id", row.id);
+        continue;
+      }
+      charged = true;
+    }
+
+    // Guard the flip on the status we read: a concurrent second restore then
+    // matches no rows.
+    const { data: restored, error } = await admin
       .from("bookings")
       .update({
         status: prior,
         cancelled_at: null,
         cancelled_reason: null,
       })
-      .eq("id", row.id);
+      .eq("id", row.id)
+      .eq("status", "cancelled")
+      .select("id");
     if (error) throw new Error(error.message);
+
+    if ((restored?.length ?? 0) === 0) {
+      // Someone else restored it first — give back the credit we just took so
+      // it isn't charged twice for one seat.
+      if (charged) {
+        await admin.rpc("adjust_class_credits", {
+          p_user_id: row.user_id,
+          p_delta: 1,
+        });
+      }
+      continue;
+    }
+
+    const profile = profileById.get(row.user_id);
+    const tpl = row.class_templates as unknown as {
+      name: string;
+      start_time: string;
+    };
+    if (profile?.email) {
+      restoredRecipients.push({
+        to: profile.email,
+        studentName: profile.full_name,
+        className: tpl.name,
+        timeLabel: formatTime(
+          overrides.get(`${row.template_id}|${instance_date}`) ??
+            tpl.start_time,
+        ),
+        charged,
+      });
+    }
+  }
+
+  // The cancellation was announced, so the un-cancellation must be too —
+  // otherwise a student who was told the class was off is silently re-booked
+  // (and re-charged) and finds out by not turning up.
+  if (restoredRecipients.length > 0) {
+    try {
+      await sendClassRestoredBatch(restoredRecipients, {
+        dateLabel: formatDayHeader(instance_date),
+        siteUrl: getSiteUrl(),
+      });
+    } catch (err) {
+      console.error("[calendar] restore emails failed:", err);
+    }
   }
 }
 
@@ -395,6 +656,18 @@ export async function rescheduleClassInstance(formData: FormData) {
   }
 
   const supabase = await createClient();
+
+  // The hour they were expecting, before we overwrite it.
+  const admin = createAdminClient();
+  const { data: template } = await admin
+    .from("class_templates")
+    .select("name, start_time")
+    .eq("id", template_id)
+    .maybeSingle();
+  const oldStartTime = template
+    ? await effectiveStartTime(template_id, instance_date, template.start_time)
+    : null;
+
   const { error } = await supabase.from("class_overrides").upsert(
     {
       template_id,
@@ -407,8 +680,59 @@ export async function rescheduleClassInstance(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  // Tell everyone who is booked. Moving a class without telling anyone is how
+  // a student turns up an hour late (or early) to a class they did book.
+  //
+  // Compare on the DISPLAYED time: the stored value is HH:MM:SS while the form
+  // sends HH:MM, so a raw string compare treats re-saving the same hour as a
+  // change and mails the whole roster "18:00 -> 18:00". Also skip a class that
+  // has already happened, and send in ONE batch rather than a POST per student.
+  // Best-effort: the reschedule itself must not fail on a mail problem.
+  const timeChanged =
+    !!oldStartTime && formatTime(oldStartTime) !== formatTime(new_start_time);
+  const alreadyRan = isClassInPast(instance_date, new_start_time);
+
+  if (template && timeChanged && !alreadyRan) {
+    try {
+      const { data: rows } = await admin
+        .from("bookings")
+        .select("user_id")
+        .eq("template_id", template_id)
+        .eq("instance_date", instance_date)
+        .in("status", ["booked", "waitlisted"]);
+      const userIds = [...new Set((rows ?? []).map((r) => r.user_id))];
+      if (userIds.length > 0) {
+        const { data: profiles } = await admin
+          .from("profiles")
+          .select("email, full_name")
+          .in("id", userIds);
+        const recipients = (profiles ?? []).flatMap((p) =>
+          p.email
+            ? [
+                {
+                  to: p.email,
+                  studentName: p.full_name,
+                  className: template.name,
+                  timeLabel: formatTime(new_start_time),
+                  oldTimeLabel: formatTime(oldStartTime!),
+                },
+              ]
+            : [],
+        );
+        await sendClassRescheduledBatch(recipients, {
+          dateLabel: formatDayHeader(instance_date),
+          newTimeLabel: formatTime(new_start_time),
+          siteUrl: getSiteUrl(),
+        });
+      }
+    } catch (err) {
+      console.error("[calendar] reschedule emails failed:", err);
+    }
+  }
+
   revalidatePath("/admin/calendar");
   revalidatePath("/aulas");
+  revalidatePath("/perfil");
 }
 
 // ============================================================================

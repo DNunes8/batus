@@ -42,7 +42,10 @@ export async function GET(request: NextRequest) {
     .from("profiles")
     .select("id, email, full_name, has_monthly_fee, joined_at")
     .eq("approved", true)
-    .eq("is_admin", false);
+    .eq("is_admin", false)
+    // A paused account owes nothing this month — chasing them for payment is
+    // both wrong and the kind of thing that makes a student leave.
+    .eq("is_blocked", false);
   if (profilesError) {
     // Fail loudly (red run in GitHub Actions) — proceeding on a failed query
     // would compute a wrong recipient list.

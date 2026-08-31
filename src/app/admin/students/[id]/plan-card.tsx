@@ -34,6 +34,25 @@ export function PlanCard({
 
   function choose(plan: Plan, label: string) {
     if (plan === active || planPending) return;
+
+    // Leaving a pack throws away prepaid classes the student already paid for,
+    // and nothing records them — so make the coach say yes to that number out
+    // loud rather than discovering it later.
+    const leavingPackWithBalance =
+      active === "pack" && plan !== "pack" && credits > 0;
+    if (
+      leavingPackWithBalance &&
+      !window.confirm(
+        `O aluno ainda tem ${credits} ${
+          credits === 1 ? "aula" : "aulas"
+        } no pack.\n\nMudar para "${label}" apaga ${
+          credits === 1 ? "essa aula" : "essas aulas"
+        } e não dá para recuperar. Continuar?`,
+      )
+    ) {
+      return;
+    }
+
     startPlan(async () => {
       try {
         const result = await setStudentPlan({ id: student.id, plan });
