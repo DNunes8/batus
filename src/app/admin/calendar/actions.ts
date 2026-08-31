@@ -273,27 +273,47 @@ async function restoreInstanceBookings(
     .eq("status", "cancelled")
     .like("cancelled_reason", `${COACH_CANCEL_MARKER}%`);
   if (template_id) markedQ = markedQ.eq("template_id", template_id);
-  const { data: marked } = await markedQ;
+  const { data: marked, error: markedError } = await markedQ;
+  // Every guard below is built on a read. supabase-js resolves a failed read
+  // to data: null rather than throwing, so an unchecked one turns into its own
+  // opposite: no rows to restore, nobody has a clashing booking, no class is
+  // still cancelled, nobody is over their weekly limit. Refuse instead —
+  // nothing has been written yet, and the markers survive for the next tap.
+  if (markedError) {
+    throw new Error(
+      `Não foi possível ler as marcações desta aula (${markedError.message}). Tenta outra vez.`,
+    );
+  }
   if (!marked || marked.length === 0) return;
 
   // Same-day active bookings for the affected students → conflicts to skip.
   const userIds = [...new Set(marked.map((m) => m.user_id))];
-  const { data: sameDay } = await admin
+  const { data: sameDay, error: sameDayError } = await admin
     .from("bookings")
     .select("user_id")
     .eq("instance_date", instance_date)
     .in("status", ["booked", "waitlisted"])
     .in("user_id", userIds);
+  if (sameDayError) {
+    throw new Error(
+      `Não foi possível verificar as outras marcações do dia (${sameDayError.message}). Tenta outra vez.`,
+    );
+  }
   const conflicted = new Set((sameDay ?? []).map((b) => b.user_id));
 
   // A day can be reopened while individual classes on it are still cancelled
   // in their own right. Those bookings must stay cancelled — reopening the day
   // is not the same as un-cancelling every class in it.
-  const { data: stillCancelled } = await admin
+  const { data: stillCancelled, error: stillCancelledError } = await admin
     .from("class_overrides")
     .select("template_id")
     .eq("instance_date", instance_date)
     .eq("cancelled", true);
+  if (stillCancelledError) {
+    throw new Error(
+      `Não foi possível verificar que aulas continuam canceladas (${stillCancelledError.message}). Tenta outra vez.`,
+    );
+  }
   const cancelledTemplates = new Set(
     (stillCancelled ?? []).map((o) => o.template_id as string),
   );
@@ -327,7 +347,7 @@ async function restoreInstanceBookings(
   const weekStart = mondayOf(instance_date);
   const overLimit = new Set<string>();
   if (limitByUser.size > 0) {
-    const { data: weekRows } = await admin
+    const { data: weekRows, error: weekRowsError } = await admin
       .from("bookings")
       .select("user_id")
       .in("user_id", [...limitByUser.keys()])
@@ -336,6 +356,11 @@ async function restoreInstanceBookings(
       .or(
         `status.eq.booked,and(status.eq.waitlisted,instance_date.gte.${todayLisbon()})`,
       );
+    if (weekRowsError) {
+      throw new Error(
+        `Não foi possível contar as aulas da semana (${weekRowsError.message}). Tenta outra vez.`,
+      );
+    }
     const weekCount = new Map<string, number>();
     for (const b of weekRows ?? []) {
       weekCount.set(b.user_id, (weekCount.get(b.user_id) ?? 0) + 1);
@@ -1051,11 +1076,15 @@ export async function addClassGuest(formData: FormData) {
   const supabase = await createClient();
 
   // Same stale-tab guard as addStudentToClass: no seats on a closed day.
-  const { data: closed } = await supabase
+  const { data: closed, error: closedError } = await supabase
     .from("closed_days")
     .select("date")
     .eq("date", instance_date)
     .maybeSingle();
+  // Fail closed: a read that errors must not read as "the day is open".
+  if (closedError) {
+    throw new Error("Sem ligação ao servidor. Tenta outra vez.");
+  }
   if (closed) throw new Error("O estúdio está fechado neste dia.");
 
   const { error } = await supabase.from("class_guests").insert({
@@ -1179,7 +1208,11 @@ export async function addStudentToClass(input: {
   // Stale-tab guard, same threat as the cancelled-instance stop above: a day
   // closed from another device renders NO calendar entries, so a booking
   // forced onto it would be invisible and unremovable — and would burn a pack
-  // credit on a class that won't happen.
+  // credit on a class that won't happen. A read that errors must not read as
+  // "the day is open".
+  if (closedRes.error) {
+    return { error: "Sem ligação ao servidor. Tenta outra vez." };
+  }
   if (closedRes.data) return { error: "O estúdio está fechado neste dia." };
 
   // Same started-class gate as removeStudentBooking: adding into the past
