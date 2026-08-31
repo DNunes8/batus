@@ -22,6 +22,7 @@ import {
   formatWeekRange,
   formatTime,
   getAdminWeekSchedule,
+  isClassInPast,
   mondayOf,
   safeReferenceDate,
   todayLisbon,
@@ -764,6 +765,7 @@ function GroupBlock({ entry }: { entry: AdminGroupEntry }) {
           instance_date={entry.date}
           current_start_time={entry.start_time}
           label={entry.name}
+          started={isClassInPast(entry.date, entry.start_time)}
         />
         <ConfirmForm
           message={`Cancelar "${entry.name}" neste dia? Os alunos com marcação vão ver-la cancelada.`}
@@ -846,6 +848,7 @@ function SoloBlock({ entry }: { entry: AdminSoloEntry }) {
           instance_date={entry.date}
           current_start_time={entry.start_time}
           label={`PT · ${entry.student_name}`}
+          started={isClassInPast(entry.date, entry.start_time)}
         />
         <ConfirmForm
           message={`Cancelar PT com ${entry.student_name} neste dia?`}

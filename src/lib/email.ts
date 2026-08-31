@@ -14,7 +14,7 @@ import { studio } from "@/lib/studio.config";
 // emails (password reset, etc.) are written by Supabase's template editor and
 // merely delivered through Resend's SMTP — they don't live here.
 //
-// Config (Vercel env): RESEND_API_KEY + RESEND_FROM
+// Config (Cloudflare secrets): RESEND_API_KEY + RESEND_FROM
 // (e.g. "Batus <noreply@batusboxe.com>" — domain must be verified in Resend).
 
 // Canonical, absolute site origin for links + the logo inside emails. Pinned

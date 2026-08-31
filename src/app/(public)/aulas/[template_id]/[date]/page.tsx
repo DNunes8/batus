@@ -253,7 +253,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
   const backHref = `/aulas?week=${mondayOf(date)}`;
 
   // Build the absolute URL once on the server so the share text has the right
-  // host (matches custom domain after handover; works on Vercel previews too).
+  // host (matches custom domain after handover; works on preview deployments too).
   const headersList = await headers();
   const host = headersList.get("host") ?? "localhost:3000";
   const protocol = host.startsWith("localhost") ? "http" : "https";

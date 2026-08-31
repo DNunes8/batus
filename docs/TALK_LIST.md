@@ -57,6 +57,7 @@ The store itself is built (public /loja, admin /admin/merch + /admin/claims; cla
 
 ## Operational — before serious production use
 
-- [ ] **Email sender** — currently Supabase's default service (rate-limited). Once there's a domain, set up Resend SMTP.
-- [ ] **Backups** — the Supabase free tier has no automated daily DB backup. Set up a weekly dump.
-- [ ] **Custom domain** — once bought, point DNS to Vercel and add it to Supabase's Site URL + redirect URLs.
+- [x] **Email sender** — done. batusboxe.com is verified in Resend and the app sends from `noreply@batusboxe.com`. Supabase Auth's own mail (password reset) may still use Supabase's rate-limited default — worth pointing at Resend SMTP one day.
+- [x] **Backups** — done, weekly encrypted `pg_dump` in `.github/workflows/backup.yml`. **The restore has never been tested and BACKUP_PASSPHRASE is write-only in GitHub** — if nobody has it written down, the backups can't be decrypted.
+- [x] **Custom domain** — done. batusboxe.com is live, registered at Vercel, nameservers at Cloudflare, and set in Supabase's Site URL + redirect URLs.
+- [ ] **A second admin account** — there is exactly one (`batusboxing@gmail.com`). If it's locked out, nobody can approve a student or open the booking window.

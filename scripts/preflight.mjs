@@ -27,9 +27,14 @@ function loadEnv() {
   }
   const url = env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
+  const missing = [
+    !url && "NEXT_PUBLIC_SUPABASE_URL",
+    !key && "SUPABASE_SERVICE_ROLE_KEY",
+  ].filter(Boolean);
+  if (missing.length) {
     console.error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY (.env.local or environment).",
+      `preflight needs ${missing.join(" and ")} in .env.local (Supabase → Project Settings → API).\n` +
+        "It reads the database directly, so unlike a deploy it cannot use the Cloudflare secrets.",
     );
     process.exit(2);
   }

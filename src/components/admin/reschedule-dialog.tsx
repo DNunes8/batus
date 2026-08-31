@@ -26,12 +26,18 @@ export function RescheduleDialog({
   instance_date,
   current_start_time,
   label,
+  // A class that has already started can't be moved — the server refuses it,
+  // and moving a finished class would take it back off every attendee's
+  // lifetime count. Don't offer the control (same idea as the roster picker,
+  // which degrades on past days).
+  started = false,
 }: {
   kind: "group" | "solo";
   template_id: string;
   instance_date: string;
   current_start_time: string;
   label: string;
+  started?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -44,6 +50,8 @@ export function RescheduleDialog({
     setOpen(false);
     router.refresh();
   }
+
+  if (started) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

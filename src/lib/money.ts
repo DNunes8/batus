@@ -9,11 +9,28 @@ export function formatEuro(cents: number | null | undefined): string {
 }
 
 // Accepts "50", "50.00", or "50,00" — returns integer cents (0 on invalid).
+//
+// The 0-on-invalid behaviour is only safe where 0 is a sensible default. Where
+// a wrong 0 would be recorded as money — a monthly fee, a payment row — use
+// parseEuroOrNull and refuse instead: "€50" and "cinquenta" both parse to NaN
+// here, and a coach's typo silently becoming "pays nothing" is the exact shape
+// of bug that hides revenue.
 export function parseEuroToCents(input: string | null | undefined): number {
-  if (!input) return 0;
+  return parseEuroOrNull(input) ?? 0;
+}
+
+// Same parse, but null when the input is not a usable amount. An empty string
+// is null too — "not filled in" is not "zero".
+export function parseEuroOrNull(
+  input: string | null | undefined,
+): number | null {
+  if (input == null) return null;
   const normalized = input.trim().replace(",", ".");
+  if (normalized === "") return null;
   const num = parseFloat(normalized);
-  if (isNaN(num) || num < 0) return 0;
+  // parseFloat("50abc") is 50, so check the whole string is a number.
+  if (!/^\d*\.?\d+$/.test(normalized)) return null;
+  if (!Number.isFinite(num) || num < 0) return null;
   return Math.round(num * 100);
 }
 

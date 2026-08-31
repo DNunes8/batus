@@ -47,7 +47,7 @@ The admin area has its own layout — a sidebar on desktop, a top bar on mobile 
 
 **/admin — Dashboard.** A real daily-driver screen:
 - A banner when new accounts are waiting for approval.
-- Four metric cards: receitas este mês, aulas hoje, pedidos pendentes, mensagens por ler.
+- Two cards: receitas este mês (links to Finanças) and pedidos pendentes. Above them, whatever needs attention today — a lapsed booking window, new accounts waiting, birthdays.
 - "Hoje" — today's classes with booked/capacity.
 - Shortcuts: nova aula, nova sessão PT, ver alunos, novo artigo.
 
@@ -62,7 +62,7 @@ The admin area has its own layout — a sidebar on desktop, a top bar on mobile 
 - **Approve pending accounts here** — a new signup can't book until you do.
 - Click a student → detail page: name, phone, goals, private notes (your CRM), payment ledger.
 
-**/admin/sessions — PTs** — solo sessions Baltaru runs directly. "Nova sessão" matches an existing account by email/name, or stores an off-app name. These feed the earnings.
+**/admin/classes → PTs** — solo sessions Baltaru runs directly. "Nova sessão" matches an existing account by email/name, or stores an off-app name. These feed the earnings.
 
 **/admin/pagamentos — Pagamentos** — payment tracking + earnings, the part Regybox does poorly:
 - Two tabs — "Aulas de grupo" and "PTs".

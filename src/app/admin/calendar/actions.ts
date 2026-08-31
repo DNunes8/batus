@@ -878,6 +878,17 @@ export async function rescheduleClassInstance(formData: FormData) {
     ? await effectiveStartTime(template_id, instance_date, template.start_time)
     : null;
 
+  // A class that has already started cannot be moved. Beyond the obvious —
+  // nobody can be told in time — it would rewrite history: the profile counts
+  // a class as done from its start time, so pushing this morning's finished
+  // 09:00 to 21:00 takes it back off every attendee's total and drops it back
+  // into "Próximas". The same guard the roster edits already use.
+  if (oldStartTime && isClassInPast(instance_date, oldStartTime)) {
+    redirect(
+      `/admin/calendar?week=${mondayOf(instance_date)}&day=${instance_date}&started=1`,
+    );
+  }
+
   const { error } = await supabase.from("class_overrides").upsert(
     {
       template_id,

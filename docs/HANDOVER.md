@@ -41,6 +41,11 @@ Everything else (service role key, Resend key, cron secret) already lives as a
 Cloudflare secret and is read at runtime — `npx wrangler secret list` shows
 them. A new machine does not need those values to ship a working deploy.
 
+It does need the service role key for one thing: `npm run preflight`, the
+read-only data check described in the README, talks to the database directly.
+Copy `SUPABASE_SERVICE_ROLE_KEY` from Supabase → Project Settings → API into
+`.env.local` if you want to run it. The deploy itself works without it.
+
 ## Database changes
 
 Migrations in `supabase/migrations/` are applied **by hand** in the Supabase SQL

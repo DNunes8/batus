@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertAdmin } from "@/lib/auth-guard";
-import { parseEuroToCents } from "@/lib/money";
+import { parseEuroOrNull } from "@/lib/money";
 import { parseBirthdayFromForm } from "@/lib/birthday";
 import { PLAN_CONFIG, STANDARD_FEES_CENTS, type Plan } from "@/lib/plans";
 
@@ -22,8 +22,13 @@ export async function updateStudentNotesAndGoals(formData: FormData) {
   // Per-student monthly fee override. Empty input → "Por definir". Normally set
   // by the plan (see setStudentPlan); the coach edits it here only for a custom
   // rate that differs from the tier price.
+  // Empty → "Por definir". Anything else must parse: "€50" or a stray letter
+  // used to land as 0, quietly recording that this student pays nothing.
   const feeRaw = ((formData.get("monthly_fee") as string | null) ?? "").trim();
-  const monthly_fee_cents = feeRaw === "" ? null : parseEuroToCents(feeRaw);
+  const monthly_fee_cents = feeRaw === "" ? null : parseEuroOrNull(feeRaw);
+  if (feeRaw !== "" && monthly_fee_cents === null) {
+    redirect(`/admin/students/${formData.get("id")}?feeerr=1`);
+  }
 
   // Whether this student's monthly payment is tracked (PTs who pay per-session
   // turn this off). service_type + weekly_class_limit are owned by the plan
@@ -97,8 +102,10 @@ export async function upsertPaymentRecord(formData: FormData) {
   await assertAdmin();
   const user_id = formData.get("user_id") as string | null;
   const month = formData.get("month") as string | null;
-  const priceRaw = (formData.get("amount") as string | null) ?? "0";
-  const amount_cents = parseEuroToCents(priceRaw);
+  // No silent zero here either: this row IS the money, and the form defaults
+  // its status to "pago".
+  const priceRaw = (formData.get("amount") as string | null) ?? "";
+  const amount_cents = parseEuroOrNull(priceRaw);
   const statusRaw = (formData.get("status") as string | null) ?? "unpaid";
   const status = ["paid", "unpaid", "paused"].includes(statusRaw)
     ? statusRaw
@@ -106,6 +113,9 @@ export async function upsertPaymentRecord(formData: FormData) {
   const notes = ((formData.get("notes") as string | null) ?? "").trim() || null;
 
   if (!user_id || !month) throw new Error("Dados em falta.");
+  if (amount_cents === null) {
+    redirect(`/admin/students/${user_id}?feeerr=1`);
+  }
 
   const monthDate = month.length === 7 ? `${month}-01` : month;
 
