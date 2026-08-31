@@ -70,11 +70,10 @@ export default function PrivacidadePage() {
           ) : (
             <p className="mt-2">
               Este site é operado pelo estúdio {studio.fullName}, do treinador{" "}
-              {studio.coach}, em {studio.city}, {studio.country}. A
-              identificação legal completa do responsável pelo tratamento (nome
-              e número de identificação fiscal) será publicada nesta página
-              antes do lançamento público do site. Para qualquer questão sobre
-              privacidade, {reachUs}.
+              {studio.coach}, em {studio.city}, {studio.country}. Para qualquer
+              questão sobre privacidade — ou para saberes a identificação legal
+              completa do responsável pelo tratamento — {reachUs}. Respondemos
+              com a informação que precisares.
             </p>
           )}
         </section>
