@@ -89,6 +89,16 @@ export async function bulkSetPaymentStatus(input: {
       .in("user_id", user_ids),
   ]);
 
+  // Both reads decide what gets written. An unchecked failure on the second
+  // one is the dangerous half: with no existing rows in hand, every student's
+  // standing fee would be written straight over the amount the coach set for
+  // this month in the drawer.
+  if (profilesRes.error || existingRes.error) {
+    throw new Error(
+      "Sem ligação ao servidor. Nada foi alterado — tenta outra vez.",
+    );
+  }
+
   const feeByStudent = new Map<string, number | null>();
   const nameByStudent = new Map<string, string>();
   // Pack students pay per bundle of classes, not per month — the board already
