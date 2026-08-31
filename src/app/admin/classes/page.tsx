@@ -2,10 +2,11 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { ConfirmForm } from "@/components/confirm-form";
-import { SubmitButton } from "@/components/submit-button";
 import { formatEuro } from "@/lib/money";
 import { formatDayHeader, todayLisbon } from "@/lib/schedule";
 import {
+  CUTOFF_OPTIONS,
+  cutoffLabel,
   getBookableUntil,
   getCancellationCutoffHours,
 } from "@/lib/booking-window";
@@ -125,39 +126,41 @@ export default async function ClassesListPage() {
           </ConfirmForm>
         </div>
 
-        {/* Cancellation cutoff — the coach's rule, editable by the coach. */}
+        {/* Cancellation cutoff — the coach's rule, in his own hands. Tap to
+            choose (same gesture as the student plan buttons) rather than a
+            number box: he reads the option instead of translating a number,
+            and one tap saves. Plain submit buttons, so no client JS. */}
         <form
           action={setCancellationCutoff}
-          className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border/60 p-4"
+          className="mt-3 rounded-md border border-border/60 p-4"
         >
-          <div>
-            <p className="text-sm">
-              Os alunos podem cancelar até{" "}
-              <strong>
-                {cutoffHours === 0
-                  ? "à hora da aula"
-                  : `${cutoffHours}h antes da aula`}
-              </strong>
-              .
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Depois disso deixam de ver o botão Cancelar e falam contigo.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              name="hours"
-              min={0}
-              max={48}
-              defaultValue={cutoffHours}
-              aria-label="Horas antes da aula"
-              className="h-11 w-20 rounded-md border border-input bg-background px-3 text-sm"
-            />
-            <span className="text-sm text-muted-foreground">horas</span>
-            <SubmitButton variant="outline" className="h-11 px-4">
-              Guardar
-            </SubmitButton>
+          <p className="text-sm font-medium">
+            Até quando podem desmarcar?
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Depois disto o aluno já não vê o botão Cancelar e fala contigo.
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {CUTOFF_OPTIONS.map((h) => {
+              const label = cutoffLabel(h);
+              const selected = h === cutoffHours;
+              return (
+                <button
+                  key={h}
+                  type="submit"
+                  name="hours"
+                  value={h}
+                  aria-pressed={selected}
+                  className={`flex h-12 items-center justify-center rounded-md border px-2 text-center text-sm font-medium transition-colors ${
+                    selected
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border/60 hover:border-foreground"
+                  }`}
+                >
+                  {label.charAt(0).toUpperCase() + label.slice(1)}
+                </button>
+              );
+            })}
           </div>
         </form>
 

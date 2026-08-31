@@ -6,6 +6,18 @@ import { addDays, lisbonInstant, todayLisbon } from "@/lib/schedule";
 // without a deploy. Default matches the seeded value.
 export const DEFAULT_CANCELLATION_CUTOFF_HOURS = 4;
 
+// The choices the coach can pick from. Deliberately a short list of taps
+// rather than a free number box: he reads the option instead of translating a
+// number into a rule, and a typo can't lock every student out. Fractional
+// hours are allowed (0.5 = 30 minutes) — do not round these.
+export const CUTOFF_OPTIONS = [0, 0.5, 1, 2, 4] as const;
+
+export function cutoffLabel(hours: number): string {
+  if (hours === 0) return "à hora da aula";
+  if (hours < 1) return `${Math.round(hours * 60)} minutos antes`;
+  return hours === 1 ? "1 hora antes" : `${hours} horas antes`;
+}
+
 export async function getCancellationCutoffHours(): Promise<number> {
   const admin = createAdminClient();
   const { data } = await admin

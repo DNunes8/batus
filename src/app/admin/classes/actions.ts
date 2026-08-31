@@ -11,7 +11,7 @@ import {
   mondayOf,
   todayLisbon,
 } from "@/lib/schedule";
-import { nextWindowEnd } from "@/lib/booking-window";
+import { CUTOFF_OPTIONS, nextWindowEnd } from "@/lib/booking-window";
 
 // Open booking for the next two weeks — the wife's fortnightly "set up the
 // next 2 weeks" button. Stores the cutoff date in settings.bookable_until;
@@ -36,16 +36,17 @@ export async function openNextTwoWeeks() {
 export async function setCancellationCutoff(formData: FormData) {
   await assertAdmin();
   const hours = Number(formData.get("hours"));
-  // 0 = "até à hora da aula". Capped at 48h so a fat finger can't lock every
-  // student out of cancelling for days.
-  if (!Number.isFinite(hours) || hours < 0 || hours > 48) {
+  // Only the values the UI actually offers. A whitelist (not a range) means a
+  // tampered form can't store something absurd, and no rounding can turn the
+  // 30-minute option (0.5) into an hour.
+  if (!CUTOFF_OPTIONS.includes(hours as (typeof CUTOFF_OPTIONS)[number])) {
     redirect("/admin/classes?cutofferr=1");
   }
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("settings")
-    .upsert({ key: "cancellation_cutoff_hours", value: Math.round(hours) });
+    .upsert({ key: "cancellation_cutoff_hours", value: hours });
   if (error) throw new Error(error.message);
 
   revalidatePath("/admin/classes");
