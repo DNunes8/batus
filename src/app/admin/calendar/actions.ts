@@ -624,9 +624,14 @@ export async function restoreClassInstance(formData: FormData) {
   }
 
   const supabase = await createClient();
+  // Un-cancel, don't delete. The row also carries override_start_time (the
+  // coach's "Adiar") and override_capacity; deleting it silently reverted an
+  // 18:00 -> 19:00 move back to 18:00 — and, because the row was already gone
+  // by the time the restore emails were built, told every student the old
+  // hour. Clearing just the cancellation leaves the rest of the row intact.
   const { error } = await supabase
     .from("class_overrides")
-    .delete()
+    .update({ cancelled: false, reason: null })
     .eq("template_id", template_id)
     .eq("instance_date", instance_date);
 
@@ -839,9 +844,11 @@ export async function restoreSoloInstance(formData: FormData) {
   }
 
   const supabase = await createClient();
+  // Same as the group restore: keep override_start_time, drop only the
+  // cancellation. A deleted row takes the "Adiar" with it.
   const { error } = await supabase
     .from("solo_session_overrides")
-    .delete()
+    .update({ cancelled: false, reason: null })
     .eq("template_id", template_id)
     .eq("instance_date", instance_date);
 
