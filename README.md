@@ -53,7 +53,14 @@ Before deploying:
 
 ```bash
 npm run check      # types and a production build
+npm run preflight  # read-only invariant check against the live database
 ```
+
+`preflight` is the one that catches the bugs that actually cost money. It never
+writes anything — it asserts things that should never be true of the data (a
+month recorded as paid for 0,00 €, a seat stranded on a closed day, a booking
+on a day its class no longer runs, someone waiting for a class with a free
+seat) and exits non-zero if any of them are. Run it again after deploying.
 
 `npm run lint` is separate and currently reports four React-hooks findings in
 older dialogs (`login`, `add-class-dialog`, `payment-drawer`, `contacto`). They
