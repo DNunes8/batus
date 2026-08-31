@@ -6,8 +6,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/supabase/auth-user";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { addDays, mondayOf, todayLisbon } from "@/lib/schedule";
+import {
+  canCancelBooking,
+  getBookableUntil,
+  getCancellationCutoffHours,
+} from "@/lib/booking-window";
 import { isUnpaidAndBlocked } from "@/lib/payment";
-import { getBookableUntil } from "@/lib/booking-window";
 import { promoteFirstWaitlistedIfSeatFree } from "@/lib/waitlist";
 
 export async function bookClass(formData: FormData) {
@@ -216,24 +220,22 @@ export async function cancelBooking(formData: FormData) {
 
   const wasBooked = booking.status === "booked";
 
-  // Cutoff check only applies to confirmed bookings; waitlisted can always cancel.
+  // Cutoff check only applies to confirmed bookings; waitlisted can always
+  // cancel. Uses the SAME predicate the /perfil UI uses to decide whether to
+  // offer the button, so the two can never disagree — a student must never be
+  // shown Cancelar and then refused.
   if (wasBooked) {
-    const { data: settingRow } = await supabase
-      .from("settings")
-      .select("value")
-      .eq("key", "cancellation_cutoff_hours")
-      .single();
-    const cutoffHours = Number(settingRow?.value ?? 4);
-
     const startTime = (booking.class_templates as unknown as {
       start_time: string;
     }).start_time;
-    // Note: server may run in UTC; Lisbon offset varies with DST. Off by at
-    // most ~1h either way — acceptable for MVP. Refine with date-fns-tz later.
-    const classDateTime = new Date(`${booking.instance_date}T${startTime}`);
-    const cutoffMs = classDateTime.getTime() - cutoffHours * 60 * 60 * 1000;
+    const allowed = canCancelBooking({
+      instance_date: booking.instance_date,
+      start_time: startTime,
+      status: booking.status,
+      cutoffHours: await getCancellationCutoffHours(),
+    });
 
-    if (Date.now() > cutoffMs) {
+    if (!allowed) {
       // Expected case, not an exception: a thrown message would be masked in
       // production. Redirect to /perfil with the cutoff toast instead.
       redirect("/perfil?cutoff=1");

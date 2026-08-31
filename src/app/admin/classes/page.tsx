@@ -2,13 +2,18 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { ConfirmForm } from "@/components/confirm-form";
+import { SubmitButton } from "@/components/submit-button";
 import { formatEuro } from "@/lib/money";
 import { formatDayHeader, todayLisbon } from "@/lib/schedule";
-import { getBookableUntil } from "@/lib/booking-window";
+import {
+  getBookableUntil,
+  getCancellationCutoffHours,
+} from "@/lib/booking-window";
 import {
   deleteClassTemplate,
   deleteSoloTemplate,
   openNextTwoWeeks,
+  setCancellationCutoff,
 } from "./actions";
 import { assertAdminPage } from "@/lib/auth-guard";
 
@@ -61,6 +66,7 @@ export default async function ClassesListPage() {
   const ptTemplates = (ptRes.data ?? []) as unknown as PtTemplate[];
   const bookableUntil = await getBookableUntil();
   const windowOpen = bookableUntil > todayLisbon();
+  const cutoffHours = await getCancellationCutoffHours();
 
   return (
     <div className="p-6 sm:p-10">
@@ -118,6 +124,42 @@ export default async function ClassesListPage() {
             </button>
           </ConfirmForm>
         </div>
+
+        {/* Cancellation cutoff — the coach's rule, editable by the coach. */}
+        <form
+          action={setCancellationCutoff}
+          className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border/60 p-4"
+        >
+          <div>
+            <p className="text-sm">
+              Os alunos podem cancelar até{" "}
+              <strong>
+                {cutoffHours === 0
+                  ? "à hora da aula"
+                  : `${cutoffHours}h antes da aula`}
+              </strong>
+              .
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Depois disso deixam de ver o botão Cancelar e falam contigo.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              name="hours"
+              min={0}
+              max={48}
+              defaultValue={cutoffHours}
+              aria-label="Horas antes da aula"
+              className="h-11 w-20 rounded-md border border-input bg-background px-3 text-sm"
+            />
+            <span className="text-sm text-muted-foreground">horas</span>
+            <SubmitButton variant="outline" className="h-11 px-4">
+              Guardar
+            </SubmitButton>
+          </div>
+        </form>
 
         {templates.length === 0 ? (
           <div className="mt-8 rounded-md border border-dashed border-border/60 p-10 text-center">

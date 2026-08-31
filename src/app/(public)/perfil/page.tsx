@@ -10,6 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { formatTime } from "@/lib/schedule";
+import {
+  canCancelBooking,
+  getCancellationCutoffHours,
+} from "@/lib/booking-window";
 import { getStudentStats } from "@/lib/stats";
 import { cancelBooking } from "@/app/(public)/aulas/actions";
 import {
@@ -83,6 +87,8 @@ export default async function PerfilPage({
     .single();
 
   const stats = await getStudentStats(user.id);
+  // Drives whether each upcoming booking still offers a Cancelar button.
+  const cutoffHours = await getCancellationCutoffHours();
 
   // Admins are always treated as approved; everyone else needs the flag.
   const isApproved = !!profile?.approved || !!profile?.is_admin;
@@ -352,22 +358,43 @@ export default async function PerfilPage({
                         </p>
                       </div>
                     </div>
-                    <form
-                      action={cancelBooking}
-                      className="flex items-center gap-2"
-                    >
-                      <input type="hidden" name="booking_id" value={b.id} />
+                    <div className="flex items-center gap-2">
                       <span className="text-xs uppercase tracking-widest text-muted-foreground">
                         {b.status === "waitlisted" ? "Em espera" : "Marcado"}
                       </span>
-                      <SubmitButton
-                        variant="outline"
-                        className="h-10 px-4"
-                        pendingText="A cancelar…"
-                      >
-                        Cancelar
-                      </SubmitButton>
-                    </form>
+                      {canCancelBooking({
+                        instance_date: b.instance_date,
+                        start_time: b.start_time,
+                        status: b.status,
+                        cutoffHours,
+                      }) ? (
+                        <form action={cancelBooking}>
+                          <input
+                            type="hidden"
+                            name="booking_id"
+                            value={b.id}
+                          />
+                          <SubmitButton
+                            variant="outline"
+                            className="h-10 px-4"
+                            pendingText="A cancelar…"
+                          >
+                            Cancelar
+                          </SubmitButton>
+                        </form>
+                      ) : (
+                        // Past the cutoff: say so instead of offering a button
+                        // the server would refuse. Contacting the coach is the
+                        // only remaining route, so point there.
+                        <span className="text-right text-xs leading-tight text-muted-foreground">
+                          Já não dá para cancelar
+                          <br />
+                          <span className="text-muted-foreground/70">
+                            (fala com o treinador)
+                          </span>
+                        </span>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>

@@ -9,6 +9,7 @@ import {
   dayOfWeek as dowHelper,
   formatDayHeader,
   formatTime,
+  lisbonInstant,
   mondayOf,
   todayLisbon,
 } from "@/lib/schedule";
@@ -706,7 +707,7 @@ export async function addStudentToClass(input: {
   // would mint stats/streak retroactively and spend a credit on a class that
   // already happened. The UI hides the picker on past days; this backs it up.
   const startTime = override?.override_start_time ?? template.start_time;
-  const classStart = new Date(`${instance_date}T${startTime}`);
+  const classStart = lisbonInstant(instance_date, startTime);
   if (Date.now() >= classStart.getTime()) {
     return { error: "A aula já começou." };
   }
@@ -877,7 +878,7 @@ export async function removeStudentBooking(formData: FormData) {
   const startTime = (booking.class_templates as unknown as {
     start_time: string;
   }).start_time;
-  const classStart = new Date(`${booking.instance_date}T${startTime}`);
+  const classStart = lisbonInstant(booking.instance_date, startTime);
   if (Date.now() >= classStart.getTime()) {
     revalidatePath("/admin/calendar");
     return;

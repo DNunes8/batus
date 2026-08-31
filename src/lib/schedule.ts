@@ -115,14 +115,49 @@ export function safeReferenceDate(input: string | undefined): string {
   return todayLisbon();
 }
 
+// How far Lisbon wall-clock is ahead of UTC at a given instant, in ms.
+// Asks Intl for the real zone rules rather than guessing, so it is exact on
+// both sides of a DST switch (Portugal flips on the last Sunday of March and
+// of October — a month-based guess is wrong for up to four weeks a year).
+function lisbonOffsetMs(instant: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Lisbon",
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(instant);
+  const p: Record<string, number> = {};
+  for (const part of parts) {
+    if (part.type !== "literal") p[part.type] = Number(part.value);
+  }
+  const asIfUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return asIfUtc - instant.getTime();
+}
+
+// THE time primitive for this app. Class times are stored as Lisbon wall-clock
+// ("18:00" means 6pm at the studio), but the server runs in UTC — so
+// `new Date("2026-08-31T18:00:00")` silently means 19:00 Lisbon in summer.
+// That one-hour lie is what let a student be refused a cancellation she was
+// entitled to. Convert here, always, before comparing a class time to now().
+export function lisbonInstant(date: string, time: string): Date {
+  const [y, mo, d] = date.split("-").map(Number);
+  const [h, mi, s] = time.split(":").map(Number);
+  const naive = Date.UTC(y, mo - 1, d, h || 0, mi || 0, s || 0);
+  // Subtract the offset that applies at that moment. The first guess can land
+  // on the wrong side of a switch, so re-resolve once with the corrected
+  // instant (standard two-pass wall-clock → UTC conversion).
+  const first = naive - lisbonOffsetMs(new Date(naive));
+  const second = naive - lisbonOffsetMs(new Date(first));
+  return new Date(second);
+}
+
 // Server-side check: is this class instance already in the past?
-// Approximates Lisbon offset (DST aware via month). Off by minutes during
-// DST transition windows, fine for "should we show the Marcar button".
 export function isClassInPast(date: string, startTime: string): boolean {
-  const month = parseISODate(date).getUTCMonth();
-  const offset = month >= 2 && month <= 9 ? "+01:00" : "+00:00";
-  const start = new Date(`${date}T${startTime}${offset}`);
-  return start.getTime() < Date.now();
+  return lisbonInstant(date, startTime).getTime() < Date.now();
 }
 
 const PT_DAYS = [

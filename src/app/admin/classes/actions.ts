@@ -30,6 +30,29 @@ export async function openNextTwoWeeks() {
   redirect("/admin/classes?opened=1");
 }
 
+// How late students may cancel. Lived only in the database until a student was
+// refused a cancellation the coach thought was allowed — and he had no way to
+// see or change the rule. Now it's his.
+export async function setCancellationCutoff(formData: FormData) {
+  await assertAdmin();
+  const hours = Number(formData.get("hours"));
+  // 0 = "até à hora da aula". Capped at 48h so a fat finger can't lock every
+  // student out of cancelling for days.
+  if (!Number.isFinite(hours) || hours < 0 || hours > 48) {
+    redirect("/admin/classes?cutofferr=1");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("settings")
+    .upsert({ key: "cancellation_cutoff_hours", value: Math.round(hours) });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin/classes");
+  revalidatePath("/perfil");
+  redirect("/admin/classes?cutoffset=1");
+}
+
 export async function createClassTemplate(formData: FormData) {
   await assertAdmin();
   const supabase = await createClient();
