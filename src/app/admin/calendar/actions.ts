@@ -208,6 +208,23 @@ async function cancelInstanceBookings(
     }
   }
 
+  // The same failed read would also leave us with no addresses, so the day
+  // would be cancelled with nobody told. Ask once more before giving up —
+  // these failures are transient, and one extra query is cheap next to 26
+  // students turning up at a locked door.
+  if (packUnknown) {
+    const { data: retry } = await admin
+      .from("profiles")
+      .select("id, email, full_name, class_credits")
+      .in("id", userIds);
+    for (const p of retry ?? []) byId.set(p.id, p);
+    if (byId.size === 0) {
+      console.error(
+        `[calendar] NO ADDRESSES for ${instance_date} — the class was cancelled but NOBODY was emailed.`,
+      );
+    }
+  }
+
   // Tell them, in ONE batched send. A per-student POST inside a server action
   // would blow the Workers subrequest budget on a busy day and half-deliver.
   // Best-effort: a mail problem must never leave the class half-cancelled.
@@ -288,7 +305,7 @@ async function restoreInstanceBookings(
   // only while still upcoming.
   const { data: userProfiles } = await admin
     .from("profiles")
-    .select("id, email, full_name, weekly_class_limit")
+    .select("id, email, full_name, weekly_class_limit, class_credits")
     .in("id", userIds);
   const limitByUser = new Map(
     (userProfiles ?? [])
@@ -380,7 +397,13 @@ async function restoreInstanceBookings(
     // false) rather than clamping at zero, so a student who has since spent the
     // credit is not silently restored for free.
     let charged = false;
-    if (wasRefunded && prior === "booked") {
+    // Only a pack student was ever refunded, but they may have moved to a
+    // monthly plan since — and a monthly student needs no credit to hold a
+    // seat. charge_class_credit refuses for them exactly as it refuses an
+    // empty pack, so without this the seat would never come back and the
+    // marker would be stripped, putting it beyond a second attempt.
+    const stillOnAPack = profileById.get(row.user_id)?.class_credits != null;
+    if (wasRefunded && prior === "booked" && stillOnAPack) {
       const { data: didCharge, error: chargeError } = await admin.rpc(
         "charge_class_credit",
         { p_user_id: row.user_id },
@@ -716,13 +739,18 @@ export async function restoreClassInstance(formData: FormData) {
   // into it would put students back on a seat nobody can see, with an email
   // telling them the class is on. Reopen the day first. Every sibling write
   // path (guests, adding a student) already refuses this way.
-  const { data: closed } = await supabase
+  const { data: closed, error: closedError } = await supabase
     .from("closed_days")
     .select("date")
     .eq("date", instance_date)
     .maybeSingle();
-  if (closed) {
-    redirect(`/admin/calendar?week=${mondayOf(instance_date)}&dayclosed=1`);
+  // Fail closed: if we can't tell whether the day is open, don't restore into
+  // it. A retry costs the coach one tap; guessing wrong puts students back on
+  // a seat the app doesn't draw and emails them that the class is on.
+  if (closed || closedError) {
+    redirect(
+      `/admin/calendar?week=${mondayOf(instance_date)}&day=${instance_date}&dayclosed=1`,
+    );
   }
 
   // Un-cancel, don't delete. The row also carries override_start_time (the

@@ -178,12 +178,15 @@ export async function deleteClassTemplate(formData: FormData) {
   // this class with it, wiping attendance history and streaks for everyone
   // who trained here. (The old code caught an FK error that cannot happen and
   // the dialog promised a failure that never came.) Count first and refuse.
-  const { count } = await supabase
+  const { count, error: countError } = await supabase
     .from("bookings")
     .select("id", { count: "exact", head: true })
     .eq("template_id", id);
 
-  if ((count ?? 0) > 0) {
+  // A failed count must not read as "no bookings". This guard is the only
+  // thing standing between a tap and an ON DELETE CASCADE that takes every
+  // booking ever made for this class with it.
+  if (countError || count === null || count > 0) {
     redirect("/admin/classes?hasbookings=1");
   }
 

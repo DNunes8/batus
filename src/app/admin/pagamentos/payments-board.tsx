@@ -65,15 +65,23 @@ export function PaymentsBoard({
     });
   }
 
+  // A pack student pays per bundle of classes, so a monthly Pago/Por pagar
+  // means nothing for them — the board already leaves them out of the counts,
+  // and the server drops them. Don't let them be selected at all, or the coach
+  // ticks 26 students, is told 25 changed, and nothing explains the 26th.
+  const isBulkable = (r: BoardRow) => r.class_credits == null;
+
   function selectAllFiltered() {
-    const allFilteredSelected = filtered.every((r) => selectedIds.has(r.id));
+    const selectable = filtered.filter(isBulkable);
+    const allFilteredSelected =
+      selectable.length > 0 && selectable.every((r) => selectedIds.has(r.id));
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (allFilteredSelected) {
         // Toggle off everything currently visible
-        for (const r of filtered) next.delete(r.id);
+        for (const r of selectable) next.delete(r.id);
       } else {
-        for (const r of filtered) next.add(r.id);
+        for (const r of selectable) next.add(r.id);
       }
       return next;
     });
@@ -132,8 +140,10 @@ export function PaymentsBoard({
   }
 
   const selectedCount = selectedIds.size;
+  // Packs can't be selected, so "todos" means every selectable row.
   const allFilteredSelected =
-    filtered.length > 0 && filtered.every((r) => selectedIds.has(r.id));
+    filtered.some(isBulkable) &&
+    filtered.filter(isBulkable).every((r) => selectedIds.has(r.id));
 
   const bulkLabel = bulkConfirm
     ? bulkConfirm.status === "paid"
@@ -221,7 +231,8 @@ export function PaymentsBoard({
                     <input
                       type="checkbox"
                       checked={selected}
-                      onChange={() => toggleOne(r.id)}
+                      onChange={() => isBulkable(r) && toggleOne(r.id)}
+                      disabled={!isBulkable(r)}
                       className="size-5"
                       aria-label={`Selecionar ${r.full_name ?? r.email}`}
                     />

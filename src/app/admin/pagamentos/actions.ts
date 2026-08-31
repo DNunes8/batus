@@ -113,11 +113,17 @@ export async function bulkSetPaymentStatus(input: {
   for (const uid of user_ids) {
     if (packStudents.has(uid)) continue;
     const existing = existingByStudent.get(uid);
-    // Preserve customised amount/notes for students who already have a row, so
-    // flipping "unpaid → paid" doesn't wipe a price the coach set on purpose —
-    // including a deliberate 0 for a free month. Only a genuinely absent amount
-    // counts as unknown.
-    const known = existing?.amount_cents ?? feeByStudent.get(uid) ?? null;
+    // Preserve a customised amount for students who already have a row, so
+    // flipping "unpaid → paid" doesn't wipe a price the coach set.
+    //
+    // A stored 0 counts as UNKNOWN, not as a free month. This action itself
+    // writes 0 for "por pagar"/"em pausa" rows whose amount nobody has set —
+    // the column is NOT NULL, so there is nowhere else to put "don't know" —
+    // and trusting that 0 later is exactly how a month gets marked paid at
+    // 0,00 € and quietly disappears from Finanças. A genuinely free month is
+    // set per student in the drawer, where the coach types the amount and can
+    // see what he is recording.
+    const known = existing?.amount_cents || feeByStudent.get(uid) || null;
     if (status === "paid" && known === null) {
       skipped.push(nameByStudent.get(uid) ?? "Sem nome");
       continue;
