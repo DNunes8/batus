@@ -95,13 +95,17 @@ export function PaymentsBoard({
           month,
           status,
         });
-        toast.success(
-          status === "paid"
-            ? `${result.updated} alunos marcados como pagos.`
-            : status === "paused"
-              ? `${result.updated} alunos em pausa.`
-              : `${result.updated} alunos marcados por pagar.`,
-        );
+        // "0 alunos marcados como pagos" helps nobody — when everything was
+        // skipped, the warning below is the whole message.
+        if (result.updated > 0) {
+          toast.success(
+            status === "paid"
+              ? `${result.updated} alunos marcados como pagos.`
+              : status === "paused"
+                ? `${result.updated} alunos em pausa.`
+                : `${result.updated} alunos marcados por pagar.`,
+          );
+        }
         // Nobody is marked paid for an amount we don't know — say who, and
         // why, instead of writing a silent 0,00 € into the month.
         if (result.skipped.length > 0) {
