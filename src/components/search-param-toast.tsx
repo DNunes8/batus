@@ -110,6 +110,11 @@ const DYNAMIC_BY_PARAM: Record<
     message: (v) => `Os alunos podem cancelar até ${v}.`,
     description: "Já está a valer para toda a gente.",
   },
+  opened: {
+    type: "success",
+    message: (v) => `Marcações abertas até ${v}.`,
+    description: "Os alunos já podem marcar este bloco.",
+  },
 };
 
 export function SearchParamToast() {

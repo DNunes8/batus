@@ -4,6 +4,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { formatDayHeader, formatTime, todayLisbon } from "@/lib/schedule";
 import { assertAdminPage } from "@/lib/auth-guard";
+import { getBookableUntil } from "@/lib/booking-window";
+import { openNextTwoWeeks } from "@/app/admin/classes/actions";
+import { ConfirmForm } from "@/components/confirm-form";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +19,15 @@ const PT_DAYS = [
   "Sexta",
   "Sábado",
 ];
+
+// Whole days from a to b (both YYYY-MM-DD), for the booking-window countdown.
+function daysUntil(from: string, to: string): number {
+  const [y1, m1, d1] = from.split("-").map(Number);
+  const [y2, m2, d2] = to.split("-").map(Number);
+  return Math.round(
+    (Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000,
+  );
+}
 
 function dowOf(s: string): number {
   const [y, m, d] = s.split("-").map(Number);
@@ -64,6 +76,7 @@ export default async function AdminDashboardPage() {
     pendingApprovalsRes,
     birthdaysRes,
     todayGuestsRes,
+    bookableUntil,
   ] = await Promise.all([
     supabase.auth.getUser(),
     supabase
@@ -117,6 +130,7 @@ export default async function AdminDashboardPage() {
       .from("class_guests")
       .select("template_id, name")
       .eq("instance_date", today),
+    getBookableUntil(),
   ]);
 
   const todayClasses = todayClassesRes.data ?? [];
@@ -226,6 +240,14 @@ export default async function AdminDashboardPage() {
 
   const dayName = PT_DAYS[dowOf(today)];
 
+  // Booking window. When it lapses, EVERY class silently shows "Abre em breve"
+  // and no student can book — with nothing anywhere to say why. The state lived
+  // only on Modelos, a page the coach rarely opens; it belongs on the page he
+  // does. Warn from three days out so he is never caught by a closed weekend.
+  const windowDaysLeft = daysUntil(today, bookableUntil);
+  const windowClosed = windowDaysLeft <= 0;
+  const windowEndingSoon = !windowClosed && windowDaysLeft <= 3;
+
   return (
     <div className="p-6 sm:p-10">
       <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
@@ -237,6 +259,39 @@ export default async function AdminDashboardPage() {
       <p className="mt-2 text-sm text-muted-foreground">
         {user?.email} · {dayName}, {formatDayHeader(today).split(", ")[1]}
       </p>
+
+      {/* Booking window — the one failure that stops the whole app quietly.
+          Shown only when it's closed or about to close, with the button right
+          here so opening it is one tap from where he already is. */}
+      {(windowClosed || windowEndingSoon) && (
+        <section className="mt-8 rounded-md border border-foreground/30 bg-muted/40 p-4 sm:p-5">
+          <p className="text-sm font-medium">
+            {windowClosed
+              ? "Marcações fechadas — ninguém consegue marcar aulas."
+              : `Marcações abertas só até ${formatDayHeader(bookableUntil)}.`}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {windowClosed
+              ? "Os alunos veem “Abre em breve” em todas as aulas. Abre o próximo bloco."
+              : windowDaysLeft === 1
+                ? "Falta 1 dia. Abre o próximo bloco para os alunos continuarem a marcar."
+                : `Faltam ${windowDaysLeft} dias. Abre o próximo bloco para os alunos continuarem a marcar.`}
+          </p>
+          <ConfirmForm
+            message="Abrir marcações para as próximas 2 semanas?"
+            action={openNextTwoWeeks}
+            className="mt-3"
+          >
+            <input type="hidden" name="return_to" value="/admin" />
+            <button
+              type="submit"
+              className="h-11 rounded-md bg-foreground px-5 text-sm font-medium uppercase tracking-wider text-background transition-opacity hover:opacity-90"
+            >
+              Abrir próximas 2 semanas
+            </button>
+          </ConfirmForm>
+        </section>
+      )}
 
       {/* New-account approvals — surfaced as an action item, not a stat,
           because nobody can book until the coach acts on it. */}

@@ -8,6 +8,7 @@ import { parseEuroToCents } from "@/lib/money";
 import {
   addDays,
   dayOfWeek as dowHelper,
+  formatDayHeader,
   mondayOf,
   todayLisbon,
 } from "@/lib/schedule";
@@ -20,18 +21,25 @@ import {
 // Open booking for the next two weeks — the wife's fortnightly "set up the
 // next 2 weeks" button. Stores the cutoff date in settings.bookable_until;
 // bookClass + the schedule UI gate on it.
-export async function openNextTwoWeeks() {
+export async function openNextTwoWeeks(formData?: FormData) {
   await assertAdmin();
   const supabase = await createClient();
+  const until = nextWindowEnd();
   const { error } = await supabase
     .from("settings")
-    .upsert({ key: "bookable_until", value: nextWindowEnd() });
+    .upsert({ key: "bookable_until", value: until });
   if (error) throw new Error(error.message);
 
   revalidatePath("/aulas");
+  revalidatePath("/admin");
   revalidatePath("/admin/classes");
   revalidatePath("/admin/calendar");
-  redirect("/admin/classes?opened=1");
+  // The dashboard warns about a lapsed window and offers this same button, so
+  // land the coach back where he tapped instead of on Modelos.
+  const from = formData?.get("return_to");
+  const back = from === "/admin" ? "/admin" : "/admin/classes";
+  const params = new URLSearchParams({ opened: formatDayHeader(until) });
+  redirect(`${back}?${params}`);
 }
 
 // How late students may cancel. Lived only in the database until a student was
