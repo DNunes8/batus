@@ -128,18 +128,33 @@ async function cancelInstanceBookings(
   );
   if (upcoming.length === 0) return;
 
+  // Who holds a pack, and where do we write to them: one query, used by both
+  // halves below. Closing a busy day used to fire a credits RPC plus a row
+  // update for EVERY booked student — dozens of subrequests before a single
+  // email was sent, which on Workers means the action dies partway and the
+  // day is left cancelled with nobody told. Only pack students hold credits
+  // (class_credits is null for everyone else), and the RPC is a no-op for the
+  // rest, so skipping them costs nothing and keeps the request small.
+  const userIds = [...new Set(upcoming.map((r) => r.user_id))];
+  const { data: profiles } = await admin
+    .from("profiles")
+    .select("id, email, full_name, class_credits")
+    .in("id", userIds);
+  const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+
   // Give pack students their class back. The studio cancelled — they must not
   // pay for a class that never ran. Refunding here (rather than leaving the
   // credit "parked" in the cancelled row) means no booking ever carries an
-  // unsettled credit, so a re-book charges normally. adjust_class_credits is a
-  // no-op for non-pack students and returns the new balance.
+  // unsettled credit, so a re-book charges normally.
+  const refundedBookingIds: string[] = [];
   for (const row of upcoming) {
     if (row.priorStatus !== "booked") continue; // waitlist never spent a credit
+    if (byId.get(row.user_id)?.class_credits == null) continue; // not a pack
     try {
-      const { data: newBalance, error: refundError } = await admin.rpc(
-        "adjust_class_credits",
-        { p_user_id: row.user_id, p_delta: 1 },
-      );
+      const { error: refundError } = await admin.rpc("adjust_class_credits", {
+        p_user_id: row.user_id,
+        p_delta: 1,
+      });
       if (refundError) {
         // Loud: a swallowed failure here means a student quietly paid for a
         // class that never ran, and nothing else in the system would notice.
@@ -149,19 +164,29 @@ async function cancelInstanceBookings(
         );
         continue;
       }
-      if (newBalance === null || newBalance === undefined) continue; // not a pack
       row.refunded = true;
-      // Record the settlement in the row itself. The restore must charge only
-      // when a refund actually landed — deriving that from the student's
-      // current balance would double-charge whenever a refund had failed.
-      await admin
-        .from("bookings")
-        .update({
-          cancelled_reason: `${COACH_CANCEL_MARKER}${row.priorStatus}:r|${reason}`,
-        })
-        .eq("id", row.booking_id);
+      refundedBookingIds.push(row.booking_id);
     } catch (err) {
       console.error("[calendar] credit refund threw:", err);
+    }
+  }
+
+  // Record the settlement in the rows themselves, in one update. The restore
+  // must charge only when a refund actually landed — deriving that from the
+  // student's current balance would double-charge whenever a refund failed.
+  // Every id here is a prior "booked" row, so one marker fits them all.
+  if (refundedBookingIds.length > 0) {
+    const { error: markError } = await admin
+      .from("bookings")
+      .update({
+        cancelled_reason: `${COACH_CANCEL_MARKER}booked:r|${reason}`,
+      })
+      .in("id", refundedBookingIds);
+    if (markError) {
+      console.error(
+        `[calendar] REFUND MARKER FAILED on ${instance_date} (a later restore will not charge these back):`,
+        markError.message,
+      );
     }
   }
 
@@ -169,13 +194,6 @@ async function cancelInstanceBookings(
   // would blow the Workers subrequest budget on a busy day and half-deliver.
   // Best-effort: a mail problem must never leave the class half-cancelled.
   try {
-    const userIds = [...new Set(upcoming.map((r) => r.user_id))];
-    const { data: profiles } = await admin
-      .from("profiles")
-      .select("id, email, full_name")
-      .in("id", userIds);
-    const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
-
     const recipients = upcoming.flatMap((row) => {
       const profile = byId.get(row.user_id);
       if (!profile?.email) return [];
@@ -297,6 +315,20 @@ async function restoreInstanceBookings(
     charged: boolean;
   }[] = [];
 
+  // Sort the rows first, act in batches after. Reopening a busy day used to
+  // cost one or two writes PER STUDENT, which on Workers means the action can
+  // run out of subrequests and stop halfway — some seats back, some not, and
+  // credits already taken for rows that were never restored.
+  type Marked = (typeof marked)[number];
+  const staleIds: string[] = []; // stay cancelled, marker stripped
+  const toRestore: {
+    row: Marked;
+    prior: "booked" | "waitlisted";
+    // Per ROW, not per user: someone with two bookings that day may have been
+    // charged for one and not the other.
+    charged: boolean;
+  }[] = [];
+
   for (const row of marked) {
     // Marker is BATUS_CLASS_CANCELLED:<status>[:<r|n>]|<reason>. Rows written
     // before the settlement flag existed carry no flag — and were never
@@ -320,17 +352,15 @@ async function restoreInstanceBookings(
       // Leave cancelled, but strip the marker so a later cancel/restore cycle
       // can't resurrect a stale row. Any refunded credit stays refunded — the
       // student keeps the class they paid for.
-      await admin
-        .from("bookings")
-        .update({ cancelled_reason: "Aula cancelada pelo estúdio" })
-        .eq("id", row.id);
+      staleIds.push(row.id as string);
       continue;
     }
 
     // Take the credit back BEFORE handing back the seat, and only if the cancel
-    // actually returned one. charge_class_credit refuses (returns false) rather
-    // than clamping at zero, so a student who has since spent the credit is not
-    // silently restored for free.
+    // actually returned one — which only ever happened for pack students, so
+    // this loop touches nobody else. charge_class_credit refuses (returns
+    // false) rather than clamping at zero, so a student who has since spent the
+    // credit is not silently restored for free.
     let charged = false;
     if (wasRefunded && prior === "booked") {
       const { data: didCharge, error: chargeError } = await admin.rpc(
@@ -345,41 +375,57 @@ async function restoreInstanceBookings(
           );
         }
         // Can't pay (or couldn't be charged) → don't restore the seat.
-        await admin
-          .from("bookings")
-          .update({ cancelled_reason: "Aula cancelada pelo estúdio" })
-          .eq("id", row.id);
+        staleIds.push(row.id as string);
         continue;
       }
       charged = true;
     }
 
-    // Guard the flip on the status we read: a concurrent second restore then
-    // matches no rows.
-    const { data: restored, error } = await admin
+    toRestore.push({ row, prior, charged });
+  }
+
+  if (staleIds.length > 0) {
+    const { error } = await admin
       .from("bookings")
-      .update({
-        status: prior,
-        cancelled_at: null,
-        cancelled_reason: null,
-      })
-      .eq("id", row.id)
+      .update({ cancelled_reason: "Aula cancelada pelo estúdio" })
+      .in("id", staleIds);
+    if (error) {
+      console.error("[calendar] stale marker cleanup failed:", error.message);
+    }
+  }
+
+  // Flip the seats back, one statement per prior status, each still guarded on
+  // status = 'cancelled' so a concurrent second restore matches no rows. The
+  // returned ids are the rows THIS call actually restored.
+  const restoredIds = new Set<string>();
+  for (const status of ["booked", "waitlisted"] as const) {
+    const ids = toRestore
+      .filter((t) => t.prior === status)
+      .map((t) => t.row.id as string);
+    if (ids.length === 0) continue;
+    const { data: flipped, error } = await admin
+      .from("bookings")
+      .update({ status, cancelled_at: null, cancelled_reason: null })
+      .in("id", ids)
       .eq("status", "cancelled")
       .select("id");
     if (error) throw new Error(error.message);
+    for (const r of flipped ?? []) restoredIds.add(r.id as string);
+  }
 
-    if ((restored?.length ?? 0) === 0) {
-      // Someone else restored it first — give back the credit we just took so
-      // it isn't charged twice for one seat.
-      if (charged) {
-        await admin.rpc("adjust_class_credits", {
-          p_user_id: row.user_id,
-          p_delta: 1,
-        });
-      }
-      continue;
-    }
+  // Anything charged for a seat that didn't come back (someone else restored it
+  // first) gets its credit returned, so one seat is never paid for twice.
+  const refundBack = new Map<string, number>();
+  for (const { row, charged } of toRestore) {
+    if (!charged || restoredIds.has(row.id as string)) continue;
+    refundBack.set(row.user_id, (refundBack.get(row.user_id) ?? 0) + 1);
+  }
+  for (const [uid, n] of refundBack) {
+    await admin.rpc("adjust_class_credits", { p_user_id: uid, p_delta: n });
+  }
 
+  for (const { row, charged } of toRestore) {
+    if (!restoredIds.has(row.id as string)) continue;
     const profile = profileById.get(row.user_id);
     const tpl = row.class_templates as unknown as {
       name: string;
