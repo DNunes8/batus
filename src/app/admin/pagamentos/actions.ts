@@ -48,16 +48,22 @@ export async function setPaymentStatus(input: {
 // Bulk update from the selection bar.
 // Preserves existing amount/notes for students who already have a row this
 // month — only flips the status. For new rows, uses the student's standing
-// monthly fee; if not set, falls back to 0 (coach can edit per-month after).
+// monthly fee.
+//
+// A student with no fee on file shows as "Por definir" everywhere: the amount
+// is unknown, not zero. Marking them paid used to write 0,00 €, which reads as
+// a settled month while contributing nothing to Finanças — revenue quietly
+// short by exactly the amount nobody recorded. Those students are skipped and
+// named back to the caller instead.
 // ----------------------------------------------------------------------------
 export async function bulkSetPaymentStatus(input: {
   user_ids: string[];
   month: string;
   status: PaymentStatus;
-}) {
+}): Promise<{ updated: number; skipped: string[] }> {
   await assertAdmin();
   const { user_ids, month, status } = input;
-  if (user_ids.length === 0) return { updated: 0 };
+  if (user_ids.length === 0) return { updated: 0, skipped: [] };
   if (!month) throw new Error("Mês em falta.");
   if (!["paid", "unpaid", "paused"].includes(status)) {
     throw new Error("Estado inválido.");
@@ -68,7 +74,7 @@ export async function bulkSetPaymentStatus(input: {
   const [profilesRes, existingRes] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, monthly_fee_cents")
+      .select("id, full_name, monthly_fee_cents")
       .in("id", user_ids),
     supabase
       .from("payment_records")
@@ -77,9 +83,11 @@ export async function bulkSetPaymentStatus(input: {
       .in("user_id", user_ids),
   ]);
 
-  const feeByStudent = new Map<string, number>();
+  const feeByStudent = new Map<string, number | null>();
+  const nameByStudent = new Map<string, string>();
   for (const p of profilesRes.data ?? []) {
-    feeByStudent.set(p.id, p.monthly_fee_cents ?? 0);
+    feeByStudent.set(p.id, p.monthly_fee_cents ?? null);
+    nameByStudent.set(p.id, p.full_name || "Sem nome");
   }
 
   const existingByStudent = new Map<
@@ -94,28 +102,40 @@ export async function bulkSetPaymentStatus(input: {
   }
 
   const now = new Date().toISOString();
-  const rows = user_ids.map((uid) => {
+  const skipped: string[] = [];
+  const rows = [];
+  for (const uid of user_ids) {
     const existing = existingByStudent.get(uid);
     // Preserve customised amount/notes for students who already have a row,
     // so flipping "unpaid → paid" doesn't wipe a custom price the coach set.
-    return {
+    // An existing 0 counts as unknown too: that is what the old bulk action
+    // wrote, so trusting it would keep the wrong number alive forever.
+    const known = existing?.amount_cents || feeByStudent.get(uid) || null;
+    if (status === "paid" && known === null) {
+      skipped.push(nameByStudent.get(uid) ?? "Sem nome");
+      continue;
+    }
+    rows.push({
       user_id: uid,
       month,
       status,
-      amount_cents: existing?.amount_cents ?? feeByStudent.get(uid) ?? 0,
+      amount_cents: known ?? 0,
       paid_at: status === "paid" ? now : null,
       notes: existing?.notes ?? null,
-    };
-  });
+    });
+  }
 
-  const { error } = await supabase
-    .from("payment_records")
-    .upsert(rows, { onConflict: "user_id,month" });
+  if (rows.length > 0) {
+    const { error } = await supabase
+      .from("payment_records")
+      .upsert(rows, { onConflict: "user_id,month" });
 
-  if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message);
+  }
 
   revalidatePath("/admin/pagamentos");
-  return { updated: rows.length };
+  revalidatePath("/admin/financas");
+  return { updated: rows.length, skipped };
 }
 
 // ----------------------------------------------------------------------------

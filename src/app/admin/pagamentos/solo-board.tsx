@@ -113,6 +113,20 @@ export function SoloBoard({
               ? `${result.updated} alunos em pausa.`
               : `${result.updated} alunos marcados por pagar.`,
         );
+        // Nobody is marked paid for an amount we don't know — say who, and
+        // why, instead of writing a silent 0,00 € into the month.
+        if (result.skipped.length > 0) {
+          toast.warning(
+            result.skipped.length === 1
+              ? `${result.skipped[0]} ficou de fora.`
+              : `${result.skipped.length} alunos ficaram de fora.`,
+            {
+              description:
+                "Falta definir a mensalidade: abre o aluno e escreve o valor.",
+              duration: 8000,
+            },
+          );
+        }
         setSelectedIds(new Set());
         setBulkConfirm(null);
         router.refresh();
