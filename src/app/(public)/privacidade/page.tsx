@@ -222,11 +222,11 @@ export default function PrivacidadePage() {
           <p className="mt-2">
             A base de dados e as contas são alojadas em servidores na União
             Europeia (Supabase, em Frankfurt, Alemanha). O site é distribuído
-            através da Vercel. Alguns destes fornecedores são empresas com sede
-            fora da União Europeia; quando exista transferência internacional de
-            dados, esta é coberta pelas salvaguardas previstas no RGPD,
-            nomeadamente as cláusulas contratuais-tipo aprovadas pela Comissão
-            Europeia.
+            através da Cloudflare e os emails de sistema são enviados através da
+            Resend. Alguns destes fornecedores são empresas com sede fora da
+            União Europeia; quando exista transferência internacional de dados,
+            esta é coberta pelas salvaguardas previstas no RGPD, nomeadamente as
+            cláusulas contratuais-tipo aprovadas pela Comissão Europeia.
           </p>
         </section>
 

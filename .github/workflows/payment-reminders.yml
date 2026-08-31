@@ -6,7 +6,7 @@ name: Lembrete de pagamento (dia 8)
 # job just has to fire it.
 #
 # Setup (one-time): add a CRON_SECRET to BOTH
-#   • Vercel → Project → Settings → Environment Variables
+#   • Cloudflare — `npx wrangler secret put CRON_SECRET`
 #   • GitHub → repo → Settings → Secrets and variables → Actions
 # with the same random value.
 

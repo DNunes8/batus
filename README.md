@@ -4,32 +4,75 @@ Booking and management web app for **Batus Studio** — boxing and kickboxing in
 
 Replaces a third-party booking SaaS with a single, owner-controlled site that combines marketing, class booking, and admin tools.
 
+Live at **https://batusboxe.com**.
+
 ## Stack
 
-- **Next.js 16** (App Router) on **Vercel**
-- **Supabase** — Postgres, Auth (magic link), Storage
+- **Next.js 16** (App Router) on **Cloudflare Workers**, via `@opennextjs/cloudflare`
+- **Supabase** — Postgres, Auth, Storage
 - **Tailwind v4** + **shadcn/ui**
 - **Resend** for transactional email
 - PWA (installable on iOS/Android home screen, no native app)
+
+Everything runs on free tiers. See `docs/COSTS_AND_SCALE.md`.
 
 ## Local development
 
 ```bash
 nvm use            # picks the version in .nvmrc (Node 22)
 npm install
+cp .env.example .env.local   # then fill it in — see below
 npm run dev        # http://localhost:3000
 ```
 
 ## Environment variables
 
-See `.env.example` once added (Day 2 — Supabase setup).
+`.env.example` lists all of them and says where each one lives.
+
+Short version: the two `NEXT_PUBLIC_*` values are compiled into the browser
+bundle, so the machine that builds needs them. The rest are Cloudflare
+secrets, read at runtime:
+
+```bash
+npx wrangler secret list
+```
+
+## Deploying
+
+Deploys are manual and take about a minute:
+
+```bash
+npm run deploy
+```
+
+That builds **and** uploads. Do not run `opennextjs-cloudflare deploy` on its
+own — it does not rebuild, so it will happily ship whatever is already in
+`.open-next/` (this shipped a stale bundle once).
+
+Before deploying:
+
+```bash
+npm run check      # types, lint, and a production build
+```
+
+## Database changes
+
+Migrations in `supabase/migrations/` are applied **by hand** in the Supabase
+SQL editor, not by a CLI. Apply the SQL first, confirm it worked, then deploy
+the code that depends on it.
 
 ## Architecture notes
 
 - **Single source of branding:** `src/lib/studio.config.ts`. Logos, colors, contact info, copy live there.
-- **Portuguese-first.** Optional EN later via a single `pt.json` / `en.json` swap.
+- **`src/middleware.ts` must stay on the legacy middleware convention.** Next 16's `proxy.ts` is locked to the Node runtime, which the Cloudflare adapter cannot run; `middleware.ts` builds as edge.
+- **Times are Lisbon wall-clock.** Class times are stored as the hour on the studio wall; `src/lib/schedule.ts` converts to real instants with the correct DST offset. The Worker's own clock is UTC — never use the local timezone for class logic.
+- **Portuguese-first.**
 - **No payments integration.** Cash / MBWay / bank transfer happen outside the app; admin tracks "paid this month" per student-month.
 
 ## Ownership
 
-Infrastructure (Vercel, Supabase, future domain) is owned by `batusboxing@gmail.com`. The single GitHub repo is public for resilience — anyone can clone if the original maintainer is unreachable.
+Infrastructure (Cloudflare, Supabase, Resend) is owned by
+`batusboxing@gmail.com`. The domain is still **registered at Vercel** with its
+nameservers pointed at Cloudflare — renewal is a Vercel bill. The GitHub repo
+is public for resilience — anyone can clone if the original maintainer is
+unreachable. See `docs/HANDOVER.md`.
