@@ -727,17 +727,21 @@ export async function reopenDay(formData: FormData) {
   if (!date) throw new Error("Data inválida.");
 
   const supabase = await createClient();
-  const { error } = await supabase.from("closed_days").delete().eq("date", date);
 
-  if (error) throw new Error(error.message);
-
-  // Put the day's coach-cancelled bookings back (skips students who booked
-  // elsewhere in the meantime).
+  // Put the bookings back BEFORE reopening the day, not after. If the restore
+  // fails once the closed_days row is gone, the day is open, the bookings are
+  // still cancelled, and "Reabrir dia" — the only control that runs this — has
+  // disappeared with the closure, so there is no way left to finish the job.
+  // This order leaves a failure fully recoverable: the day stays closed, the
+  // button stays put, and a second tap redoes the work from the markers.
   const reopened = await restoreInstanceBookings(null, date);
   if (!reopened) {
     revalidatePath("/admin/calendar");
     redirect(`/admin/calendar?week=${mondayOf(date)}&day=${date}&offline=1`);
   }
+
+  const { error } = await supabase.from("closed_days").delete().eq("date", date);
+  if (error) throw new Error(error.message);
 
   revalidatePath("/admin/calendar");
   revalidatePath("/aulas");
