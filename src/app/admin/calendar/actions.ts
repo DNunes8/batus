@@ -317,6 +317,11 @@ async function restoreInstanceBookings(
   const cancelledTemplates = new Set(
     (stillCancelled ?? []).map((o) => o.template_id as string),
   );
+  // ...except the class we were asked to restore. Its own override still says
+  // cancelled at this point — the caller clears that flag only once these
+  // bookings are safely back — so leaving it in the veto set would make the
+  // restore a guaranteed no-op.
+  if (template_id) cancelledTemplates.delete(template_id);
 
   // Weekly plan limits: a restore must not push a limited student over their
   // cap (they may have legitimately booked a replacement class this week
@@ -815,6 +820,19 @@ export async function restoreClassInstance(formData: FormData) {
     );
   }
 
+  // Bookings first, class second — the same order as "Reabrir dia", and for
+  // the same reason. "Restaurar" only renders on a class that is cancelled,
+  // so un-cancelling first and then failing would leave the class looking
+  // live and empty with its whole roster still cancelled, and no button left
+  // to try again.
+  const restored = await restoreInstanceBookings(template_id, instance_date);
+  if (!restored) {
+    revalidatePath("/admin/calendar");
+    redirect(
+      `/admin/calendar?week=${mondayOf(instance_date)}&day=${instance_date}&offline=1`,
+    );
+  }
+
   // Un-cancel, don't delete. The row also carries override_start_time (the
   // coach's "Adiar") and override_capacity; deleting it silently reverted an
   // 18:00 -> 19:00 move back to 18:00 — and, because the row was already gone
@@ -827,16 +845,6 @@ export async function restoreClassInstance(formData: FormData) {
     .eq("instance_date", instance_date);
 
   if (error) throw new Error(error.message);
-
-  // Bring the cancelled bookings back to their pre-cancel status (skipping
-  // students who booked a different class this day in the meantime).
-  const restored = await restoreInstanceBookings(template_id, instance_date);
-  if (!restored) {
-    revalidatePath("/admin/calendar");
-    redirect(
-      `/admin/calendar?week=${mondayOf(instance_date)}&day=${instance_date}&offline=1`,
-    );
-  }
 
   revalidatePath("/admin/calendar");
   revalidatePath("/aulas");

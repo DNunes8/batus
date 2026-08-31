@@ -99,8 +99,8 @@ export default function PrivacidadePage() {
               </span>{" "}
               — o teu nome, o teu telefone e a tua data de nascimento. São
               pedidos ao criares a conta: o telefone para o treinador te
-              contactar sobre as aulas, a data de nascimento para confirmar
-              que tens idade para treinar.
+              contactar sobre as aulas, a data de nascimento para o treinador
+              te desejar parabéns no dia certo.
             </li>
             <li>
               <span className="font-medium text-foreground">
@@ -166,7 +166,12 @@ export default function PrivacidadePage() {
             </li>
             <li>
               responder às mensagens que nos envias pelo formulário de contacto
-              — para tratar o teu pedido.
+              — para tratar o teu pedido;
+            </li>
+            <li>
+              assinalar o teu aniversário ao treinador, para te desejar
+              parabéns — interesse legítimo do estúdio na relação com os
+              alunos.
             </li>
           </ul>
           <p className="mt-3">
