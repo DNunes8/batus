@@ -110,8 +110,8 @@ export default function TermosPage() {
             </li>
             <li>
               Podes cancelar uma marcação até ao limite definido pelo estúdio
-              antes do início da aula — atualmente 4 horas. Este período pode
-              ser ajustado pelo estúdio.
+              antes do início da aula. Vês o limite em vigor na página da aula
+              e no teu Perfil — o estúdio pode ajustá-lo.
             </li>
             <li>
               Cancela sempre que não puderes comparecer, para libertares o lugar

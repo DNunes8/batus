@@ -9,13 +9,19 @@ import { SubmitButton } from "@/components/submit-button";
 import { WhatsAppShareButton } from "@/components/whatsapp-share-button";
 import { studio } from "@/lib/studio.config";
 import { currentMonthLabel, isUnpaidAndBlocked } from "@/lib/payment";
-import { getBookableUntil } from "@/lib/booking-window";
 import {
+  cutoffLabel,
+  getBookableUntil,
+  getCancellationCutoffHours,
+} from "@/lib/booking-window";
+import {
+  addDays,
   dayOfWeek,
   formatDayHeader,
   formatTime,
   isClassInPast,
   mondayOf,
+  todayLisbon,
 } from "@/lib/schedule";
 import { bookClass } from "../../actions";
 
@@ -159,6 +165,9 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
   let isPaused = false;
   let isIncomplete = false;
   let isUnpaid = false;
+  let packEmpty = false;
+  let dayHasOtherBooking = false;
+  let weeklyLimitReached = false;
   if (user) {
     const [bookingRes, profileRes] = await Promise.all([
       supabase
@@ -172,7 +181,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       supabase
         .from("profiles")
         .select(
-          "approved, is_admin, is_blocked, full_name, phone, birthday, has_monthly_fee, joined_at",
+          "approved, is_admin, is_blocked, full_name, phone, birthday, has_monthly_fee, joined_at, weekly_class_limit, class_credits",
         )
         .eq("id", user.id)
         .maybeSingle(),
@@ -198,9 +207,49 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       isApproved && !isPaused && !isIncomplete && profileRes.data
         ? await isUnpaidAndBlocked(user.id, profileRes.data)
         : false;
+
+    // The three rules the schedule page already locks the button for. Without
+    // them this page showed a live "Marcar" that the server then refused with
+    // no explanation — the same trap as offering a Cancelar the server rejects.
+    const credits = profileRes.data?.class_credits ?? null;
+    packEmpty = credits !== null && credits <= 0;
+
+    // Only worth asking when the student could otherwise book: the earlier
+    // gates (pending, paused, incomplete, unpaid) already own the card.
+    if (!userBooking && isApproved && !isPaused && !isIncomplete && !isUnpaid) {
+      const [sameDayRes, weekRes] = await Promise.all([
+        supabase
+          .from("bookings")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("instance_date", date)
+          .neq("template_id", template_id)
+          .in("status", ["booked", "waitlisted"])
+          .limit(1)
+          .maybeSingle(),
+        profileRes.data?.weekly_class_limit != null
+          ? supabase
+              .from("bookings")
+              .select("id", { count: "exact", head: true })
+              .eq("user_id", user.id)
+              .gte("instance_date", mondayOf(date))
+              .lte("instance_date", addDays(mondayOf(date), 6))
+              .or(
+                `status.eq.booked,and(status.eq.waitlisted,instance_date.gte.${todayLisbon()})`,
+              )
+          : Promise.resolve({ count: null }),
+      ]);
+      dayHasOtherBooking = !!sameDayRes.data;
+      const limit = profileRes.data?.weekly_class_limit ?? null;
+      weeklyLimitReached =
+        limit !== null && (weekRes.count ?? 0) >= limit;
+    }
   }
 
   const bookableUntil = await getBookableUntil();
+  // The rule the coach actually set — this page used to promise a flat "4h"
+  // regardless, which is wrong by 8x once he picks the 30-minute option.
+  const cutoffHours = await getCancellationCutoffHours();
   const backHref = `/aulas?week=${mondayOf(date)}`;
 
   // Build the absolute URL once on the server so the share text has the right
@@ -309,6 +358,9 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
           isIncomplete={isIncomplete}
           isUnpaid={isUnpaid}
           notYetOpen={date > bookableUntil}
+          packEmpty={packEmpty}
+          dayHasOtherBooking={dayHasOtherBooking}
+          weeklyLimitReached={weeklyLimitReached}
           userBooking={userBooking}
         />
       </div>
@@ -316,7 +368,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       {/* Cancellation rule reminder */}
       {!isCancelled && !isPast && (
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Cancelas até 4h antes do início, em{" "}
+          Cancelas até {cutoffLabel(cutoffHours)} do início, em{" "}
           <Link
             href="/perfil"
             className="text-foreground underline-offset-4 hover:underline"
@@ -366,6 +418,9 @@ function BookingAction({
   isIncomplete,
   isUnpaid,
   notYetOpen,
+  packEmpty,
+  dayHasOtherBooking,
+  weeklyLimitReached,
   userBooking,
 }: {
   template_id: string;
@@ -379,6 +434,9 @@ function BookingAction({
   isIncomplete: boolean;
   isUnpaid: boolean;
   notYetOpen: boolean;
+  packEmpty: boolean;
+  dayHasOtherBooking: boolean;
+  weeklyLimitReached: boolean;
   userBooking: {
     id: string;
     status: "booked" | "waitlisted";
@@ -560,6 +618,78 @@ function BookingAction({
           className="mt-4 inline-flex h-10 items-center justify-center rounded-md border border-border/60 px-4 text-xs uppercase tracking-widest hover:bg-muted"
         >
           Saber mais →
+        </Link>
+      </div>
+    );
+  }
+
+  // The three plan rules bookClass enforces. Without these the page offered a
+  // live "Marcar" the server then refused, with the student left on a page
+  // that looked unchanged.
+  if (dayHasOtherBooking) {
+    return (
+      <div className="rounded-md border border-foreground/25 bg-muted/30 p-6 text-center">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+          Marcações
+        </p>
+        <p className="mt-2 font-display text-2xl tracking-wide">
+          JÁ TENS AULA NESTE DIA
+        </p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Só podes ter uma aula por dia. Cancela a outra em Perfil se preferires
+          esta.
+        </p>
+        <Link
+          href="/perfil"
+          className="mt-4 inline-flex h-10 items-center justify-center rounded-md border border-border/60 px-4 text-xs uppercase tracking-widest hover:bg-muted"
+        >
+          Ir para Perfil →
+        </Link>
+      </div>
+    );
+  }
+
+  if (weeklyLimitReached) {
+    return (
+      <div className="rounded-md border border-foreground/25 bg-muted/30 p-6 text-center">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+          Plano
+        </p>
+        <p className="mt-2 font-display text-2xl tracking-wide">
+          LIMITE SEMANAL ATINGIDO
+        </p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Já marcaste todas as aulas do teu plano para esta semana. Fala com o{" "}
+          {studio.coach} se precisares de mais.
+        </p>
+        <Link
+          href="/perfil"
+          className="mt-4 inline-flex h-10 items-center justify-center rounded-md border border-border/60 px-4 text-xs uppercase tracking-widest hover:bg-muted"
+        >
+          Ver as minhas aulas →
+        </Link>
+      </div>
+    );
+  }
+
+  if (packEmpty) {
+    return (
+      <div className="rounded-md border border-foreground/25 bg-muted/30 p-6 text-center">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+          Pack
+        </p>
+        <p className="mt-2 font-display text-2xl tracking-wide">
+          SEM AULAS NO PACK
+        </p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Acabaram-se as aulas do teu pack. Fala com o {studio.coach} para
+          renovares.
+        </p>
+        <Link
+          href="/perfil"
+          className="mt-4 inline-flex h-10 items-center justify-center rounded-md border border-border/60 px-4 text-xs uppercase tracking-widest hover:bg-muted"
+        >
+          Ver o meu pack →
         </Link>
       </div>
     );
