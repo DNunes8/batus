@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { assertAdmin } from "@/lib/auth-guard";
-import { parseEuroOrNull } from "@/lib/money";
+import { parseEuroToCents } from "@/lib/money";
 import {
   addDays,
   dayOfWeek as dowHelper,
@@ -247,16 +247,13 @@ function readSoloTemplateForm(formData: FormData) {
   const day_of_week = Number(formData.get("day_of_week"));
   const start_time = formData.get("start_time") as string | null;
   const duration_minutes = Number(formData.get("duration_minutes") ?? 60);
-  const price_cents = parseEuroOrNull(
-    (formData.get("price") as string | null) ?? "",
+  const price_cents = parseEuroToCents(
+    (formData.get("price") as string | null) ?? "0",
   );
   const notes = ((formData.get("notes") as string | null) ?? "").trim() || null;
   // The form's mode select sends "preset" or "recurring".
   const is_preset = formData.get("mode") === "preset";
 
-  if (price_cents === null) {
-    throw new Error("Preço inválido. Escreve só o número — por exemplo 25 ou 25,50.");
-  }
   if (!student || !start_time || Number.isNaN(day_of_week)) {
     throw new Error("Preenche o aluno, o dia e a hora.");
   }

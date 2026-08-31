@@ -9,11 +9,11 @@ _Updated 2026-05-18._ Decisions intentionally deferred — the app works without
 - [ ] **Studio address, email, phone** — still `TBD` in `studio.config.ts`; the footer and contact page hide them until they're set.
 - [ ] **Photos & video** — real photographer originals for the landing page and the /sobre gallery/video slots (they drop into `studio.config.ts`).
 - [ ] **Accent colour** — gold (current) or Portuguese red. Look at the live site and pick.
-- [ ] **Domain** — `batusboxing.pt` (matches the Gmail) or `batusboxe.pt`. Buy once decided.
+- [x] **Domain** — done: `batusboxe.com` is live.
 
 ## Configuration
 
-- [ ] **Cancellation cutoff** — currently 4h. 2h? 12h? 24h?
+- [ ] **Cancellation cutoff** — currently 1h. The admin page offers 30min, 1h, 2h, 4h.
 - [ ] **Account approval** — new students land pending and the coach approves each one from /admin/students. Keep that, or auto-approve on signup?
 - [ ] **Class roster privacy** — students see only the count ("8/12"), not names. Confirm that's right.
 - [ ] **Pricing display** — no public pricing today. Show it on the site, or keep "contact for pricing"?

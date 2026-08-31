@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { assertAdmin } from "@/lib/auth-guard";
-import { parseEuroOrNull } from "@/lib/money";
+import { parseEuroToCents } from "@/lib/money";
 
 export async function createMerchItem(formData: FormData) {
   await assertAdmin();
@@ -13,18 +13,14 @@ export async function createMerchItem(formData: FormData) {
   const name = ((formData.get("name") as string | null) ?? "").trim();
   const description =
     ((formData.get("description") as string | null) ?? "").trim() || null;
-  // null, not 0: an unreadable price used to become a free item.
-  const price_cents = parseEuroOrNull(
-    (formData.get("price") as string | null) ?? "",
+  const price_cents = parseEuroToCents(
+    (formData.get("price") as string | null) ?? "0",
   );
   const stock = Number(formData.get("stock") ?? 0);
   const image_url =
     ((formData.get("image_url") as string | null) ?? "").trim() || null;
 
   if (!name) throw new Error("Nome obrigatório.");
-  if (price_cents === null) {
-    throw new Error("Preço inválido. Escreve só o número — por exemplo 25 ou 25,50.");
-  }
 
   const { error } = await supabase.from("merch_items").insert({
     name,

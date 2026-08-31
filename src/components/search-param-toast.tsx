@@ -109,11 +109,6 @@ const TOAST_BY_PARAM: Record<string, ToastConfig> = {
     description:
       "Apagar levava o histórico com ela. Edita as datas para a desativar.",
   },
-  feeerr: {
-    type: "error",
-    message: "Esse valor não dá para ler.",
-    description: "Escreve só o número — por exemplo 35 ou 35,50. Nada foi alterado.",
-  },
   cutofferr: {
     type: "error",
     message: "Essa opção não é válida.",
