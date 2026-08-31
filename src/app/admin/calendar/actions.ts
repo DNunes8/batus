@@ -303,10 +303,20 @@ async function restoreInstanceBookings(
   // while the instance was cancelled). Count each limited student's active
   // week bookings the same way book_class does — booked always, waitlisted
   // only while still upcoming.
-  const { data: userProfiles } = await admin
+  const { data: userProfiles, error: profilesError } = await admin
     .from("profiles")
     .select("id, email, full_name, weekly_class_limit, class_credits")
     .in("id", userIds);
+  // Everything below reads this: who is over their weekly limit, who is still
+  // on a pack, and where to write to them. An empty map from a failed read
+  // would silently answer "nobody" to all three — restoring pack students for
+  // free and telling no one. Nothing has been written yet, so failing here is
+  // clean: the markers stay put and the coach's next tap does the whole job.
+  if (profilesError) {
+    throw new Error(
+      `Não foi possível ler os alunos desta aula (${profilesError.message}). Tenta outra vez.`,
+    );
+  }
   const limitByUser = new Map(
     (userProfiles ?? [])
       .filter((p) => p.weekly_class_limit !== null)
@@ -747,7 +757,14 @@ export async function restoreClassInstance(formData: FormData) {
   // Fail closed: if we can't tell whether the day is open, don't restore into
   // it. A retry costs the coach one tap; guessing wrong puts students back on
   // a seat the app doesn't draw and emails them that the class is on.
-  if (closed || closedError) {
+  if (closedError) {
+    // Couldn't tell — say so. Telling him the day is closed would send him
+    // looking for a "Reabrir dia" button that isn't there.
+    redirect(
+      `/admin/calendar?week=${mondayOf(instance_date)}&day=${instance_date}&offline=1`,
+    );
+  }
+  if (closed) {
     redirect(
       `/admin/calendar?week=${mondayOf(instance_date)}&day=${instance_date}&dayclosed=1`,
     );

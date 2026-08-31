@@ -185,8 +185,12 @@ export async function deleteClassTemplate(formData: FormData) {
 
   // A failed count must not read as "no bookings". This guard is the only
   // thing standing between a tap and an ON DELETE CASCADE that takes every
-  // booking ever made for this class with it.
-  if (countError || count === null || count > 0) {
+  // booking ever made for this class with it. Refuse either way, but don't
+  // claim bookings exist when the truth is that we couldn't ask.
+  if (countError || count === null) {
+    redirect("/admin/classes?offline=1");
+  }
+  if (count > 0) {
     redirect("/admin/classes?hasbookings=1");
   }
 

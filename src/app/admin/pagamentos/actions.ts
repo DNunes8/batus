@@ -53,8 +53,14 @@ export async function setPaymentStatus(input: {
 // A student with no fee on file shows as "Por definir" everywhere: the amount
 // is unknown, not zero. Marking them paid used to write 0,00 €, which reads as
 // a settled month while contributing nothing to Finanças — revenue quietly
-// short by exactly the amount nobody recorded. Those students are skipped and
-// named back to the caller instead.
+// short by exactly the amount nobody recorded.
+//
+// The rule now is simply: this action never writes an amount it does not know.
+// amount_cents is NOT NULL, so writing a placeholder 0 for a "por pagar" row
+// would make the same 0 ambiguous forever — was it a free month, or was it
+// nobody's guess? Skipping instead keeps every stored 0 deliberate, so a real
+// free month (typed into the drawer, or a standing fee of 0) survives a bulk
+// sweep untouched. Students with no amount are named back to the caller.
 // ----------------------------------------------------------------------------
 export async function bulkSetPaymentStatus(input: {
   user_ids: string[];
@@ -113,18 +119,11 @@ export async function bulkSetPaymentStatus(input: {
   for (const uid of user_ids) {
     if (packStudents.has(uid)) continue;
     const existing = existingByStudent.get(uid);
-    // Preserve a customised amount for students who already have a row, so
-    // flipping "unpaid → paid" doesn't wipe a price the coach set.
-    //
-    // A stored 0 counts as UNKNOWN, not as a free month. This action itself
-    // writes 0 for "por pagar"/"em pausa" rows whose amount nobody has set —
-    // the column is NOT NULL, so there is nowhere else to put "don't know" —
-    // and trusting that 0 later is exactly how a month gets marked paid at
-    // 0,00 € and quietly disappears from Finanças. A genuinely free month is
-    // set per student in the drawer, where the coach types the amount and can
-    // see what he is recording.
-    const known = existing?.amount_cents || feeByStudent.get(uid) || null;
-    if (status === "paid" && known === null) {
+    // This month's row wins over the standing fee, so flipping "por pagar →
+    // pago" keeps a price the coach set for this month — including a
+    // deliberate 0. Only a genuinely absent amount is unknown.
+    const known = existing?.amount_cents ?? feeByStudent.get(uid) ?? null;
+    if (known === null) {
       skipped.push(nameByStudent.get(uid) ?? "Sem nome");
       continue;
     }
@@ -132,7 +131,7 @@ export async function bulkSetPaymentStatus(input: {
       user_id: uid,
       month,
       status,
-      amount_cents: known ?? 0,
+      amount_cents: known,
       paid_at: status === "paid" ? now : null,
       notes: existing?.notes ?? null,
     });

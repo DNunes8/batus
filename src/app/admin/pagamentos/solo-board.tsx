@@ -126,7 +126,7 @@ export function SoloBoard({
               : `${result.skipped.length} alunos ficaram de fora.`,
             {
               description:
-                "Falta definir a mensalidade: abre o aluno e escreve o valor.",
+                "Ainda não têm mensalidade definida. Abre o aluno e escreve o valor — pode ser 0.",
               duration: 8000,
             },
           );
