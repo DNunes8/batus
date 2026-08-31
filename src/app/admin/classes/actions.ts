@@ -155,13 +155,27 @@ export async function deleteClassTemplate(formData: FormData) {
   if (!id) throw new Error("ID em falta.");
 
   const supabase = await createClient();
+
+  // bookings.template_id is ON DELETE CASCADE, so the database will NEVER
+  // refuse this delete — it will silently take every booking ever made for
+  // this class with it, wiping attendance history and streaks for everyone
+  // who trained here. (The old code caught an FK error that cannot happen and
+  // the dialog promised a failure that never came.) Count first and refuse.
+  const { count } = await supabase
+    .from("bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("template_id", id);
+
+  if ((count ?? 0) > 0) {
+    redirect("/admin/classes?hasbookings=1");
+  }
+
   const { error } = await supabase
     .from("class_templates")
     .delete()
     .eq("id", id);
 
   if (error) {
-    // Likely FK violation if bookings reference it.
     throw new Error(
       "Não é possível apagar — existem marcações para este modelo. Edita as datas para o desativar.",
     );

@@ -160,6 +160,50 @@ export function isClassInPast(date: string, startTime: string): boolean {
   return lisbonInstant(date, startTime).getTime() < Date.now();
 }
 
+// When the coach uses "Adiar", the new time lives in class_overrides, NOT on
+// the template — the template keeps its original hour forever. Every RENDER
+// path already resolves the override; the gates that decide what a student or
+// coach is ALLOWED to do were reading the template directly, so a rescheduled
+// class was judged against an hour it no longer starts at.
+//
+// Resolve the real start time for a set of (template_id, instance_date) pairs
+// in ONE query. Returns a lookup keyed "templateId|date"; anything missing
+// simply has no override and keeps the template time.
+export async function getStartTimeOverrides(
+  pairs: { template_id: string; instance_date: string }[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (pairs.length === 0) return out;
+
+  const admin = createAdminClient();
+  const dates = [...new Set(pairs.map((p) => p.instance_date))];
+  const templateIds = [...new Set(pairs.map((p) => p.template_id))];
+  const { data } = await admin
+    .from("class_overrides")
+    .select("template_id, instance_date, override_start_time")
+    .in("instance_date", dates)
+    .in("template_id", templateIds)
+    .not("override_start_time", "is", null);
+
+  for (const row of data ?? []) {
+    out.set(
+      `${row.template_id}|${row.instance_date}`,
+      row.override_start_time as string,
+    );
+  }
+  return out;
+}
+
+// Single-instance convenience wrapper for the action paths.
+export async function effectiveStartTime(
+  template_id: string,
+  instance_date: string,
+  templateStartTime: string,
+): Promise<string> {
+  const map = await getStartTimeOverrides([{ template_id, instance_date }]);
+  return map.get(`${template_id}|${instance_date}`) ?? templateStartTime;
+}
+
 const PT_DAYS = [
   "Domingo",
   "Segunda",

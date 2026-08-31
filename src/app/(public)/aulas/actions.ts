@@ -5,7 +5,12 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/supabase/auth-user";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { addDays, mondayOf, todayLisbon } from "@/lib/schedule";
+import {
+  addDays,
+  effectiveStartTime,
+  mondayOf,
+  todayLisbon,
+} from "@/lib/schedule";
 import {
   canCancelBooking,
   getBookableUntil,
@@ -225,9 +230,15 @@ export async function cancelBooking(formData: FormData) {
   // offer the button, so the two can never disagree — a student must never be
   // shown Cancelar and then refused.
   if (wasBooked) {
-    const startTime = (booking.class_templates as unknown as {
-      start_time: string;
-    }).start_time;
+    // The coach may have moved this instance with "Adiar" — the new hour lives
+    // in class_overrides, not on the template. Measure the cutoff from when the
+    // class ACTUALLY starts, or a rescheduled class refuses (or allows) a
+    // cancellation against an hour that no longer exists.
+    const startTime = await effectiveStartTime(
+      booking.template_id,
+      booking.instance_date,
+      (booking.class_templates as unknown as { start_time: string }).start_time,
+    );
     const allowed = canCancelBooking({
       instance_date: booking.instance_date,
       start_time: startTime,

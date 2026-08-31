@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertAdmin } from "@/lib/auth-guard";
 import {
   addDays,
   dayOfWeek as dowHelper,
+  effectiveStartTime,
   formatDayHeader,
   formatTime,
   lisbonInstant,
@@ -872,16 +874,21 @@ export async function removeStudentBooking(formData: FormData) {
   // streak, refund a pack credit for a class already delivered (a free class
   // minted from nothing), and promote a waitlisted student into a class that is
   // over. Deliberately narrower than the student cutoff — last-minute removal
-  // BEFORE the class starts is the whole point of "ceder vagas". (Server may
-  // run in UTC; Lisbon DST makes this off by at most ~1h — immaterial for an
-  // already-started gate.)
-  const startTime = (booking.class_templates as unknown as {
-    start_time: string;
-  }).start_time;
+  // BEFORE the class starts is the whole point of "ceder vagas".
+  //
+  // Uses the EFFECTIVE start time: if the coach moved this instance with
+  // "Adiar", the template still holds the original hour, so gating on it would
+  // be wrong by the whole reschedule delta in either direction.
+  const startTime = await effectiveStartTime(
+    booking.template_id,
+    booking.instance_date,
+    (booking.class_templates as unknown as { start_time: string }).start_time,
+  );
   const classStart = lisbonInstant(booking.instance_date, startTime);
   if (Date.now() >= classStart.getTime()) {
-    revalidatePath("/admin/calendar");
-    return;
+    // Tell the coach, don't just no-op: a × that silently does nothing reads
+    // as a broken button and he'll keep tapping it.
+    redirect("/admin/calendar?started=1");
   }
 
   const wasBooked = booking.status === "booked";

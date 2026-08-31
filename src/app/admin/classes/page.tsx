@@ -228,7 +228,7 @@ export default async function ClassesListPage() {
                           Editar
                         </Button>
                         <ConfirmForm
-                          message={`Apagar "${t.name}" para sempre? Vai falhar se existirem marcações.`}
+                          message={`Apagar "${t.name}" para sempre? Só dá se nunca ninguém tiver marcado esta aula. Se já houve marcações, muda as datas para a desativar.`}
                           action={deleteClassTemplate}
                         >
                           <input type="hidden" name="id" value={t.id} />

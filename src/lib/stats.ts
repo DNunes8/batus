@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { todayLisbon } from "@/lib/schedule";
+import { getStartTimeOverrides, todayLisbon } from "@/lib/schedule";
 
 export type UpcomingBooking = {
   id: string;
@@ -20,6 +20,7 @@ export type StudentStats = {
 type RawBooking = {
   id: string;
   instance_date: string;
+  template_id: string;
   status: string;
   class_templates: {
     name: string;
@@ -34,7 +35,7 @@ export async function getStudentStats(userId: string): Promise<StudentStats> {
   const { data } = await supabase
     .from("bookings")
     .select(
-      `id, instance_date, status,
+      `id, instance_date, template_id, status,
        class_templates!inner(name, start_time, duration_minutes)`,
     )
     .eq("user_id", userId)
@@ -57,22 +58,35 @@ export async function getStudentStats(userId: string): Promise<StudentStats> {
       (b.status === "attended" || b.status === "booked"),
   ).length;
 
-  const upcoming: UpcomingBooking[] = bookings
+  const upcomingRaw = bookings
     .filter(
       (b) =>
         b.instance_date >= today &&
         (b.status === "booked" || b.status === "waitlisted"),
     )
     .reverse()
-    .slice(0, 10)
-    .map((b) => ({
-      id: b.id,
+    .slice(0, 10);
+
+  // A class the coach moved with "Adiar" keeps its old hour on the template.
+  // Resolve the real time so /perfil shows when she should actually turn up —
+  // and so the cancellation cutoff is measured from the right moment.
+  const overrides = await getStartTimeOverrides(
+    upcomingRaw.map((b) => ({
+      template_id: b.template_id,
       instance_date: b.instance_date,
-      status: b.status as "booked" | "waitlisted",
-      template_name: b.class_templates.name,
-      start_time: b.class_templates.start_time,
-      duration_minutes: b.class_templates.duration_minutes,
-    }));
+    })),
+  );
+
+  const upcoming: UpcomingBooking[] = upcomingRaw.map((b) => ({
+    id: b.id,
+    instance_date: b.instance_date,
+    status: b.status as "booked" | "waitlisted",
+    template_name: b.class_templates.name,
+    start_time:
+      overrides.get(`${b.template_id}|${b.instance_date}`) ??
+      b.class_templates.start_time,
+    duration_minutes: b.class_templates.duration_minutes,
+  }));
 
   const cancelled = bookings.filter((b) => b.status === "cancelled").length;
 
