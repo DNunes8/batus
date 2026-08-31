@@ -17,7 +17,7 @@ import {
   mondayOf,
   todayLisbon,
 } from "@/lib/schedule";
-import { parseEuroToCents } from "@/lib/money";
+import { parseEuroOrNull } from "@/lib/money";
 import { promoteFirstWaitlistedIfSeatFree } from "@/lib/waitlist";
 import {
   getSiteUrl,
@@ -970,11 +970,16 @@ export async function createSoloFromCalendar(
     ((formData.get("student") as string | null) ?? "").trim();
   const start_time = formData.get("start_time") as string | null;
   const duration_minutes = Number(formData.get("duration_minutes") ?? 60);
-  const priceRaw = (formData.get("price") as string | null) ?? "0";
-  const price_cents = parseEuroToCents(priceRaw);
+  const priceRaw = (formData.get("price") as string | null) ?? "";
+  const price_cents = parseEuroOrNull(priceRaw);
   const notes = ((formData.get("notes") as string | null) ?? "").trim() || null;
   const repeat_weekly = formData.get("repeat_weekly") === "on";
 
+  if (price_cents === null) {
+    return {
+      error: "Preço inválido. Escreve só o número — por exemplo 25 ou 25,50.",
+    };
+  }
   if (!date || !studentInput || !start_time) {
     return { error: "Preenche o aluno e a hora." };
   }
