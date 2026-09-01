@@ -11,7 +11,7 @@ import {
   effectiveStartTime,
   formatDayHeader,
   formatTime,
-  readStartTimeOverrides,
+  getStartTimeOverrides,
   isClassInPast,
   lisbonInstant,
   mondayOf,
@@ -112,7 +112,7 @@ async function cancelInstanceBookings(
   // Effective start times ("Adiar" moves the hour without touching the
   // template), used both to skip classes that already happened and to tell the
   // student the hour they were actually expecting.
-  const { map: overrides, ok: overridesOk } = await readStartTimeOverrides(
+  const overrides = await getStartTimeOverrides(
     affected.map((r) => ({ template_id: r.template_id, instance_date })),
   );
   const startTimeOf = (r: { template_id: string; templateStartTime: string }) =>
@@ -123,67 +123,23 @@ async function cancelInstanceBookings(
   // emailing "esta aula não se vai realizar" about last Tuesday is nonsense.
   // The booking rows are still flipped above — only the money and the mail are
   // skipped.
-  // If the override read failed we do not know the real hour, and the template
-  // hour may be earlier than the class actually starts. Guessing "already ran"
-  // would skip every refund and every cancellation email on a class that has
-  // NOT run — the whole roster turns up at a locked door. Err the other way:
-  // refunding someone for a class that did run is a far smaller harm, and the
-  // coach can take the credit back by hand.
-  const upcoming = overridesOk
-    ? affected.filter((r) => !isClassInPast(instance_date, startTimeOf(r)))
-    : affected;
-  if (!overridesOk) {
-    console.error(
-      `[calendar] override read failed on ${instance_date} — refunding and emailing everyone rather than risk skipping them.`,
-    );
-  }
+  const upcoming = affected.filter(
+    (r) => !isClassInPast(instance_date, startTimeOf(r)),
+  );
   if (upcoming.length === 0) return;
-
-  // Who holds a pack, and where do we write to them: one query, used by both
-  // halves below. Closing a busy day used to fire a credits RPC plus a row
-  // update for EVERY booked student — dozens of subrequests before a single
-  // email was sent, which on Workers means the action dies partway and the
-  // day is left cancelled with nobody told. Only pack students hold credits
-  // (class_credits is null for everyone else), and the RPC is a no-op for the
-  // rest, so skipping them costs nothing and keeps the request small.
-  const userIds = [...new Set(upcoming.map((r) => r.user_id))];
-  const { data: profiles, error: profilesError } = await admin
-    .from("profiles")
-    .select("id, email, full_name, class_credits")
-    .in("id", userIds);
-  const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
-  // If that read failed we know nothing about who holds a pack, and an empty
-  // map would read as "nobody does" — silently swallowing every refund on a
-  // day the studio cancelled. Fall back to asking the RPC about each booked
-  // row, the way this did before the pack shortcut existed: slower, but it
-  // cannot lose a credit. Retrying the cancel would not help — the bookings
-  // are already flipped, so a second run finds nothing to refund.
-  const packUnknown = !!profilesError || !profiles;
-  if (packUnknown) {
-    console.error(
-      `[calendar] PROFILE READ FAILED on ${instance_date}; refunding without the pack shortcut:`,
-      profilesError?.message ?? "no rows returned",
-    );
-  }
 
   // Give pack students their class back. The studio cancelled — they must not
   // pay for a class that never ran. Refunding here (rather than leaving the
   // credit "parked" in the cancelled row) means no booking ever carries an
-  // unsettled credit, so a re-book charges normally.
-  const refundedBookingIds: string[] = [];
+  // unsettled credit, so a re-book charges normally. adjust_class_credits is a
+  // no-op for non-pack students and returns the new balance.
   for (const row of upcoming) {
     if (row.priorStatus !== "booked") continue; // waitlist never spent a credit
-    if (!packUnknown && byId.get(row.user_id)?.class_credits == null) {
-      continue; // not a pack
-    }
     try {
       const { data: newBalance, error: refundError } = await admin.rpc(
         "adjust_class_credits",
         { p_user_id: row.user_id, p_delta: 1 },
       );
-      if (!refundError && packUnknown && newBalance == null) {
-        continue; // the RPC's own answer: not a pack student
-      }
       if (refundError) {
         // Loud: a swallowed failure here means a student quietly paid for a
         // class that never ran, and nothing else in the system would notice.
@@ -193,46 +149,19 @@ async function cancelInstanceBookings(
         );
         continue;
       }
+      if (newBalance === null || newBalance === undefined) continue; // not a pack
       row.refunded = true;
-      refundedBookingIds.push(row.booking_id);
+      // Record the settlement in the row itself. The restore must charge only
+      // when a refund actually landed — deriving that from the student's
+      // current balance would double-charge whenever a refund had failed.
+      await admin
+        .from("bookings")
+        .update({
+          cancelled_reason: `${COACH_CANCEL_MARKER}${row.priorStatus}:r|${reason}`,
+        })
+        .eq("id", row.booking_id);
     } catch (err) {
       console.error("[calendar] credit refund threw:", err);
-    }
-  }
-
-  // Record the settlement in the rows themselves, in one update. The restore
-  // must charge only when a refund actually landed — deriving that from the
-  // student's current balance would double-charge whenever a refund failed.
-  // Every id here is a prior "booked" row, so one marker fits them all.
-  if (refundedBookingIds.length > 0) {
-    const { error: markError } = await admin
-      .from("bookings")
-      .update({
-        cancelled_reason: `${COACH_CANCEL_MARKER}booked:r|${reason}`,
-      })
-      .in("id", refundedBookingIds);
-    if (markError) {
-      console.error(
-        `[calendar] REFUND MARKER FAILED on ${instance_date} (a later restore will not charge these back):`,
-        markError.message,
-      );
-    }
-  }
-
-  // The same failed read would also leave us with no addresses, so the day
-  // would be cancelled with nobody told. Ask once more before giving up —
-  // these failures are transient, and one extra query is cheap next to 26
-  // students turning up at a locked door.
-  if (packUnknown) {
-    const { data: retry } = await admin
-      .from("profiles")
-      .select("id, email, full_name, class_credits")
-      .in("id", userIds);
-    for (const p of retry ?? []) byId.set(p.id, p);
-    if (byId.size === 0) {
-      console.error(
-        `[calendar] NO ADDRESSES for ${instance_date} — the class was cancelled but NOBODY was emailed.`,
-      );
     }
   }
 
@@ -240,6 +169,13 @@ async function cancelInstanceBookings(
   // would blow the Workers subrequest budget on a busy day and half-deliver.
   // Best-effort: a mail problem must never leave the class half-cancelled.
   try {
+    const userIds = [...new Set(upcoming.map((r) => r.user_id))];
+    const { data: profiles } = await admin
+      .from("profiles")
+      .select("id, email, full_name")
+      .in("id", userIds);
+    const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+
     const recipients = upcoming.flatMap((row) => {
       const profile = byId.get(row.user_id);
       if (!profile?.email) return [];
@@ -269,13 +205,10 @@ async function cancelInstanceBookings(
 // Restore bookings that were cancelled by a coach cancel/close — back to
 // their recorded status — skipping any student who has meanwhile booked a
 // different class that day (one-per-day must keep holding).
-// Returns false when it refused because a read failed — the caller turns that
-// into a toast the coach can act on. A thrown error here would surface as
-// Next's generic English error page in production, which tells him nothing.
 async function restoreInstanceBookings(
   template_id: string | null,
   instance_date: string,
-): Promise<boolean> {
+) {
   const admin = createAdminClient();
 
   let markedQ = admin
@@ -287,71 +220,40 @@ async function restoreInstanceBookings(
     .eq("status", "cancelled")
     .like("cancelled_reason", `${COACH_CANCEL_MARKER}%`);
   if (template_id) markedQ = markedQ.eq("template_id", template_id);
-  const { data: marked, error: markedError } = await markedQ;
-  // Every guard below is built on a read. supabase-js resolves a failed read
-  // to data: null rather than throwing, so an unchecked one turns into its own
-  // opposite: no rows to restore, nobody has a clashing booking, no class is
-  // still cancelled, nobody is over their weekly limit. Refuse instead —
-  // nothing has been written yet, and the markers survive for the next tap.
-  if (markedError) {
-    console.error("[calendar] restore: bookings read failed:", markedError.message);
-    return false;
-  }
-  if (!marked || marked.length === 0) return true;
+  const { data: marked } = await markedQ;
+  if (!marked || marked.length === 0) return;
 
   // Same-day active bookings for the affected students → conflicts to skip.
   const userIds = [...new Set(marked.map((m) => m.user_id))];
-  const { data: sameDay, error: sameDayError } = await admin
+  const { data: sameDay } = await admin
     .from("bookings")
     .select("user_id")
     .eq("instance_date", instance_date)
     .in("status", ["booked", "waitlisted"])
     .in("user_id", userIds);
-  if (sameDayError) {
-    console.error("[calendar] restore: same-day read failed:", sameDayError.message);
-    return false;
-  }
   const conflicted = new Set((sameDay ?? []).map((b) => b.user_id));
 
   // A day can be reopened while individual classes on it are still cancelled
   // in their own right. Those bookings must stay cancelled — reopening the day
   // is not the same as un-cancelling every class in it.
-  const { data: stillCancelled, error: stillCancelledError } = await admin
+  const { data: stillCancelled } = await admin
     .from("class_overrides")
     .select("template_id")
     .eq("instance_date", instance_date)
     .eq("cancelled", true);
-  if (stillCancelledError) {
-    console.error("[calendar] restore: overrides read failed:", stillCancelledError.message);
-    return false;
-  }
   const cancelledTemplates = new Set(
     (stillCancelled ?? []).map((o) => o.template_id as string),
   );
-  // ...except the class we were asked to restore. Its own override still says
-  // cancelled at this point — the caller clears that flag only once these
-  // bookings are safely back — so leaving it in the veto set would make the
-  // restore a guaranteed no-op.
-  if (template_id) cancelledTemplates.delete(template_id);
 
   // Weekly plan limits: a restore must not push a limited student over their
   // cap (they may have legitimately booked a replacement class this week
   // while the instance was cancelled). Count each limited student's active
   // week bookings the same way book_class does — booked always, waitlisted
   // only while still upcoming.
-  const { data: userProfiles, error: profilesError } = await admin
+  const { data: userProfiles } = await admin
     .from("profiles")
-    .select("id, email, full_name, weekly_class_limit, class_credits")
+    .select("id, email, full_name, weekly_class_limit")
     .in("id", userIds);
-  // Everything below reads this: who is over their weekly limit, who is still
-  // on a pack, and where to write to them. An empty map from a failed read
-  // would silently answer "nobody" to all three — restoring pack students for
-  // free and telling no one. Nothing has been written yet, so failing here is
-  // clean: the markers stay put and the coach's next tap does the whole job.
-  if (profilesError) {
-    console.error("[calendar] restore: profiles read failed:", profilesError.message);
-    return false;
-  }
   const limitByUser = new Map(
     (userProfiles ?? [])
       .filter((p) => p.weekly_class_limit !== null)
@@ -362,7 +264,7 @@ async function restoreInstanceBookings(
   const weekStart = mondayOf(instance_date);
   const overLimit = new Set<string>();
   if (limitByUser.size > 0) {
-    const { data: weekRows, error: weekRowsError } = await admin
+    const { data: weekRows } = await admin
       .from("bookings")
       .select("user_id")
       .in("user_id", [...limitByUser.keys()])
@@ -371,10 +273,6 @@ async function restoreInstanceBookings(
       .or(
         `status.eq.booked,and(status.eq.waitlisted,instance_date.gte.${todayLisbon()})`,
       );
-    if (weekRowsError) {
-      console.error("[calendar] restore: week count failed:", weekRowsError.message);
-      return false;
-    }
     const weekCount = new Map<string, number>();
     for (const b of weekRows ?? []) {
       weekCount.set(b.user_id, (weekCount.get(b.user_id) ?? 0) + 1);
@@ -384,50 +282,18 @@ async function restoreInstanceBookings(
     }
   }
 
-  const { map: overrides, ok: overridesOk } = await readStartTimeOverrides(
+  const overrides = await getStartTimeOverrides(
     marked.map((m) => ({
       template_id: m.template_id as string,
       instance_date,
     })),
   );
 
-  // Did this instance already run? The cancel half asks the same question and
-  // skips the money and the mail for a class that is over (only the rows are
-  // touched). The restore half never asked — so reopening a day at 21:00 took
-  // the credit back for an 18:00 class that never happened, counted it as
-  // attended, and mailed the roster "esta aula afinal realiza-se" two hours
-  // after it would have ended.
-  const alreadyRan = (row: (typeof marked)[number]) => {
-    // Same unknown, opposite safe direction. Here the risky move is taking a
-    // credit or sending mail we should not, so an unreadable hour counts as
-    // "already ran": the seat still goes back, silently and for free.
-    if (!overridesOk) return true;
-    const tpl = row.class_templates as unknown as { start_time: string };
-    return isClassInPast(
-      instance_date,
-      overrides.get(`${row.template_id}|${instance_date}`) ?? tpl.start_time,
-    );
-  };
-
   const restoredRecipients: {
     to: string;
     studentName: string | null;
     className: string;
     timeLabel: string;
-    charged: boolean;
-  }[] = [];
-
-  // Sort the rows first, act in batches after. Reopening a busy day used to
-  // cost one or two writes PER STUDENT, which on Workers means the action can
-  // run out of subrequests and stop halfway — some seats back, some not, and
-  // credits already taken for rows that were never restored.
-  type Marked = (typeof marked)[number];
-  const staleIds: string[] = []; // stay cancelled, marker stripped
-  const toRestore: {
-    row: Marked;
-    prior: "booked" | "waitlisted";
-    // Per ROW, not per user: someone with two bookings that day may have been
-    // charged for one and not the other.
     charged: boolean;
   }[] = [];
 
@@ -454,123 +320,66 @@ async function restoreInstanceBookings(
       // Leave cancelled, but strip the marker so a later cancel/restore cycle
       // can't resurrect a stale row. Any refunded credit stays refunded — the
       // student keeps the class they paid for.
-      staleIds.push(row.id as string);
+      await admin
+        .from("bookings")
+        .update({ cancelled_reason: "Aula cancelada pelo estúdio" })
+        .eq("id", row.id);
       continue;
     }
 
     // Take the credit back BEFORE handing back the seat, and only if the cancel
-    // actually returned one — which only ever happened for pack students, so
-    // this loop touches nobody else. charge_class_credit refuses (returns
-    // false) rather than clamping at zero, so a student who has since spent the
-    // credit is not silently restored for free.
+    // actually returned one. charge_class_credit refuses (returns false) rather
+    // than clamping at zero, so a student who has since spent the credit is not
+    // silently restored for free.
     let charged = false;
-    // Only a pack student was ever refunded, but they may have moved to a
-    // monthly plan since — and a monthly student needs no credit to hold a
-    // seat. charge_class_credit refuses for them exactly as it refuses an
-    // empty pack, so without this the seat would never come back and the
-    // marker would be stripped, putting it beyond a second attempt.
-    const stillOnAPack = profileById.get(row.user_id)?.class_credits != null;
-    // Nobody pays for a class that did not happen. The refund the cancel made
-    // stays with them; the seat is still restored so the roster reads true.
-    if (wasRefunded && prior === "booked" && stillOnAPack && !alreadyRan(row)) {
+    if (wasRefunded && prior === "booked") {
       const { data: didCharge, error: chargeError } = await admin.rpc(
         "charge_class_credit",
         { p_user_id: row.user_id },
       );
-      if (chargeError) {
-        // COULDN'T ASK is not the same as WAS REFUSED. Sending this row to
-        // staleIds would strip its marker, and the marker is the only way a
-        // later restore can find it — one transient RPC failure would put the
-        // seat permanently beyond recovery. Leave the row untouched instead,
-        // so the coach's next tap picks it up exactly as it is now.
-        console.error(
-          `[calendar] CREDIT CHARGE FAILED for user ${row.user_id} on ${instance_date} — booking left as it was:`,
-          chargeError.message,
-        );
-        continue;
-      }
-      if (didCharge !== true) {
-        // A real refusal: the pack is empty. Don't restore a seat for free.
-        staleIds.push(row.id as string);
+      if (chargeError || didCharge !== true) {
+        if (chargeError) {
+          console.error(
+            `[calendar] CREDIT CHARGE FAILED for user ${row.user_id} on ${instance_date}:`,
+            chargeError.message,
+          );
+        }
+        // Can't pay (or couldn't be charged) → don't restore the seat.
+        await admin
+          .from("bookings")
+          .update({ cancelled_reason: "Aula cancelada pelo estúdio" })
+          .eq("id", row.id);
         continue;
       }
       charged = true;
     }
 
-    toRestore.push({ row, prior, charged });
-  }
-
-  if (staleIds.length > 0) {
-    const { error } = await admin
+    // Guard the flip on the status we read: a concurrent second restore then
+    // matches no rows.
+    const { data: restored, error } = await admin
       .from("bookings")
-      .update({ cancelled_reason: "Aula cancelada pelo estúdio" })
-      .in("id", staleIds);
-    if (error) {
-      console.error("[calendar] stale marker cleanup failed:", error.message);
+      .update({
+        status: prior,
+        cancelled_at: null,
+        cancelled_reason: null,
+      })
+      .eq("id", row.id)
+      .eq("status", "cancelled")
+      .select("id");
+    if (error) throw new Error(error.message);
+
+    if ((restored?.length ?? 0) === 0) {
+      // Someone else restored it first — give back the credit we just took so
+      // it isn't charged twice for one seat.
+      if (charged) {
+        await admin.rpc("adjust_class_credits", {
+          p_user_id: row.user_id,
+          p_delta: 1,
+        });
+      }
+      continue;
     }
-  }
 
-  // Flip the seats back, one statement per prior status, each still guarded on
-  // status = 'cancelled' so a concurrent second restore matches no rows. The
-  // returned ids are the rows THIS call actually restored.
-  const restoredIds = new Set<string>();
-  let flipError: Error | null = null;
-  try {
-    for (const status of ["booked", "waitlisted"] as const) {
-      const ids = toRestore
-        .filter((t) => t.prior === status)
-        .map((t) => t.row.id as string);
-      if (ids.length === 0) continue;
-      const { data: flipped, error } = await admin
-        .from("bookings")
-        .update({ status, cancelled_at: null, cancelled_reason: null })
-        .in("id", ids)
-        .eq("status", "cancelled")
-        .select("id");
-      if (error) throw new Error(error.message);
-      for (const r of flipped ?? []) restoredIds.add(r.id as string);
-    }
-  } catch (err) {
-    // Do NOT leave here without paying the credits back. The charges above all
-    // happened before any seat was flipped, so throwing straight out would take
-    // a credit from every pack student on the day and give back not one seat —
-    // and their rows would still say ":r", so the coach's next attempt would
-    // charge them a second time.
-    flipError = err instanceof Error ? err : new Error(String(err));
-  }
-
-  // Anything charged for a seat that didn't come back (someone else restored it
-  // first, or the flip above failed) gets its credit returned, so one seat is
-  // never paid for twice.
-  const refundBack = new Map<string, number>();
-  for (const { row, charged } of toRestore) {
-    if (!charged || restoredIds.has(row.id as string)) continue;
-    refundBack.set(row.user_id, (refundBack.get(row.user_id) ?? 0) + 1);
-  }
-  for (const [uid, n] of refundBack) {
-    const { error } = await admin.rpc("adjust_class_credits", {
-      p_user_id: uid,
-      p_delta: n,
-    });
-    if (error) {
-      console.error(
-        `[calendar] COULD NOT RETURN ${n} credit(s) to user ${uid} after a failed restore on ${instance_date}:`,
-        error.message,
-      );
-    }
-  }
-
-  if (flipError) {
-    console.error(
-      `[calendar] restore: seat flip failed on ${instance_date} (credits returned):`,
-      flipError.message,
-    );
-    return false;
-  }
-
-  for (const { row, charged } of toRestore) {
-    if (!restoredIds.has(row.id as string)) continue;
-    if (alreadyRan(row)) continue; // no "a tua aula foi reposta" after the fact
     const profile = profileById.get(row.user_id);
     const tpl = row.class_templates as unknown as {
       name: string;
@@ -603,8 +412,6 @@ async function restoreInstanceBookings(
       console.error("[calendar] restore emails failed:", err);
     }
   }
-
-  return true;
 }
 
 // One-tap "add this model to today". Clones an existing class_template's
@@ -764,21 +571,13 @@ export async function reopenDay(formData: FormData) {
   if (!date) throw new Error("Data inválida.");
 
   const supabase = await createClient();
-
-  // Put the bookings back BEFORE reopening the day, not after. If the restore
-  // fails once the closed_days row is gone, the day is open, the bookings are
-  // still cancelled, and "Reabrir dia" — the only control that runs this — has
-  // disappeared with the closure, so there is no way left to finish the job.
-  // This order leaves a failure fully recoverable: the day stays closed, the
-  // button stays put, and a second tap redoes the work from the markers.
-  const reopened = await restoreInstanceBookings(null, date);
-  if (!reopened) {
-    revalidatePath("/admin/calendar");
-    redirect(`/admin/calendar?week=${mondayOf(date)}&day=${date}&offline=1`);
-  }
-
   const { error } = await supabase.from("closed_days").delete().eq("date", date);
+
   if (error) throw new Error(error.message);
+
+  // Put the day's coach-cancelled bookings back (skips students who booked
+  // elsewhere in the meantime).
+  await restoreInstanceBookings(null, date);
 
   revalidatePath("/admin/calendar");
   revalidatePath("/aulas");
@@ -825,58 +624,17 @@ export async function restoreClassInstance(formData: FormData) {
   }
 
   const supabase = await createClient();
-
-  // The whole day may have been closed since — from another device, or by the
-  // coach forgetting. A closed day renders no classes at all, so restoring one
-  // into it would put students back on a seat nobody can see, with an email
-  // telling them the class is on. Reopen the day first. Every sibling write
-  // path (guests, adding a student) already refuses this way.
-  const { data: closed, error: closedError } = await supabase
-    .from("closed_days")
-    .select("date")
-    .eq("date", instance_date)
-    .maybeSingle();
-  // Fail closed: if we can't tell whether the day is open, don't restore into
-  // it. A retry costs the coach one tap; guessing wrong puts students back on
-  // a seat the app doesn't draw and emails them that the class is on.
-  if (closedError) {
-    // Couldn't tell — say so. Telling him the day is closed would send him
-    // looking for a "Reabrir dia" button that isn't there.
-    redirect(
-      `/admin/calendar?week=${mondayOf(instance_date)}&day=${instance_date}&offline=1`,
-    );
-  }
-  if (closed) {
-    redirect(
-      `/admin/calendar?week=${mondayOf(instance_date)}&day=${instance_date}&dayclosed=1`,
-    );
-  }
-
-  // Bookings first, class second — the same order as "Reabrir dia", and for
-  // the same reason. "Restaurar" only renders on a class that is cancelled,
-  // so un-cancelling first and then failing would leave the class looking
-  // live and empty with its whole roster still cancelled, and no button left
-  // to try again.
-  const restored = await restoreInstanceBookings(template_id, instance_date);
-  if (!restored) {
-    revalidatePath("/admin/calendar");
-    redirect(
-      `/admin/calendar?week=${mondayOf(instance_date)}&day=${instance_date}&offline=1`,
-    );
-  }
-
-  // Un-cancel, don't delete. The row also carries override_start_time (the
-  // coach's "Adiar") and override_capacity; deleting it silently reverted an
-  // 18:00 -> 19:00 move back to 18:00 — and, because the row was already gone
-  // by the time the restore emails were built, told every student the old
-  // hour. Clearing just the cancellation leaves the rest of the row intact.
   const { error } = await supabase
     .from("class_overrides")
-    .update({ cancelled: false, reason: null })
+    .delete()
     .eq("template_id", template_id)
     .eq("instance_date", instance_date);
 
   if (error) throw new Error(error.message);
+
+  // Bring the cancelled bookings back to their pre-cancel status (skipping
+  // students who booked a different class this day in the meantime).
+  await restoreInstanceBookings(template_id, instance_date);
 
   revalidatePath("/admin/calendar");
   revalidatePath("/aulas");
@@ -1081,11 +839,9 @@ export async function restoreSoloInstance(formData: FormData) {
   }
 
   const supabase = await createClient();
-  // Same as the group restore: keep override_start_time, drop only the
-  // cancellation. A deleted row takes the "Adiar" with it.
   const { error } = await supabase
     .from("solo_session_overrides")
-    .update({ cancelled: false, reason: null })
+    .delete()
     .eq("template_id", template_id)
     .eq("instance_date", instance_date);
 
@@ -1142,15 +898,11 @@ export async function addClassGuest(formData: FormData) {
   const supabase = await createClient();
 
   // Same stale-tab guard as addStudentToClass: no seats on a closed day.
-  const { data: closed, error: closedError } = await supabase
+  const { data: closed } = await supabase
     .from("closed_days")
     .select("date")
     .eq("date", instance_date)
     .maybeSingle();
-  // Fail closed: a read that errors must not read as "the day is open".
-  if (closedError) {
-    throw new Error("Sem ligação ao servidor. Tenta outra vez.");
-  }
   if (closed) throw new Error("O estúdio está fechado neste dia.");
 
   const { error } = await supabase.from("class_guests").insert({
@@ -1274,11 +1026,7 @@ export async function addStudentToClass(input: {
   // Stale-tab guard, same threat as the cancelled-instance stop above: a day
   // closed from another device renders NO calendar entries, so a booking
   // forced onto it would be invisible and unremovable — and would burn a pack
-  // credit on a class that won't happen. A read that errors must not read as
-  // "the day is open".
-  if (closedRes.error) {
-    return { error: "Sem ligação ao servidor. Tenta outra vez." };
-  }
+  // credit on a class that won't happen.
   if (closedRes.data) return { error: "O estúdio está fechado neste dia." };
 
   // Same started-class gate as removeStudentBooking: adding into the past
