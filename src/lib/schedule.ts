@@ -172,39 +172,18 @@ export function isClassInPast(date: string, startTime: string): boolean {
 export async function getStartTimeOverrides(
   pairs: { template_id: string; instance_date: string }[],
 ): Promise<Map<string, string>> {
-  return (await readStartTimeOverrides(pairs)).map;
-}
-
-// The same lookup, but honest about failure. An empty map means two very
-// different things — "nothing was rescheduled" and "we could not ask" — and
-// supabase-js reports a failed read as data: null without throwing, so callers
-// that decide something important (has this class already run? what hour do we
-// tell the student?) must be able to tell those apart. Deciding from a silent
-// empty map is how a moved class gets treated as if it still ran at its
-// original hour.
-export async function readStartTimeOverrides(
-  pairs: { template_id: string; instance_date: string }[],
-): Promise<{ map: Map<string, string>; ok: boolean }> {
   const out = new Map<string, string>();
-  if (pairs.length === 0) return { map: out, ok: true };
+  if (pairs.length === 0) return out;
 
   const admin = createAdminClient();
   const dates = [...new Set(pairs.map((p) => p.instance_date))];
   const templateIds = [...new Set(pairs.map((p) => p.template_id))];
-  const { data, error } = await admin
+  const { data } = await admin
     .from("class_overrides")
     .select("template_id, instance_date, override_start_time")
     .in("instance_date", dates)
     .in("template_id", templateIds)
     .not("override_start_time", "is", null);
-
-  if (error) {
-    console.error(
-      "[schedule] could not read start-time overrides:",
-      error.message,
-    );
-    return { map: out, ok: false };
-  }
 
   for (const row of data ?? []) {
     out.set(
@@ -212,7 +191,7 @@ export async function readStartTimeOverrides(
       row.override_start_time as string,
     );
   }
-  return { map: out, ok: true };
+  return out;
 }
 
 // Single-instance convenience wrapper for the action paths.

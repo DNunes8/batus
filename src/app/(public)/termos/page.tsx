@@ -8,10 +8,6 @@ export const metadata = {
 
 export default function TermosPage() {
   const email = configured(studio.contact.email);
-  // Only claim the Privacy Policy carries the legal identification when it
-  // actually does — that page hides the block while the details are unset,
-  // so an unconditional cross-reference sends the reader to a dead end.
-  const hasLegalId = !!configured(studio.legal.controller);
 
   const reachUs = email ? (
     <>
@@ -63,23 +59,15 @@ export default function TermosPage() {
             O {studio.fullName} é um estúdio de boxe e kickboxing em{" "}
             {studio.city}, {studio.country}, do treinador {studio.coach}. Este
             site permite-te conhecer o estúdio, criar conta, marcar e gerir
-            aulas e reservar artigos da loja.{" "}
-            {hasLegalId ? (
-              <>
-                A identificação legal do estúdio (responsável) consta da{" "}
-                <Link
-                  href="/privacidade"
-                  className="underline underline-offset-2 hover:text-foreground"
-                >
-                  Política de Privacidade
-                </Link>
-                .
-              </>
-            ) : (
-              <>
-                Para a identificação legal completa do estúdio, {reachUs}.
-              </>
-            )}
+            aulas e reservar artigos da loja. A identificação legal do estúdio
+            (responsável) consta da{" "}
+            <Link
+              href="/privacidade"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              Política de Privacidade
+            </Link>
+            .
           </p>
         </section>
 
@@ -122,8 +110,8 @@ export default function TermosPage() {
             </li>
             <li>
               Podes cancelar uma marcação até ao limite definido pelo estúdio
-              antes do início da aula. Vês o limite em vigor na página da aula
-              e no teu Perfil — o estúdio pode ajustá-lo.
+              antes do início da aula — atualmente 4 horas. Este período pode
+              ser ajustado pelo estúdio.
             </li>
             <li>
               Cancela sempre que não puderes comparecer, para libertares o lugar

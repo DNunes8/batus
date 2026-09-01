@@ -1,16 +1,16 @@
 # Demo script — Batus walk-through with Baltaru
 
-_Updated 2026-08-31._ A ~10-minute path through the app. Tabs to have ready:
+_Updated 2026-05-18._ A ~10-minute path through the app. Tabs to have ready:
 
-1. https://batusboxe.com/ — the public site (an incognito window helps for the "as a student" view)
-2. https://batusboxe.com/admin — logged in as you
+1. https://batus-mu.vercel.app/ — the public site (an incognito window helps for the "as a student" view)
+2. https://batus-mu.vercel.app/admin — logged in as you
 3. (optional) Supabase dashboard → Table Editor — to show the data is real
 
 ---
 
 ## 1. Public site (2–3 min)
 
-**Home — https://batusboxe.com/**
+**Home — https://batus-mu.vercel.app/**
 - Hero, manifesto band, coach section, a live weekly-schedule preview (pulled from the database), and a student testimonial.
 - CTAs: "Ver horário" → /aulas, "Contactar" → /contacto.
 
@@ -47,7 +47,7 @@ The admin area has its own layout — a sidebar on desktop, a top bar on mobile 
 
 **/admin — Dashboard.** A real daily-driver screen:
 - A banner when new accounts are waiting for approval.
-- Two cards: a Finanças link (no figure on it — the numbers live inside) and pedidos pendentes. Above them, whatever needs attention today — a lapsed booking window, new accounts waiting, birthdays.
+- Four metric cards: receitas este mês, aulas hoje, pedidos pendentes, mensagens por ler.
 - "Hoje" — today's classes with booked/capacity.
 - Shortcuts: nova aula, nova sessão PT, ver alunos, novo artigo.
 
@@ -62,7 +62,7 @@ The admin area has its own layout — a sidebar on desktop, a top bar on mobile 
 - **Approve pending accounts here** — a new signup can't book until you do.
 - Click a student → detail page: name, phone, goals, private notes (your CRM), payment ledger.
 
-**/admin/classes → PTs** — solo sessions Baltaru runs directly. "Novo PT" → the Aluno field matches an existing account by email/name, or stores an off-app name. These feed the earnings.
+**/admin/sessions — PTs** — solo sessions Baltaru runs directly. "Nova sessão" matches an existing account by email/name, or stores an off-app name. These feed the earnings.
 
 **/admin/pagamentos — Pagamentos** — payment tracking + earnings, the part Regybox does poorly:
 - Two tabs — "Aulas de grupo" and "PTs".
@@ -81,7 +81,9 @@ The admin area has its own layout — a sidebar on desktop, a top bar on mobile 
 The app works today; these are the calls only he can make. Full list in [TALK_LIST.md](./TALK_LIST.md) — the headlines:
 
 - Real logo file, photos, and his bio for /sobre
-- Public pricing on the site: yes or no
+- Accent colour — gold (current) or Portuguese red
+- Domain — batusboxing.pt vs batusboxe.pt
+- Cancellation cutoff (currently 4h); public pricing yes/no
 - Free / trial-class rules; no-show policy
 - Importing the existing student list from Regybox
 - His legal name + NIF to complete the Terms / Privacy pages
@@ -90,7 +92,7 @@ The app works today; these are the calls only he can make. Full list in [TALK_LI
 
 ## 5. Hand-off mechanics (1 min)
 
-- All infrastructure sits under `batusboxing@gmail.com` — hand him that Gmail's password and he owns Cloudflare + Supabase + Resend (the domain is registered at Vercel).
+- All infrastructure sits under `batusboxing@gmail.com` — hand him that Gmail's password and he owns Vercel + Supabase + (future domain).
 - Source code: public on github.com/DNunes8/batus.
-- Cost today: €0/month (Cloudflare free + Supabase free + Resend free). Domain: ~€15/year.
+- Cost today: €0/month (Vercel free + Supabase free). Domain when bought: ~€15/year.
 - See [HANDOVER.md](./HANDOVER.md) for the full transfer steps.

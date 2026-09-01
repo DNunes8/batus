@@ -106,35 +106,13 @@ export function SoloBoard({
           month,
           status,
         });
-        if (result.error) {
-          toast.error(result.error);
-          return;
-        }
-        // "0 alunos marcados como pagos" helps nobody — when everything was
-        // skipped, the warning below is the whole message.
-        if (result.updated > 0) {
-          toast.success(
-            status === "paid"
-              ? `${result.updated} alunos marcados como pagos.`
-              : status === "paused"
-                ? `${result.updated} alunos em pausa.`
-                : `${result.updated} alunos marcados por pagar.`,
-          );
-        }
-        // Nobody is marked paid for an amount we don't know — say who, and
-        // why, instead of writing a silent 0,00 € into the month.
-        if (result.skipped.length > 0) {
-          toast.warning(
-            result.skipped.length === 1
-              ? `${result.skipped[0]} ficou de fora.`
-              : `${result.skipped.length} alunos ficaram de fora.`,
-            {
-              description:
-                "Ainda não têm mensalidade definida. Abre o aluno e escreve o valor — pode ser 0.",
-              duration: 8000,
-            },
-          );
-        }
+        toast.success(
+          status === "paid"
+            ? `${result.updated} alunos marcados como pagos.`
+            : status === "paused"
+              ? `${result.updated} alunos em pausa.`
+              : `${result.updated} alunos marcados por pagar.`,
+        );
         setSelectedIds(new Set());
         setBulkConfirm(null);
         router.refresh();

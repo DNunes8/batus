@@ -12,7 +12,6 @@ import { SubmitButton } from "@/components/submit-button";
 import { formatTime } from "@/lib/schedule";
 import {
   canCancelBooking,
-  cutoffLabel,
   getCancellationCutoffHours,
 } from "@/lib/booking-window";
 import { getStudentStats } from "@/lib/stats";
@@ -331,12 +330,6 @@ export default async function PerfilPage({
             <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               Próximas aulas
             </h2>
-            {/* The rule, in the place the Termos page sends people to read it.
-                It is coach-editable, so it can never be written as a fixed
-                number anywhere. */}
-            <p className="mt-2 text-xs text-muted-foreground">
-              Podes cancelar até {cutoffLabel(cutoffHours)} do início da aula.
-            </p>
             {stats.upcoming.length === 0 ? (
               <p className="mt-3 text-sm text-muted-foreground">
                 Sem aulas marcadas.{" "}

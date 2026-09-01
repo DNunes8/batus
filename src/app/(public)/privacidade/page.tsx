@@ -70,10 +70,11 @@ export default function PrivacidadePage() {
           ) : (
             <p className="mt-2">
               Este site é operado pelo estúdio {studio.fullName}, do treinador{" "}
-              {studio.coach}, em {studio.city}, {studio.country}. Para qualquer
-              questão sobre privacidade — ou para saberes a identificação legal
-              completa do responsável pelo tratamento — {reachUs}. Respondemos
-              com a informação de que precisares.
+              {studio.coach}, em {studio.city}, {studio.country}. A
+              identificação legal completa do responsável pelo tratamento (nome
+              e número de identificação fiscal) será publicada nesta página
+              antes do lançamento público do site. Para qualquer questão sobre
+              privacidade, {reachUs}.
             </p>
           )}
         </section>
@@ -97,10 +98,7 @@ export default function PrivacidadePage() {
               <span className="font-medium text-foreground">
                 Dados de perfil
               </span>{" "}
-              — o teu nome, o teu telefone e a tua data de nascimento. São
-              pedidos ao criares a conta: o telefone para o treinador te
-              contactar sobre as aulas, a data de nascimento para o treinador
-              te desejar parabéns no dia certo.
+              — o teu nome e, se o indicares, o teu telefone.
             </li>
             <li>
               <span className="font-medium text-foreground">
@@ -166,12 +164,7 @@ export default function PrivacidadePage() {
             </li>
             <li>
               responder às mensagens que nos envias pelo formulário de contacto
-              — para tratar o teu pedido;
-            </li>
-            <li>
-              assinalar o teu aniversário ao treinador, para te desejar
-              parabéns — interesse legítimo do estúdio na relação com os
-              alunos.
+              — para tratar o teu pedido.
             </li>
           </ul>
           <p className="mt-3">
@@ -229,11 +222,11 @@ export default function PrivacidadePage() {
           <p className="mt-2">
             A base de dados e as contas são alojadas em servidores na União
             Europeia (Supabase, em Frankfurt, Alemanha). O site é distribuído
-            através da Cloudflare e os emails de sistema são enviados através da
-            Resend. Alguns destes fornecedores são empresas com sede fora da
-            União Europeia; quando exista transferência internacional de dados,
-            esta é coberta pelas salvaguardas previstas no RGPD, nomeadamente as
-            cláusulas contratuais-tipo aprovadas pela Comissão Europeia.
+            através da Vercel. Alguns destes fornecedores são empresas com sede
+            fora da União Europeia; quando exista transferência internacional de
+            dados, esta é coberta pelas salvaguardas previstas no RGPD,
+            nomeadamente as cláusulas contratuais-tipo aprovadas pela Comissão
+            Europeia.
           </p>
         </section>
 

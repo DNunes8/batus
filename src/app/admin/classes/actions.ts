@@ -8,7 +8,6 @@ import { parseEuroToCents } from "@/lib/money";
 import {
   addDays,
   dayOfWeek as dowHelper,
-  formatDayHeader,
   mondayOf,
   todayLisbon,
 } from "@/lib/schedule";
@@ -21,25 +20,18 @@ import {
 // Open booking for the next two weeks — the wife's fortnightly "set up the
 // next 2 weeks" button. Stores the cutoff date in settings.bookable_until;
 // bookClass + the schedule UI gate on it.
-export async function openNextTwoWeeks(formData?: FormData) {
+export async function openNextTwoWeeks() {
   await assertAdmin();
   const supabase = await createClient();
-  const until = nextWindowEnd();
   const { error } = await supabase
     .from("settings")
-    .upsert({ key: "bookable_until", value: until });
+    .upsert({ key: "bookable_until", value: nextWindowEnd() });
   if (error) throw new Error(error.message);
 
   revalidatePath("/aulas");
-  revalidatePath("/admin");
   revalidatePath("/admin/classes");
   revalidatePath("/admin/calendar");
-  // The dashboard warns about a lapsed window and offers this same button, so
-  // land the coach back where he tapped instead of on Modelos.
-  const from = formData?.get("return_to");
-  const back = from === "/admin" ? "/admin" : "/admin/classes";
-  const params = new URLSearchParams({ opened: formatDayHeader(until) });
-  redirect(`${back}?${params}`);
+  redirect("/admin/classes?opened=1");
 }
 
 // How late students may cancel. Lived only in the database until a student was
@@ -178,19 +170,12 @@ export async function deleteClassTemplate(formData: FormData) {
   // this class with it, wiping attendance history and streaks for everyone
   // who trained here. (The old code caught an FK error that cannot happen and
   // the dialog promised a failure that never came.) Count first and refuse.
-  const { count, error: countError } = await supabase
+  const { count } = await supabase
     .from("bookings")
     .select("id", { count: "exact", head: true })
     .eq("template_id", id);
 
-  // A failed count must not read as "no bookings". This guard is the only
-  // thing standing between a tap and an ON DELETE CASCADE that takes every
-  // booking ever made for this class with it. Refuse either way, but don't
-  // claim bookings exist when the truth is that we couldn't ask.
-  if (countError || count === null) {
-    redirect("/admin/classes?offline=1");
-  }
-  if (count > 0) {
+  if ((count ?? 0) > 0) {
     redirect("/admin/classes?hasbookings=1");
   }
 

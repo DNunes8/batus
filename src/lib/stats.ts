@@ -1,9 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import {
-  getStartTimeOverrides,
-  lisbonInstant,
-  todayLisbon,
-} from "@/lib/schedule";
+import { getStartTimeOverrides, todayLisbon } from "@/lib/schedule";
 
 export type UpcomingBooking = {
   id: string;
@@ -48,79 +44,47 @@ export async function getStudentStats(userId: string): Promise<StudentStats> {
   const bookings = (data ?? []) as unknown as RawBooking[];
   const today = todayLisbon();
   const monthStart = today.slice(0, 7) + "-01";
-  const now = Date.now();
-
-  // A class the coach moved with "Adiar" keeps its old hour on the template.
-  // Resolve the real time so /perfil shows when she should actually turn up,
-  // so the cancellation cutoff is measured from the right moment, and so the
-  // "already finished?" test below uses the hour she was actually told.
-  // Only today's classes need the clock — anything earlier has certainly
-  // finished, anything later certainly has not — so this asks about today and
-  // the handful of upcoming days, not the student's whole history.
-  const overrides = await getStartTimeOverrides(
-    bookings
-      .filter((b) => b.instance_date >= today)
-      .map((b) => ({
-        template_id: b.template_id,
-        instance_date: b.instance_date,
-      })),
-  );
-
-  const startTimeOf = (b: RawBooking) =>
-    overrides.get(`${b.template_id}|${b.instance_date}`) ??
-    b.class_templates.start_time;
-
-  // "Done" means the class actually ended, not that its date arrived. Counting
-  // by date alone credited a class at midnight and then took it back if the
-  // student cancelled that afternoon — on a card whose whole promise is that
-  // the number only goes up. It also left this morning's finished class
-  // sitting under "Próximas" all day.
-  const hasFinished = (b: RawBooking) => {
-    if (b.instance_date < today) return true;
-    if (b.instance_date > today) return false;
-    return (
-      lisbonInstant(b.instance_date, startTimeOf(b)).getTime() +
-        b.class_templates.duration_minutes * 60_000 <=
-      now
-    );
-  };
 
   const attendedThisMonth = bookings.filter(
     (b) =>
       b.instance_date >= monthStart &&
-      hasFinished(b) &&
+      b.instance_date <= today &&
       (b.status === "attended" || b.status === "booked"),
   ).length;
 
   const totalAttended = bookings.filter(
-    (b) => hasFinished(b) && (b.status === "attended" || b.status === "booked"),
+    (b) =>
+      b.instance_date <= today &&
+      (b.status === "attended" || b.status === "booked"),
   ).length;
-
-  // A WAITLISTED row is different, and dropping it here was a trap. It keeps
-  // blocking the one-per-day rule and the weekly count until midnight, so
-  // hiding it the moment its class ends left the student staring at "cancela a
-  // outra em Perfil" on a Perfil page that listed nothing — and /perfil holds
-  // the only Cancelar a student ever gets. Waitlist entries therefore stay
-  // visible for the whole day they belong to, exactly as before, so she can
-  // always clear the thing that is blocking her.
-  const stillListed = (b: RawBooking) =>
-    b.status === "waitlisted" ? b.instance_date >= today : !hasFinished(b);
 
   const upcomingRaw = bookings
     .filter(
       (b) =>
-        stillListed(b) &&
+        b.instance_date >= today &&
         (b.status === "booked" || b.status === "waitlisted"),
     )
     .reverse()
     .slice(0, 10);
+
+  // A class the coach moved with "Adiar" keeps its old hour on the template.
+  // Resolve the real time so /perfil shows when she should actually turn up —
+  // and so the cancellation cutoff is measured from the right moment.
+  const overrides = await getStartTimeOverrides(
+    upcomingRaw.map((b) => ({
+      template_id: b.template_id,
+      instance_date: b.instance_date,
+    })),
+  );
 
   const upcoming: UpcomingBooking[] = upcomingRaw.map((b) => ({
     id: b.id,
     instance_date: b.instance_date,
     status: b.status as "booked" | "waitlisted",
     template_name: b.class_templates.name,
-    start_time: startTimeOf(b),
+    start_time:
+      overrides.get(`${b.template_id}|${b.instance_date}`) ??
+      b.class_templates.start_time,
     duration_minutes: b.class_templates.duration_minutes,
   }));
 

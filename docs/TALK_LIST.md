@@ -9,11 +9,11 @@ _Updated 2026-05-18._ Decisions intentionally deferred — the app works without
 - [ ] **Studio address, email, phone** — still `TBD` in `studio.config.ts`; the footer and contact page hide them until they're set.
 - [ ] **Photos & video** — real photographer originals for the landing page and the /sobre gallery/video slots (they drop into `studio.config.ts`).
 - [ ] **Accent colour** — gold (current) or Portuguese red. Look at the live site and pick.
-- [x] **Domain** — done: `batusboxe.com` is live.
+- [ ] **Domain** — `batusboxing.pt` (matches the Gmail) or `batusboxe.pt`. Buy once decided.
 
 ## Configuration
 
-- [ ] **Cancellation cutoff** — currently 1h. The admin page offers 30min, 1h, 2h, 4h.
+- [ ] **Cancellation cutoff** — currently 4h. 2h? 12h? 24h?
 - [ ] **Account approval** — new students land pending and the coach approves each one from /admin/students. Keep that, or auto-approve on signup?
 - [ ] **Class roster privacy** — students see only the count ("8/12"), not names. Confirm that's right.
 - [ ] **Pricing display** — no public pricing today. Show it on the site, or keep "contact for pricing"?
@@ -57,7 +57,6 @@ The store itself is built (public /loja, admin /admin/merch + /admin/claims; cla
 
 ## Operational — before serious production use
 
-- [x] **Email sender** — done. batusboxe.com is verified in Resend and the app sends from `noreply@batusboxe.com`. Supabase Auth's own mail (password reset) may still use Supabase's rate-limited default — worth pointing at Resend SMTP one day.
-- [x] **Backups** — done, weekly encrypted `pg_dump` in `.github/workflows/backup.yml`. **The restore has never been tested and BACKUP_PASSPHRASE is write-only in GitHub** — if nobody has it written down, the backups can't be decrypted.
-- [x] **Custom domain** — done. batusboxe.com is live, registered at Vercel, nameservers at Cloudflare, and set in Supabase's Site URL + redirect URLs.
-- [ ] **A second admin account** — there is exactly one (`batusboxing@gmail.com`). If it's locked out, nobody can approve a student or open the booking window.
+- [ ] **Email sender** — currently Supabase's default service (rate-limited). Once there's a domain, set up Resend SMTP.
+- [ ] **Backups** — the Supabase free tier has no automated daily DB backup. Set up a weekly dump.
+- [ ] **Custom domain** — once bought, point DNS to Vercel and add it to Supabase's Site URL + redirect URLs.

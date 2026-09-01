@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 // gate (src/lib/payment.ts), so paused / paid / per-session / admin /
 // first-month students are never emailed.
 //
-// Protected by CRON_SECRET (Cloudflare secret + GitHub secret). Without it, 401.
+// Protected by CRON_SECRET (Vercel env + GitHub secret). Without it, 401.
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   const auth = request.headers.get("authorization");

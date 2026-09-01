@@ -65,23 +65,15 @@ export function PaymentsBoard({
     });
   }
 
-  // A pack student pays per bundle of classes, so a monthly Pago/Por pagar
-  // means nothing for them — the board already leaves them out of the counts,
-  // and the server drops them. Don't let them be selected at all, or the coach
-  // ticks 26 students, is told 25 changed, and nothing explains the 26th.
-  const isBulkable = (r: BoardRow) => r.class_credits == null;
-
   function selectAllFiltered() {
-    const selectable = filtered.filter(isBulkable);
-    const allFilteredSelected =
-      selectable.length > 0 && selectable.every((r) => selectedIds.has(r.id));
+    const allFilteredSelected = filtered.every((r) => selectedIds.has(r.id));
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (allFilteredSelected) {
         // Toggle off everything currently visible
-        for (const r of selectable) next.delete(r.id);
+        for (const r of filtered) next.delete(r.id);
       } else {
-        for (const r of selectable) next.add(r.id);
+        for (const r of filtered) next.add(r.id);
       }
       return next;
     });
@@ -103,35 +95,13 @@ export function PaymentsBoard({
           month,
           status,
         });
-        if (result.error) {
-          toast.error(result.error);
-          return;
-        }
-        // "0 alunos marcados como pagos" helps nobody — when everything was
-        // skipped, the warning below is the whole message.
-        if (result.updated > 0) {
-          toast.success(
-            status === "paid"
-              ? `${result.updated} alunos marcados como pagos.`
-              : status === "paused"
-                ? `${result.updated} alunos em pausa.`
-                : `${result.updated} alunos marcados por pagar.`,
-          );
-        }
-        // Nobody is marked paid for an amount we don't know — say who, and
-        // why, instead of writing a silent 0,00 € into the month.
-        if (result.skipped.length > 0) {
-          toast.warning(
-            result.skipped.length === 1
-              ? `${result.skipped[0]} ficou de fora.`
-              : `${result.skipped.length} alunos ficaram de fora.`,
-            {
-              description:
-                "Ainda não têm mensalidade definida. Abre o aluno e escreve o valor — pode ser 0.",
-              duration: 8000,
-            },
-          );
-        }
+        toast.success(
+          status === "paid"
+            ? `${result.updated} alunos marcados como pagos.`
+            : status === "paused"
+              ? `${result.updated} alunos em pausa.`
+              : `${result.updated} alunos marcados por pagar.`,
+        );
         setSelectedIds(new Set());
         setBulkConfirm(null);
         router.refresh();
@@ -144,10 +114,8 @@ export function PaymentsBoard({
   }
 
   const selectedCount = selectedIds.size;
-  // Packs can't be selected, so "todos" means every selectable row.
   const allFilteredSelected =
-    filtered.some(isBulkable) &&
-    filtered.filter(isBulkable).every((r) => selectedIds.has(r.id));
+    filtered.length > 0 && filtered.every((r) => selectedIds.has(r.id));
 
   const bulkLabel = bulkConfirm
     ? bulkConfirm.status === "paid"
@@ -235,8 +203,7 @@ export function PaymentsBoard({
                     <input
                       type="checkbox"
                       checked={selected}
-                      onChange={() => isBulkable(r) && toggleOne(r.id)}
-                      disabled={!isBulkable(r)}
+                      onChange={() => toggleOne(r.id)}
                       className="size-5"
                       aria-label={`Selecionar ${r.full_name ?? r.email}`}
                     />

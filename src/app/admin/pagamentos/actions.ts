@@ -48,28 +48,16 @@ export async function setPaymentStatus(input: {
 // Bulk update from the selection bar.
 // Preserves existing amount/notes for students who already have a row this
 // month — only flips the status. For new rows, uses the student's standing
-// monthly fee.
-//
-// A student with no fee on file shows as "Por definir" everywhere: the amount
-// is unknown, not zero. Marking them paid used to write 0,00 €, which reads as
-// a settled month while contributing nothing to Finanças — revenue quietly
-// short by exactly the amount nobody recorded.
-//
-// The rule now is simply: this action never writes an amount it does not know.
-// amount_cents is NOT NULL, so writing a placeholder 0 for a "por pagar" row
-// would make the same 0 ambiguous forever — was it a free month, or was it
-// nobody's guess? Skipping instead keeps every stored 0 deliberate, so a real
-// free month (typed into the drawer, or a standing fee of 0) survives a bulk
-// sweep untouched. Students with no amount are named back to the caller.
+// monthly fee; if not set, falls back to 0 (coach can edit per-month after).
 // ----------------------------------------------------------------------------
 export async function bulkSetPaymentStatus(input: {
   user_ids: string[];
   month: string;
   status: PaymentStatus;
-}): Promise<{ updated: number; skipped: string[]; error?: string }> {
+}) {
   await assertAdmin();
   const { user_ids, month, status } = input;
-  if (user_ids.length === 0) return { updated: 0, skipped: [] };
+  if (user_ids.length === 0) return { updated: 0 };
   if (!month) throw new Error("Mês em falta.");
   if (!["paid", "unpaid", "paused"].includes(status)) {
     throw new Error("Estado inválido.");
@@ -80,7 +68,7 @@ export async function bulkSetPaymentStatus(input: {
   const [profilesRes, existingRes] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, monthly_fee_cents, class_credits")
+      .select("id, monthly_fee_cents")
       .in("id", user_ids),
     supabase
       .from("payment_records")
@@ -89,32 +77,9 @@ export async function bulkSetPaymentStatus(input: {
       .in("user_id", user_ids),
   ]);
 
-  // Both reads decide what gets written. An unchecked failure on the second
-  // one is the dangerous half: with no existing rows in hand, every student's
-  // standing fee would be written straight over the amount the coach set for
-  // this month in the drawer.
-  // Returned, not thrown: Next masks a thrown server-action message in
-  // production, so the coach would see React's English "unexpected error"
-  // instead of this.
-  if (profilesRes.error || existingRes.error) {
-    return {
-      updated: 0,
-      skipped: [],
-      error: "Sem ligação ao servidor. Nada foi alterado — tenta outra vez.",
-    };
-  }
-
-  const feeByStudent = new Map<string, number | null>();
-  const nameByStudent = new Map<string, string>();
-  // Pack students pay per bundle of classes, not per month — the board already
-  // leaves them out of the pago/por-pagar counts. "Selecionar todos" still
-  // ticks them, so exclude them here rather than telling the coach to go and
-  // set a monthly fee they are not supposed to have.
-  const packStudents = new Set<string>();
+  const feeByStudent = new Map<string, number>();
   for (const p of profilesRes.data ?? []) {
-    feeByStudent.set(p.id, p.monthly_fee_cents ?? null);
-    nameByStudent.set(p.id, p.full_name || "Sem nome");
-    if (p.class_credits != null) packStudents.add(p.id);
+    feeByStudent.set(p.id, p.monthly_fee_cents ?? 0);
   }
 
   const existingByStudent = new Map<
@@ -129,40 +94,28 @@ export async function bulkSetPaymentStatus(input: {
   }
 
   const now = new Date().toISOString();
-  const skipped: string[] = [];
-  const rows = [];
-  for (const uid of user_ids) {
-    if (packStudents.has(uid)) continue;
+  const rows = user_ids.map((uid) => {
     const existing = existingByStudent.get(uid);
-    // This month's row wins over the standing fee, so flipping "por pagar →
-    // pago" keeps a price the coach set for this month — including a
-    // deliberate 0. Only a genuinely absent amount is unknown.
-    const known = existing?.amount_cents ?? feeByStudent.get(uid) ?? null;
-    if (known === null) {
-      skipped.push(nameByStudent.get(uid) ?? "Sem nome");
-      continue;
-    }
-    rows.push({
+    // Preserve customised amount/notes for students who already have a row,
+    // so flipping "unpaid → paid" doesn't wipe a custom price the coach set.
+    return {
       user_id: uid,
       month,
       status,
-      amount_cents: known,
+      amount_cents: existing?.amount_cents ?? feeByStudent.get(uid) ?? 0,
       paid_at: status === "paid" ? now : null,
       notes: existing?.notes ?? null,
-    });
-  }
+    };
+  });
 
-  if (rows.length > 0) {
-    const { error } = await supabase
-      .from("payment_records")
-      .upsert(rows, { onConflict: "user_id,month" });
+  const { error } = await supabase
+    .from("payment_records")
+    .upsert(rows, { onConflict: "user_id,month" });
 
-    if (error) throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
 
   revalidatePath("/admin/pagamentos");
-  revalidatePath("/admin/financas");
-  return { updated: rows.length, skipped };
+  return { updated: rows.length };
 }
 
 // ----------------------------------------------------------------------------

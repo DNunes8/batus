@@ -59,7 +59,6 @@ export default async function PagamentosPage({
     oneOffSolosRes,
     soloTemplatesRes,
     soloOverridesRes,
-    closedDaysRes,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -87,10 +86,6 @@ export default async function PagamentosPage({
       .from("solo_session_overrides")
       .select("template_id, instance_date, cancelled")
       .gte("instance_date", oldestMonth),
-    // Studio closed (holiday, works, illness): a recurring PT generated on
-    // that day never happened. Finanças already skips these; this page did
-    // not, so the two screens quoted different PT revenue for the same month.
-    supabase.from("closed_days").select("date").gte("date", oldestMonth),
   ]);
 
   const profiles = profilesRes.data ?? [];
@@ -98,9 +93,6 @@ export default async function PagamentosPage({
   const oneOffSolos = oneOffSolosRes.data ?? [];
   const soloTemplates = soloTemplatesRes.data ?? [];
   const soloOverrides = soloOverridesRes.data ?? [];
-  const closedDays = new Set(
-    (closedDaysRes.data ?? []).map((d) => d.date as string),
-  );
 
   const months: string[] = [];
   for (let i = 5; i >= 0; i--) months.push(shiftMonth(selectedMonth, -i));
@@ -178,7 +170,7 @@ export default async function PagamentosPage({
         (o) =>
           o.template_id === tpl.id && o.instance_date === cursor,
       );
-      if (!ov?.cancelled && !closedDays.has(cursor)) {
+      if (!ov?.cancelled) {
         bump(tpl.user_id, cursor, tpl.price_cents ?? 0);
       }
       cursor = addDays(cursor, 7);
@@ -302,9 +294,6 @@ export default async function PagamentosPage({
     }
   }
   for (const row of oneOffSolos) {
-    // A session logged for a future date hasn't happened and isn't revenue
-    // yet — Finanças already skips those, so this walk must too.
-    if (row.session_date.slice(0, 10) > today) continue;
     const sessionMonth = monthKey(new Date(row.session_date));
     if (totals[sessionMonth]) {
       totals[sessionMonth].solos_cents += row.price_cents ?? 0;
@@ -324,7 +313,7 @@ export default async function PagamentosPage({
       const ov = soloOverrides.find(
         (o) => o.template_id === tpl.id && o.instance_date === cursor,
       );
-      if (!ov?.cancelled && !closedDays.has(cursor)) {
+      if (!ov?.cancelled) {
         const m = `${cursor.slice(0, 7)}-01`;
         if (totals[m]) totals[m].solos_cents += tpl.price_cents ?? 0;
       }

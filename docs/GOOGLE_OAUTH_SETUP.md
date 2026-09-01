@@ -2,11 +2,7 @@
 
 Adds one-tap login alongside the magic-link email flow. Massive UX win for non-tech students who already have Gmail.
 
-> **Not currently in use.** There is no Google button on `/login` today — the
-> action survives in `src/app/login/actions.ts` (`signInWithGoogle`) but nothing
-> calls it, so this whole document is a plan, not a fix for something broken.
-> If you do wire it back up, note the origins below have been corrected: the
-> app moved off Vercel to Cloudflare and lives at https://batusboxe.com.
+The button is already wired into `/login` — clicking it currently fails with an OAuth error until you complete these steps.
 
 ## Step 1 — Create OAuth credentials in Google Cloud
 
@@ -25,7 +21,7 @@ Adds one-tap login alongside the magic-link email flow. Massive UX win for non-t
    - Application type: **Web application**.
    - Name: `Batus Web`.
    - Authorised JavaScript origins:
-     - `https://batusboxe.com`
+     - `https://batus-mu.vercel.app`
      - (add your custom domain later when bought)
    - Authorised redirect URIs:
      - `https://udgrwwkuvtycidxfaffx.supabase.co/auth/v1/callback`

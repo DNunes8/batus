@@ -80,7 +80,7 @@ export function StudentsList({ profiles }: { profiles: StudentProfile[] }) {
         <div className="mt-10 flex flex-col items-center justify-center rounded-md border border-dashed border-border/60 px-6 py-12 text-center">
           <p className="text-sm text-muted-foreground">
             Sem alunos a corresponder a{" "}
-            <span className="text-foreground">&ldquo;{query}&rdquo;</span>.
+            <span className="text-foreground">"{query}"</span>.
           </p>
           <button
             type="button"

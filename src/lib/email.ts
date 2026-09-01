@@ -14,7 +14,7 @@ import { studio } from "@/lib/studio.config";
 // emails (password reset, etc.) are written by Supabase's template editor and
 // merely delivered through Resend's SMTP — they don't live here.
 //
-// Config (Cloudflare secrets): RESEND_API_KEY + RESEND_FROM
+// Config (Vercel env): RESEND_API_KEY + RESEND_FROM
 // (e.g. "Batus <noreply@batusboxe.com>" — domain must be verified in Resend).
 
 // Canonical, absolute site origin for links + the logo inside emails. Pinned
@@ -23,11 +23,10 @@ import { studio } from "@/lib/studio.config";
 // could differ from the batusboxe.com address we send FROM. Override with
 // NEXT_PUBLIC_SITE_URL if the domain ever changes. No trailing slash.
 export function getSiteUrl(): string {
-  // `||`, not `??`: .env.example ships the key with an empty value, and an
-  // empty origin would turn every link and the logo in every email into a
-  // relative path that resolves against the mail client.
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  return (configured || "https://batusboxe.com").replace(/\/$/, "");
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://batusboxe.com").replace(
+    /\/$/,
+    "",
+  );
 }
 
 type SendArgs = {
