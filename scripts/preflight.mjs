@@ -67,13 +67,16 @@ const today = todayLisbon();
 // would quietly return a slice and every "no bad row exists" check below would
 // pass by looking at less than the whole table. bookings crosses 1000 within a
 // couple of weeks. Page explicitly instead.
-async function readAll(table, columns) {
+async function readAll(table, columns, orderBy = "id") {
   const PAGE = 1000;
   const rows = [];
   for (let from = 0; ; from += PAGE) {
+    // OFFSET paging without ORDER BY has no stable row order in Postgres, so
+    // pages could repeat or skip rows. Every table here has an ordered key.
     const { data, error } = await db
       .from(table)
       .select(columns)
+      .order(orderBy)
       .range(from, from + PAGE - 1);
     if (error) return { data: null, error };
     rows.push(...(data ?? []));
@@ -89,15 +92,16 @@ const [
   closedDays,
   templates,
   profiles,
+  guests,
 ] = await Promise.all([
-  readAll("settings", "key, value"),
+  readAll("settings", "key, value", "key"),
   readAll("payment_records", "id, user_id, month, status, amount_cents"),
   readAll(
     "bookings",
     "id, user_id, template_id, instance_date, status, cancelled_reason",
   ),
-  readAll("class_overrides", "template_id, instance_date, cancelled"),
-  readAll("closed_days", "date"),
+  readAll("class_overrides", "template_id, instance_date, cancelled", "template_id"),
+  readAll("closed_days", "date", "date"),
   readAll(
     "class_templates",
     "id, name, day_of_week, capacity, active_from, active_until",
@@ -106,10 +110,13 @@ const [
     "profiles",
     "id, full_name, class_credits, monthly_fee_cents, is_admin, approved",
   ),
+  // Coach-added guests hold real seats — every other surface counts them, so a
+  // waitlist check that ignores them calls a full class half-empty.
+  readAll("class_guests", "id, template_id, instance_date"),
 ]);
 
 for (const [label, res] of Object.entries({
-  settings, payments, bookings, overrides, closedDays, templates, profiles,
+  settings, payments, bookings, overrides, closedDays, templates, profiles, guests,
 })) {
   if (res.error) {
     console.error(`Could not read ${label}: ${res.error.message}`);
@@ -220,6 +227,12 @@ for (const b of active) {
   if (b.status === "booked") g.booked++;
   else g.waiting++;
   byInstance.set(k, g);
+}
+for (const g of guests.data) {
+  const k = `${g.template_id}|${g.instance_date}`;
+  const e = byInstance.get(k) ?? { booked: 0, waiting: 0 };
+  e.booked++;
+  byInstance.set(k, e);
 }
 const stuckWaitlist = [];
 for (const [k, g] of byInstance) {

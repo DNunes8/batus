@@ -2,9 +2,18 @@
 #
 # Every Monday — and on demand (Actions tab -> Run workflow) — this:
 #   1. dumps the `public` AND `auth` schemas with pg_dump (auth carries the
-#      login accounts — without it a restore recovers profiles but no logins)
+#      login accounts — without it a restore recovers profiles but no logins).
+#      Grants are INCLUDED on purpose: the RPC lockdown (who may execute
+#      book_class, adjust_class_credits, charge_class_credit...) lives in
+#      GRANT/REVOKE, so --no-privileges would restore a database with those
+#      protections silently removed.
 #   2. encrypts the dump with the BACKUP_PASSPHRASE secret (gpg, AES-256)
-#   3. stores the encrypted file as a workflow artifact, kept for 90 days
+#   3. stores the ENCRYPTED file as a workflow artifact, kept for 90 days.
+#
+# This repository is PUBLIC, so anyone can download that artifact. The AES256
+# passphrase is the only thing protecting every student's personal data and the
+# auth password hashes inside it — keep BACKUP_PASSPHRASE long and random, and
+# treat rotating it as a security action, not housekeeping.
 #
 # A `keepalive` job also pushes an empty commit when the repo has been quiet
 # for ~25 days: GitHub auto-disables scheduled workflows after 60 days of
@@ -51,7 +60,8 @@ jobs:
           # Strip any stray whitespace/newline that can sneak in when the
           # password is pasted into the secret box.
           CLEAN_PW="$(printf '%s' "$DB_PASSWORD" | tr -d ' \t\n\r')"
-          echo "Password length - stored: ${#DB_PASSWORD}, after trim: ${#CLEAN_PW}"
+          # (Never echo anything derived from the password — this workflow's
+          # logs are public, and even its length narrows a brute-force.)
           PGPASSWORD="$CLEAN_PW" pg_dump \
             --host=aws-1-eu-central-1.pooler.supabase.com \
             --port=5432 \
@@ -60,7 +70,6 @@ jobs:
             --schema=public \
             --schema=auth \
             --no-owner \
-            --no-privileges \
             --file=backup.sql
           echo "Dump complete - size: $(du -h backup.sql | cut -f1)"
           # Sanity: the auth schema (logins) must actually be in the dump.

@@ -11,7 +11,7 @@ import {
   effectiveStartTime,
   formatDayHeader,
   formatTime,
-  getStartTimeOverrides,
+  readStartTimeOverrides,
   isClassInPast,
   lisbonInstant,
   mondayOf,
@@ -112,7 +112,7 @@ async function cancelInstanceBookings(
   // Effective start times ("Adiar" moves the hour without touching the
   // template), used both to skip classes that already happened and to tell the
   // student the hour they were actually expecting.
-  const overrides = await getStartTimeOverrides(
+  const { map: overrides, ok: overridesOk } = await readStartTimeOverrides(
     affected.map((r) => ({ template_id: r.template_id, instance_date })),
   );
   const startTimeOf = (r: { template_id: string; templateStartTime: string }) =>
@@ -123,9 +123,20 @@ async function cancelInstanceBookings(
   // emailing "esta aula não se vai realizar" about last Tuesday is nonsense.
   // The booking rows are still flipped above — only the money and the mail are
   // skipped.
-  const upcoming = affected.filter(
-    (r) => !isClassInPast(instance_date, startTimeOf(r)),
-  );
+  // If the override read failed we do not know the real hour, and the template
+  // hour may be earlier than the class actually starts. Guessing "already ran"
+  // would skip every refund and every cancellation email on a class that has
+  // NOT run — the whole roster turns up at a locked door. Err the other way:
+  // refunding someone for a class that did run is a far smaller harm, and the
+  // coach can take the credit back by hand.
+  const upcoming = overridesOk
+    ? affected.filter((r) => !isClassInPast(instance_date, startTimeOf(r)))
+    : affected;
+  if (!overridesOk) {
+    console.error(
+      `[calendar] override read failed on ${instance_date} — refunding and emailing everyone rather than risk skipping them.`,
+    );
+  }
   if (upcoming.length === 0) return;
 
   // Who holds a pack, and where do we write to them: one query, used by both
@@ -373,7 +384,7 @@ async function restoreInstanceBookings(
     }
   }
 
-  const overrides = await getStartTimeOverrides(
+  const { map: overrides, ok: overridesOk } = await readStartTimeOverrides(
     marked.map((m) => ({
       template_id: m.template_id as string,
       instance_date,
@@ -387,6 +398,10 @@ async function restoreInstanceBookings(
   // attended, and mailed the roster "esta aula afinal realiza-se" two hours
   // after it would have ended.
   const alreadyRan = (row: (typeof marked)[number]) => {
+    // Same unknown, opposite safe direction. Here the risky move is taking a
+    // credit or sending mail we should not, so an unreadable hour counts as
+    // "already ran": the seat still goes back, silently and for free.
+    if (!overridesOk) return true;
     const tpl = row.class_templates as unknown as { start_time: string };
     return isClassInPast(
       instance_date,
