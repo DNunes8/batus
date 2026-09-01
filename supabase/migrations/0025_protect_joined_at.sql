@@ -1,4 +1,4 @@
--- Stop a student rewriting their own joined_at.
+-- Stop a student rewriting their own joined_at or email.
 --
 -- protect_profile_columns() is an allow-list-by-omission: it names the columns
 -- a student may NOT change, and anything not named is fair game. joined_at was
@@ -13,8 +13,15 @@
 -- unpaid-booking gate for that student and removes them from the reminder list,
 -- every month, for as long as they keep moving it forward.
 --
--- This is the same hole 0017 closed for has_monthly_fee, with one column missed.
--- Nothing in the app writes joined_at after signup, so pinning it costs nothing:
+-- email has the same shape and a different consequence: it is what the studio
+-- writes to. profiles.email is set once by handle_new_user() from the auth
+-- record (0001) and the app never writes it again, so a student could point
+-- every cancellation, reschedule and payment reminder at another address —
+-- including someone else's — while their login stayed unchanged.
+--
+-- This is the same hole 0017 closed for has_monthly_fee, with two columns missed.
+-- Nothing in the app writes either column after signup, so pinning them costs
+-- nothing:
 -- an admin can still change it (the is_admin() short-circuit above), and the
 -- service-role client used by the server actions bypasses the trigger's
 -- auth.uid() check entirely.
@@ -35,14 +42,16 @@ begin
      or (new.service_type is distinct from old.service_type)
      or (new.weekly_class_limit is distinct from old.weekly_class_limit)
      or (new.class_credits is distinct from old.class_credits)
-     or (new.joined_at is distinct from old.joined_at) then
+     or (new.joined_at is distinct from old.joined_at)
+     or (new.email is distinct from old.email) then
     raise exception 'Sem permissão para alterar campos admin do perfil.';
   end if;
   return new;
 end;
 $$;
 
--- Confirmation. Expect: joined_at_protected = true
-select position('joined_at' in prosrc) > 0 as joined_at_protected
+-- Confirmation. Expect both true.
+select position('joined_at' in prosrc) > 0 as joined_at_protected,
+       position('new.email' in prosrc) > 0 as email_protected
 from pg_proc
 where proname = 'protect_profile_columns';
