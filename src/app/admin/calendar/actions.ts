@@ -380,6 +380,20 @@ async function restoreInstanceBookings(
     })),
   );
 
+  // Did this instance already run? The cancel half asks the same question and
+  // skips the money and the mail for a class that is over (only the rows are
+  // touched). The restore half never asked — so reopening a day at 21:00 took
+  // the credit back for an 18:00 class that never happened, counted it as
+  // attended, and mailed the roster "esta aula afinal realiza-se" two hours
+  // after it would have ended.
+  const alreadyRan = (row: (typeof marked)[number]) => {
+    const tpl = row.class_templates as unknown as { start_time: string };
+    return isClassInPast(
+      instance_date,
+      overrides.get(`${row.template_id}|${instance_date}`) ?? tpl.start_time,
+    );
+  };
+
   const restoredRecipients: {
     to: string;
     studentName: string | null;
@@ -441,7 +455,9 @@ async function restoreInstanceBookings(
     // empty pack, so without this the seat would never come back and the
     // marker would be stripped, putting it beyond a second attempt.
     const stillOnAPack = profileById.get(row.user_id)?.class_credits != null;
-    if (wasRefunded && prior === "booked" && stillOnAPack) {
+    // Nobody pays for a class that did not happen. The refund the cancel made
+    // stays with them; the seat is still restored so the roster reads true.
+    if (wasRefunded && prior === "booked" && stillOnAPack && !alreadyRan(row)) {
       const { data: didCharge, error: chargeError } = await admin.rpc(
         "charge_class_credit",
         { p_user_id: row.user_id },
@@ -539,6 +555,7 @@ async function restoreInstanceBookings(
 
   for (const { row, charged } of toRestore) {
     if (!restoredIds.has(row.id as string)) continue;
+    if (alreadyRan(row)) continue; // no "a tua aula foi reposta" after the fact
     const profile = profileById.get(row.user_id);
     const tpl = row.class_templates as unknown as {
       name: string;

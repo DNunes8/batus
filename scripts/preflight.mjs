@@ -62,6 +62,25 @@ const advise = (name, ok, detail) => notes.push({ name, ok, detail });
 const db = loadEnv();
 const today = todayLisbon();
 
+// PostgREST caps a plain select at 1000 rows and says so with a 206, which
+// supabase-js reports as success — so an unbounded read on a growing table
+// would quietly return a slice and every "no bad row exists" check below would
+// pass by looking at less than the whole table. bookings crosses 1000 within a
+// couple of weeks. Page explicitly instead.
+async function readAll(table, columns) {
+  const PAGE = 1000;
+  const rows = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from(table)
+      .select(columns)
+      .range(from, from + PAGE - 1);
+    if (error) return { data: null, error };
+    rows.push(...(data ?? []));
+    if ((data?.length ?? 0) < PAGE) return { data: rows, error: null };
+  }
+}
+
 const [
   settings,
   payments,
@@ -71,19 +90,22 @@ const [
   templates,
   profiles,
 ] = await Promise.all([
-  db.from("settings").select("key, value"),
-  db.from("payment_records").select("id, user_id, month, status, amount_cents"),
-  db
-    .from("bookings")
-    .select("id, user_id, template_id, instance_date, status, cancelled_reason"),
-  db.from("class_overrides").select("template_id, instance_date, cancelled"),
-  db.from("closed_days").select("date"),
-  db
-    .from("class_templates")
-    .select("id, name, day_of_week, capacity, active_from, active_until"),
-  db
-    .from("profiles")
-    .select("id, full_name, class_credits, monthly_fee_cents, is_admin, approved"),
+  readAll("settings", "key, value"),
+  readAll("payment_records", "id, user_id, month, status, amount_cents"),
+  readAll(
+    "bookings",
+    "id, user_id, template_id, instance_date, status, cancelled_reason",
+  ),
+  readAll("class_overrides", "template_id, instance_date, cancelled"),
+  readAll("closed_days", "date"),
+  readAll(
+    "class_templates",
+    "id, name, day_of_week, capacity, active_from, active_until",
+  ),
+  readAll(
+    "profiles",
+    "id, full_name, class_credits, monthly_fee_cents, is_admin, approved",
+  ),
 ]);
 
 for (const [label, res] of Object.entries({
