@@ -96,10 +96,20 @@ export async function getStudentStats(userId: string): Promise<StudentStats> {
     (b) => hasFinished(b) && (b.status === "attended" || b.status === "booked"),
   ).length;
 
+  // A WAITLISTED row is different, and dropping it here was a trap. It keeps
+  // blocking the one-per-day rule and the weekly count until midnight, so
+  // hiding it the moment its class ends left the student staring at "cancela a
+  // outra em Perfil" on a Perfil page that listed nothing — and /perfil holds
+  // the only Cancelar a student ever gets. Waitlist entries therefore stay
+  // visible for the whole day they belong to, exactly as before, so she can
+  // always clear the thing that is blocking her.
+  const stillListed = (b: RawBooking) =>
+    b.status === "waitlisted" ? b.instance_date >= today : !hasFinished(b);
+
   const upcomingRaw = bookings
     .filter(
       (b) =>
-        !hasFinished(b) &&
+        stillListed(b) &&
         (b.status === "booked" || b.status === "waitlisted"),
     )
     .reverse()
