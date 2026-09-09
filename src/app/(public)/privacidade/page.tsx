@@ -135,7 +135,7 @@ export default function PrivacidadePage() {
                 Mensagens de contacto
               </span>{" "}
               — se usares o formulário de contacto, guardamos o nome, o email, o
-              telefone (se o indicares) e a mensagem.
+              telemóvel e a mensagem.
             </li>
           </ul>
         </section>

@@ -140,8 +140,20 @@ export default async function ContactoPage({
                 <Input id="email" name="email" type="email" required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Telefone (opcional)</Label>
-                <Input id="phone" name="phone" type="tel" />
+                <Label htmlFor="phone">Telemóvel</Label>
+                <Input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="9XX XXX XXX"
+                  aria-describedby="phone-hint"
+                  required
+                />
+                <p id="phone-hint" className="text-xs text-muted-foreground">
+                  Respondemos-te por WhatsApp para este número.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="message">Mensagem</Label>
