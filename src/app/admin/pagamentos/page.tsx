@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatEuro, formatMonthYear, monthKey } from "@/lib/money";

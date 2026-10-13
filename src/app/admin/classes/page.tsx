@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { ConfirmForm } from "@/components/confirm-form";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { TrendingUp, Package, ArrowRight } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/link";
 import { Menu } from "lucide-react";
 import { studio } from "@/lib/studio.config";
 import { createClient } from "@/lib/supabase/client";

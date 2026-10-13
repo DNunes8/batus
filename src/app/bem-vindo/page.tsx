@@ -2,7 +2,7 @@
 
 import { Suspense, useActionState } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/link";
 import { useSearchParams } from "next/navigation";
 import { studio } from "@/lib/studio.config";
 import { Input } from "@/components/ui/input";

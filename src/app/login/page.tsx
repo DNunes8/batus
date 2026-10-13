@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/link";
 import { Mail } from "lucide-react";
 import { studio } from "@/lib/studio.config";
 import { Button } from "@/components/ui/button";

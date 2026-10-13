@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getFinances, type FinanceMonth } from "@/lib/finances";
 import { formatEuro, formatMonthYear } from "@/lib/money";

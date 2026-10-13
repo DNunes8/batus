@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { studio, configured } from "@/lib/studio.config";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

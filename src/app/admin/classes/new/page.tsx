@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { assertAdminPage } from "@/lib/auth-guard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
